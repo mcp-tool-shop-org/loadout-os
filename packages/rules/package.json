@@ -1,0 +1,47 @@
+{
+  "name": "@mcptoolshop/claude-rules",
+  "version": "1.2.2",
+  "description": "Dispatch table generator and instruction-file optimizer for Claude Code. Put your CLAUDE.md on a diet.",
+  "type": "module",
+  "bin": {
+    "claude-rules": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "verify": "tsc --noEmit && node --test dist/**/*.test.js",
+    "test": "node --test dist/**/*.test.js",
+    "test:coverage": "c8 --reporter=lcov --reporter=text node --test dist/**/*.test.js",
+    "prepublishOnly": "npm run build"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE",
+    "SECURITY.md",
+    "logo.png"
+  ],
+  "keywords": [
+    "claude",
+    "claude-code",
+    "rules",
+    "context",
+    "optimization",
+    "instruction-file",
+    "dispatch",
+    "mcp"
+  ],
+  "author": "mcp-tool-shop",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "c8": "^11.0.0",
+    "typescript": "^5.7.0"
+  },
+  "dependencies": {
+    "@mcptoolshop/ai-loadout": "^1.0.1"
+  }
+}

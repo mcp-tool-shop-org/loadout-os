@@ -1,0 +1,58 @@
+{
+  "name": "@mcptoolshop/claude-memories",
+  "version": "1.0.3",
+  "description": "MEMORY.md optimizer and dispatch table generator for Claude Code",
+  "type": "module",
+  "bin": {
+    "claude-memories": "./dist/cli.js"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "verify": "tsc --noEmit && node --test dist/tests/*.test.js",
+    "test": "node --test dist/tests/*.test.js",
+    "test:coverage": "c8 --reporter=lcov --reporter=text node --test dist/tests/*.test.js",
+    "prepublishOnly": "npm run build"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE",
+    "SECURITY.md",
+    "SHIP_GATE.md",
+    "SCORECARD.md",
+    "logo.png"
+  ],
+  "keywords": [
+    "claude",
+    "claude-code",
+    "memory",
+    "context",
+    "optimization",
+    "dispatch",
+    "mcp",
+    "ai",
+    "agent"
+  ],
+  "author": "mcp-tool-shop",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@mcptoolshop/ai-loadout": "^1.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "c8": "^11.0.0",
+    "typescript": "^5.7.0"
+  }
+}

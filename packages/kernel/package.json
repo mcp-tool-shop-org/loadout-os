@@ -1,0 +1,63 @@
+{
+  "name": "@mcptoolshop/ai-loadout",
+  "version": "1.4.3",
+  "description": "Context-aware knowledge router for AI agents. Dispatch table, matcher, hierarchical resolver, agent runtime contract, CLI.",
+  "type": "module",
+  "bin": {
+    "ai-loadout": "./dist/cli.js"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "verify": "tsc --noEmit && node --test dist/tests/*.test.js",
+    "test": "node --test dist/tests/*.test.js",
+    "test:coverage": "c8 --reporter=lcov --reporter=text node --test dist/tests/*.test.js",
+    "prepublishOnly": "npm run build"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md",
+    "SPEC.md",
+    "AGENT_CONTRACT.md",
+    "LICENSE",
+    "SECURITY.md",
+    "logo.png"
+  ],
+  "keywords": [
+    "ai",
+    "agent",
+    "loadout",
+    "knowledge",
+    "routing",
+    "dispatch",
+    "context",
+    "frontmatter",
+    "mcp"
+  ],
+  "author": "mcp-tool-shop",
+  "license": "MIT",
+  "homepage": "https://mcp-tool-shop-org.github.io/ai-loadout/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mcp-tool-shop-org/ai-loadout.git"
+  },
+  "bugs": {
+    "url": "https://github.com/mcp-tool-shop-org/ai-loadout/issues"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "c8": "^11.0.0",
+    "typescript": "^6.0.2"
+  }
+}

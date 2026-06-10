@@ -1,0 +1,14 @@
+{
+  "name": "loadout-hook",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "UserPromptSubmit hook that injects pointers to relevant memory entries from ~/.ai-loadout/index.json",
+  "main": "loadout-hook.mjs",
+  "scripts": {
+    "test": "node loadout-hook.mjs"
+  },
+  "dependencies": {
+    "@mcptoolshop/ai-loadout": "^1.4.3"
+  }
+}
