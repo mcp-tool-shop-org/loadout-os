@@ -145,3 +145,62 @@ describe("unresolved-ref summary (MEM-B03)", () => {
     }
   });
 });
+
+// ── FT-MR4: `index` surfaces the health-summary counts ────────────────
+describe("index health summary (FT-MR4)", () => {
+  it("prints the missing · orphan · duplicate · id-too-long one-liner", () => {
+    const dir = mkdtempSync(join(tmpdir(), "mem-health-"));
+    try {
+      const out = join(dir, "index.json");
+      // The fixture has missing refs (nullout, xrpl-lab) and an over-long id.
+      const res = runCli(["index", join(FIXTURES, "MEMORY.md"), "--out", out]);
+      assert.equal(res.status, 0);
+      assert.match(res.stdout, /\d+ missing · \d+ orphan · \d+ duplicate · \d+ id-too-long/);
+      assert.match(res.stdout, /run `validate` for detail/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("the index summary counts match what validate reports", () => {
+    const dir = mkdtempSync(join(tmpdir(), "mem-health-match-"));
+    try {
+      const out = join(dir, "index.json");
+      const idx = runCli(["index", join(FIXTURES, "MEMORY.md"), "--out", out]);
+      const val = runCli(["validate", join(FIXTURES, "MEMORY.md")]);
+
+      // Pull the counts the index summary printed.
+      const m = idx.stdout.match(
+        /(\d+) missing · (\d+) orphan · (\d+) duplicate · (\d+) id-too-long/,
+      );
+      assert.ok(m, "index must print the four headline counts");
+      const [, missing, orphan, duplicate, idTooLong] = m.map(Number);
+
+      // validate prints one line per issue; count occurrences of each code.
+      const count = (code: string) =>
+        (val.stdout.match(new RegExp(`\\[${code}\\]`, "g")) ?? []).length;
+      assert.equal(missing, count("MISSING_TOPIC_FILE"), "missing count agrees with validate");
+      assert.equal(orphan, count("ORPHAN_TOPIC_FILE"), "orphan count agrees with validate");
+      assert.equal(duplicate, count("DUPLICATE_REF"), "duplicate count agrees with validate");
+      assert.equal(idTooLong, count("ID_TOO_LONG"), "id-too-long count agrees with validate");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("a clean MEMORY.md reports all-zero counts", () => {
+    const dir = mkdtempSync(join(tmpdir(), "mem-health-clean-"));
+    try {
+      writeFileSync(join(dir, "topic.md"), "# Topic\nbody\n");
+      writeFileSync(
+        join(dir, "MEMORY.md"),
+        "# Mem\n\n## Active\n\nTopic — a real topic → `topic.md`\n",
+      );
+      const res = runCli(["index", join(dir, "MEMORY.md"), "--out", join(dir, "out.json")]);
+      assert.equal(res.status, 0);
+      assert.match(res.stdout, /0 missing · 0 orphan · 0 duplicate · 0 id-too-long/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});

@@ -39,13 +39,34 @@ export interface MemoryRef {
   line: number;          // source line in MEMORY.md
 }
 
+/**
+ * FT-MR3: a structured signal emitted during analysis / index generation.
+ *
+ * Unresolved-ref, missing-topic-file, and orphan signals used to live only in
+ * flat `string[]` arrays (`missingFiles` / `orphanFiles`), and the CLI moved a
+ * one-line summary into the index command. That is lossy: severity, a machine
+ * code, the source line, and a hint are all dropped. `Diagnostic` is the typed
+ * channel — library consumers read structured data, the CLI renders it
+ * uniformly, and nothing is written to stderr. The flat arrays remain as
+ * derived back-compat views.
+ */
+export interface Diagnostic {
+  severity: "error" | "warning" | "info";
+  code: string;          // e.g. "MISSING_TOPIC_FILE", "ORPHAN_TOPIC_FILE"
+  message: string;       // human-readable description
+  refPath?: string;      // the reference / file path this signal concerns
+  line?: number;         // source line in MEMORY.md, when known
+  hint?: string;         // actionable remediation hint
+}
+
 /** Analysis report for a MEMORY.md file */
 export interface MemoryAnalysis {
   filePath: string;
   sections: MemorySection[];
   refs: MemoryRef[];
-  orphanFiles: string[];     // topic files not referenced in MEMORY.md
-  missingFiles: string[];    // referenced paths that don't exist on disk
+  orphanFiles: string[];     // topic files not referenced in MEMORY.md (derived view of diagnostics)
+  missingFiles: string[];    // referenced paths that don't exist on disk (derived view of diagnostics)
+  diagnostics: Diagnostic[]; // FT-MR3: structured signals (back-compat superset of the flat arrays)
   totalTokens: number;
   inlineTokens: number;      // tokens in MEMORY.md itself
   topicTokens: number;       // sum of all referenced topic file tokens

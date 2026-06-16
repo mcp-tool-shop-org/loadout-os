@@ -4,6 +4,7 @@ export type {
   MemoryRef,
   MemoryAnalysis,
   MemoryIndex,
+  Diagnostic,
 } from "./types.js";
 
 // Re-export kernel types
@@ -33,6 +34,12 @@ export { generateIndex } from "./index-gen.js";
 
 // ── Validator ─────────────────────────────────────────────────
 export { validateMemory, validateMemoryIndex } from "./validate.js";
+
+// ── Path resolution ───────────────────────────────────────────
+// FT-MR10: the single shared ref-path resolver, so the unified loadout-os CLI
+// (and any SDK consumer) resolves topic refs identically to analyze/index-gen/
+// validate.
+export { resolveRefPath } from "./paths.js";
 
 // ── Stats ─────────────────────────────────────────────────────
 export { generateStats, formatStats } from "./stats.js";

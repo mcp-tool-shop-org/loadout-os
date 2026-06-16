@@ -13,19 +13,8 @@ import { readFileSync, existsSync, readdirSync, statSync } from "node:fs";
 import { join, dirname, relative, extname, basename, resolve } from "node:path";
 import { estimateTokens } from "@mcptoolshop/ai-loadout";
 import { parseMemoryMd } from "./parser.js";
-import type { MemoryAnalysis, MemoryRef } from "./types.js";
-
-/**
- * Try to resolve a reference path against multiple base directories.
- * Returns the first path that exists, or null.
- */
-function resolveRefPath(refPath: string, ...baseDirs: string[]): string | null {
-  for (const base of baseDirs) {
-    const full = join(base, refPath);
-    if (existsSync(full)) return full;
-  }
-  return null;
-}
+import { resolveRefPath } from "./paths.js";
+import type { MemoryAnalysis, MemoryRef, Diagnostic } from "./types.js";
 
 /**
  * Analyze a MEMORY.md file and its referenced topic files.
@@ -47,6 +36,12 @@ export function analyzeMemoryMd(filePath: string): MemoryAnalysis {
 
   // Check which referenced files exist
   // Try: relative to MEMORY.md, then relative to parent dir
+  //
+  // FT-MR3: every missing/orphan signal is recorded as a structured Diagnostic
+  // here, at the point of detection — the flat string[] arrays below are derived
+  // views kept for back-compat. Library consumers read `diagnostics`; the CLI
+  // renders it uniformly. Nothing goes to stderr.
+  const diagnostics: Diagnostic[] = [];
   const missingFiles: string[] = [];
   let topicTokens = 0;
 
@@ -58,9 +53,25 @@ export function analyzeMemoryMd(filePath: string): MemoryAnalysis {
         topicTokens += estimateTokens(topicContent);
       } catch {
         missingFiles.push(ref.path);
+        diagnostics.push({
+          severity: "error",
+          code: "MISSING_TOPIC_FILE",
+          message: `Referenced topic file not found: ${ref.path}`,
+          refPath: ref.path,
+          line: ref.line,
+          hint: "Create the file or remove the reference from MEMORY.md",
+        });
       }
     } else {
       missingFiles.push(ref.path);
+      diagnostics.push({
+        severity: "error",
+        code: "MISSING_TOPIC_FILE",
+        message: `Referenced topic file not found: ${ref.path}`,
+        refPath: ref.path,
+        line: ref.line,
+        hint: "Create the file or remove the reference from MEMORY.md",
+      });
     }
   }
 
@@ -85,11 +96,12 @@ export function analyzeMemoryMd(filePath: string): MemoryAnalysis {
           if (stat.isFile() && extname(entry) === ".md" && entry !== "MEMORY.md") {
             if (!referencedBasenames.has(entry)) {
               orphanFiles.push(entry);
+              diagnostics.push(orphanDiagnostic(entry));
             }
           }
           // Also scan subdirectories
           if (stat.isDirectory()) {
-            scanDir(fullPath, fileDir, referencedBasenames, orphanFiles);
+            scanDir(fullPath, fileDir, referencedBasenames, orphanFiles, diagnostics);
           }
         } catch {
           // Skip entries we can't stat (permission denied, broken symlinks)
@@ -106,9 +118,21 @@ export function analyzeMemoryMd(filePath: string): MemoryAnalysis {
     refs,
     orphanFiles,
     missingFiles,
+    diagnostics,
     totalTokens: inlineTokens + topicTokens,
     inlineTokens,
     topicTokens,
+  };
+}
+
+/** FT-MR3: build the structured Diagnostic for an orphan topic file. */
+function orphanDiagnostic(path: string): Diagnostic {
+  return {
+    severity: "warning",
+    code: "ORPHAN_TOPIC_FILE",
+    message: `Topic file not referenced in MEMORY.md: ${path}`,
+    refPath: path,
+    hint: "Add a reference in MEMORY.md or delete the file",
   };
 }
 
@@ -120,6 +144,7 @@ function scanDir(
   baseDir: string,
   referenced: Set<string>,
   orphans: string[],
+  diagnostics: Diagnostic[],
 ): void {
   let entries: string[];
   try {
@@ -134,11 +159,12 @@ function scanDir(
       const stat = statSync(fullPath);
 
       if (stat.isDirectory()) {
-        scanDir(fullPath, baseDir, referenced, orphans);
+        scanDir(fullPath, baseDir, referenced, orphans, diagnostics);
       } else if (extname(entry) === ".md") {
         const relPath = relative(baseDir, fullPath).replace(/\\/g, "/");
         if (!referenced.has(relPath) && !referenced.has(basename(relPath))) {
           orphans.push(relPath);
+          diagnostics.push(orphanDiagnostic(relPath));
         }
       }
     } catch {

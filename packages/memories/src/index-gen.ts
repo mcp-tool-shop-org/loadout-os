@@ -5,21 +5,14 @@
  * from the parsed memory references and their topic files.
  */
 
-import { readFileSync, existsSync } from "node:fs";
-import { join, dirname, resolve } from "node:path";
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 import { estimateTokens, parseFrontmatter } from "@mcptoolshop/ai-loadout";
 import type { LoadoutEntry, Budget, Frontmatter } from "@mcptoolshop/ai-loadout";
 import { DEFAULT_TRIGGERS } from "@mcptoolshop/ai-loadout";
 import type { MemoryAnalysis, MemoryIndex, MemoryRef } from "./types.js";
 import { extractKeywords } from "./analyze.js";
-
-function resolveRefPath(refPath: string, ...baseDirs: string[]): string | null {
-  for (const base of baseDirs) {
-    const full = join(base, refPath);
-    if (existsSync(full)) return full;
-  }
-  return null;
-}
+import { resolveRefPath } from "./paths.js";
 
 /**
  * Generate a memory dispatch index from analysis results.
@@ -51,8 +44,24 @@ export function generateIndex(
       // unresolved path already lands in analysis.missingFiles; that is the
       // observability channel. The CLI (cmdIndex) reads missingFiles and prints
       // a one-line summary; the library stays quiet.
+      //
+      // FT-MR3: also record the structured diagnostic so SDK callers get
+      // severity + code + line + hint, not just a bare string. missingFiles
+      // stays a derived view kept in lockstep for back-compat.
       if (!analysis.missingFiles.includes(ref.path)) {
         analysis.missingFiles.push(ref.path);
+      }
+      if (!analysis.diagnostics.some(
+        (d) => d.code === "UNRESOLVED_REF" && d.refPath === ref.path,
+      )) {
+        analysis.diagnostics.push({
+          severity: "error",
+          code: "UNRESOLVED_REF",
+          message: `Reference could not be resolved to a file on disk: ${ref.path}`,
+          refPath: ref.path,
+          line: ref.line,
+          hint: "Create the file, fix the path, or remove the reference from MEMORY.md",
+        });
       }
       continue;
     }

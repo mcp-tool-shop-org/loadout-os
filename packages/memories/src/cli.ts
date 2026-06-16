@@ -17,6 +17,27 @@ import { analyzeMemoryMd } from "./analyze.js";
 import { generateIndex } from "./index-gen.js";
 import { validateMemory, validateMemoryIndex } from "./validate.js";
 import { generateStats, formatStats } from "./stats.js";
+import type { ValidationIssue } from "./types.js";
+
+/**
+ * FT-MR4: roll up the validateMemory issue list into the four headline counts
+ * the `index` health summary and `validate` both surface. Centralizing this
+ * keeps the `index` summary byte-identical to what `validate` reports in
+ * detail, so the numbers can never drift between the two commands.
+ */
+function healthCounts(issues: ValidationIssue[]): {
+  missing: number;
+  orphan: number;
+  duplicate: number;
+  idTooLong: number;
+} {
+  return {
+    missing: issues.filter((i) => i.code === "MISSING_TOPIC_FILE").length,
+    orphan: issues.filter((i) => i.code === "ORPHAN_TOPIC_FILE").length,
+    duplicate: issues.filter((i) => i.code === "DUPLICATE_REF").length,
+    idTooLong: issues.filter((i) => i.code === "ID_TOO_LONG").length,
+  };
+}
 
 // ── Colors ────────────────────────────────────────────────────
 const BOLD = "\x1b[1m";
@@ -222,6 +243,18 @@ async function cmdIndex(args: string[]) {
     const n = analysis.missingFiles.length;
     warn(`${n} unresolved ref${n === 1 ? "" : "s"} skipped — run \`validate\` for detail`);
   }
+
+  // FT-MR4: run the richer validateMemory(analysis) rollup and print a one-line
+  // health summary so `index` surfaces the same counts `validate` computes.
+  // Previously `index` only printed validateMemoryIndex issues if non-empty and
+  // never showed the missing/orphan/duplicate/id-too-long picture — pairing it
+  // with the diagnostics channel here means a single `index` run tells the user
+  // whether the memory store is healthy, pointing them at `validate` for detail.
+  const memoryIssues = validateMemory(analysis);
+  const c = healthCounts(memoryIssues);
+  info(
+    `${c.missing} missing · ${c.orphan} orphan · ${c.duplicate} duplicate · ${c.idTooLong} id-too-long — run \`validate\` for detail`,
+  );
 
   // Validate
   const issues = validateMemoryIndex(index);

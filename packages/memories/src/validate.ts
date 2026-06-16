@@ -6,27 +6,16 @@
  * and adds memory-specific checks.
  */
 
-import { readFileSync, existsSync } from "node:fs";
-import { join, dirname, resolve } from "node:path";
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 import { validateIndex as validateLoadoutIndex, parseFrontmatter } from "@mcptoolshop/ai-loadout";
 import type { ValidationIssue } from "@mcptoolshop/ai-loadout";
 import type { MemoryAnalysis, MemoryIndex } from "./types.js";
 import { nameToId } from "./index-gen.js";
+import { resolveRefPath } from "./paths.js";
 
 /** ROADMAP Phase 2 (MEM-004): derived ids longer than this are flagged. */
 const MAX_ID_LENGTH = 60;
-
-/**
- * Resolve a ref path against MEMORY.md's dir then its parent (the same
- * two-base strategy analyze/index-gen use), returning the first that exists.
- */
-function resolveRefPath(refPath: string, fileDir: string, parentDir: string): string | null {
-  for (const base of [fileDir, parentDir]) {
-    const full = join(base, refPath);
-    if (existsSync(full)) return full;
-  }
-  return null;
-}
 
 /**
  * Validate a memory analysis for structural issues.
