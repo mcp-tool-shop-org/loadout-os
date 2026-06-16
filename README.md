@@ -1,4 +1,4 @@
-<p align="center"><img src="logo.png" alt="loadout-os" width="220"></p>
+<p align="center"><img src="logo.png" alt="loadout-os" width="500"></p>
 
 # loadout-os
 
