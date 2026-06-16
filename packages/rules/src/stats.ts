@@ -9,8 +9,8 @@ import { readFileSync, existsSync, readdirSync, statSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { estimateTokens, parseFrontmatter } from "./parser.js";
 import { resolveClaudeMd } from "./analyze.js";
-import { log, info, ok, warn, fail, BOLD, DIM, RESET, CYAN, GREEN, YELLOW } from "./cli.js";
-import { positionalArgs, flagValue, hasFlag } from "./cli.js";
+import { log, info, ok, warn, fail, BOLD, DIM, RESET, CYAN, GREEN, YELLOW } from "./console.js";
+import { positionalArgs, flagValue, hasFlag } from "./console.js";
 import type { RuleIndex, RuleEntry } from "./types.js";
 
 // ── CLI command: stats ─────────────────────────────────────────

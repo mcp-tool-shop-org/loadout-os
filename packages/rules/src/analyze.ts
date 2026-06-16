@@ -8,8 +8,8 @@
 import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { parseSections, estimateTokens, headingToId } from "./parser.js";
-import { log, ok, warn, info, BOLD, DIM, RESET, CYAN } from "./cli.js";
-import { hasFlag, positionalArgs, flagValue } from "./cli.js";
+import { log, ok, warn, info, fail, BOLD, DIM, RESET, CYAN } from "./console.js";
+import { hasFlag, positionalArgs, flagValue } from "./console.js";
 import { loadSignals, DEFAULT_SIGNALS } from "./signals.js";
 import type { Section, SplitProposal, AnalysisReport, Priority, SignalsConfig } from "./types.js";
 
@@ -190,7 +190,6 @@ export async function cmdAnalyze(args: string[]): Promise<void> {
   const signals = loadSignals(flagValue(args, "--signals") ?? undefined);
 
   if (!existsSync(filePath)) {
-    const { fail } = await import("./cli.js");
     fail(
       "IO_FILE_NOT_FOUND",
       `File not found: ${filePath}`,

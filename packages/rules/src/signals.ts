@@ -7,8 +7,8 @@
 
 import { readFileSync, existsSync, writeFileSync, mkdirSync } from "node:fs";
 import { resolve, dirname } from "node:path";
-import { ok, warn, info, fail } from "./cli.js";
-import { flagValue } from "./cli.js";
+import { ok, warn, info, fail } from "./console.js";
+import { flagValue } from "./console.js";
 import type { SignalsConfig } from "./types.js";
 
 // ── Built-in defaults (moved from analyze.ts) ───────────────

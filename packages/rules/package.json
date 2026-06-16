@@ -6,6 +6,15 @@
   "bin": {
     "claude-rules": "./dist/cli.js"
   },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
   "scripts": {
     "build": "tsc",
     "verify": "tsc --noEmit && node --test dist/**/*.test.js",

@@ -13,8 +13,8 @@
 import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { resolve, join, relative } from "node:path";
 import { parseFrontmatter } from "./parser.js";
-import { log, ok, warn, info, fail, BOLD, DIM, RESET, RED, GREEN, YELLOW } from "./cli.js";
-import { positionalArgs, flagValue, hasFlag } from "./cli.js";
+import { log, ok, warn, info, fail, BOLD, DIM, RESET, RED, GREEN, YELLOW } from "./console.js";
+import { positionalArgs, flagValue, hasFlag } from "./console.js";
 import type { RuleIndex, RuleEntry, FsValidationIssue } from "./types.js";
 
 // ── Fix hints per issue code (humanization — say which side is canonical) ──

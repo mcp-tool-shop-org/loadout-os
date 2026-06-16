@@ -16,8 +16,8 @@ import { createInterface } from "node:readline";
 import { tmpdir } from "node:os";
 import { analyzeFile, resolveClaudeMd, resolveMemoryMd } from "./analyze.js";
 import { serializeFrontmatter, estimateTokens } from "./parser.js";
-import { log, ok, warn, info, fail, BOLD, DIM, RESET, CYAN, GREEN, YELLOW } from "./cli.js";
-import { hasFlag, positionalArgs, flagValue } from "./cli.js";
+import { log, ok, warn, info, fail, BOLD, DIM, RESET, CYAN, GREEN, YELLOW } from "./console.js";
+import { hasFlag, positionalArgs, flagValue } from "./console.js";
 import { loadSignals } from "./signals.js";
 import type {
   SplitProposal,
