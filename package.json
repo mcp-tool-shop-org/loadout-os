@@ -12,9 +12,9 @@
   ],
   "//buildOrder": "INTENTIONAL: kernel must build before memories and rules — they import the kernel's built dist. Do NOT 'simplify' build/test/verify to `--workspaces` (npm does not guarantee topo order) or the order breaks. The PowerShell hook smoke-test (apps/hook/smoke-test.ps1) is deliberately NOT in verify: it is Windows/rig-specific and would break Linux CI.",
   "scripts": {
-    "build": "npm run build -w packages/kernel && npm run build -w packages/memories && npm run build -w packages/rules",
-    "test": "npm run test -w packages/kernel && npm run test -w packages/memories && npm run test -w packages/rules",
-    "verify": "npm run build && npm run verify -w packages/kernel && npm run verify -w packages/memories && npm run verify -w packages/rules"
+    "build": "npm run build -w packages/kernel && npm run build -w packages/memories && npm run build -w packages/rules && npm run build -w packages/cli",
+    "test": "npm run test -w packages/kernel && npm run test -w packages/memories && npm run test -w packages/rules && npm run test -w packages/cli",
+    "verify": "npm run build && npm run verify -w packages/kernel && npm run verify -w packages/memories && npm run verify -w packages/rules && npm run verify -w packages/cli"
   },
   "engines": {
     "node": ">=20"

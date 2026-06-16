@@ -1,0 +1,42 @@
+{
+  "name": "@mcptoolshop/loadout-os",
+  "version": "0.0.0",
+  "description": "Unified Knowledge OS CLI — wraps ai-loadout (kernel) + claude-memories + claude-rules and absorbs the operational rituals (doctor, report, refresh) into one loadout-os binary.",
+  "license": "MIT",
+  "author": "mcp-tool-shop",
+  "type": "module",
+  "bin": {
+    "loadout-os": "./dist/cli.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "node --test dist/tests/*.test.js",
+    "verify": "tsc --noEmit && node --test dist/tests/*.test.js"
+  },
+  "dependencies": {
+    "@mcptoolshop/ai-loadout": "^1.4.3",
+    "@mcptoolshop/claude-memories": "^1.0.3",
+    "@mcptoolshop/claude-rules": "^1.2.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "typescript": "^5.7",
+    "c8": "^11"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
