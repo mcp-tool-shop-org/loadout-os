@@ -6,7 +6,11 @@
   "description": "UserPromptSubmit hook that injects pointers to relevant memory entries from ~/.ai-loadout/index.json",
   "main": "loadout-hook.mjs",
   "scripts": {
-    "test": "node loadout-hook.mjs"
+    "test": "node --check loadout-hook.mjs",
+    "smoke": "pwsh -NoProfile -File smoke-test.ps1"
+  },
+  "engines": {
+    "node": ">=20"
   },
   "dependencies": {
     "@mcptoolshop/ai-loadout": "^1.4.3"
