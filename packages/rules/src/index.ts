@@ -41,6 +41,10 @@ export {
   extractKeywords,
   generateSummary,
   suggestPatterns,
+  // Path resolvers — needed by in-process consumers (loadout-os `rules split`)
+  // that drive the split flow without spawning the claude-rules bin.
+  resolveClaudeMd,
+  resolveMemoryMd,
 } from "./analyze.js";
 
 // ── Split file generators ──────────────────────────────────────

@@ -12,10 +12,20 @@
  * the kernel one is flat and the others are namespaced.
  */
 
-import { readFileSync, existsSync, statSync } from "node:fs";
-import { resolve, dirname, join } from "node:path";
+import {
+  readFileSync,
+  writeFileSync,
+  mkdirSync,
+  existsSync,
+  statSync,
+  copyFileSync,
+  rmSync,
+  mkdtempSync,
+} from "node:fs";
+import { resolve, dirname, join, relative } from "node:path";
+import { tmpdir } from "node:os";
 import { createRequire } from "node:module";
-import { spawnSync } from "node:child_process";
+import { createInterface } from "node:readline";
 
 // memories
 import {
@@ -28,7 +38,18 @@ import {
 } from "@mcptoolshop/claude-memories";
 
 // rules
-import { analyzeFile, validateRules } from "@mcptoolshop/claude-rules";
+import {
+  analyzeFile,
+  validateRules,
+  resolveClaudeMd,
+  resolveMemoryMd,
+  generateRuleFile,
+  generateIndex as generateRulesIndex,
+  generateClaudeMd,
+  estimateTokens,
+  loadSignals,
+  type SplitProposal,
+} from "@mcptoolshop/claude-rules";
 
 // kernel
 import {
@@ -365,12 +386,17 @@ export function rulesStats(args: string[]): void {
 }
 
 /**
- * Resolve the absolute path to the `claude-rules` bin (its `split` command is
- * interactive). We resolve via the package's exported package.json — the only
- * subpath the package's `exports` map exposes — then read `bin.claude-rules`
- * and join it against the package dir. This works whether the dependency is the
- * published node_modules copy or a symlinked workspace package; both expose
- * `./package.json`. Returns null when the package (or its built bin) is absent.
+ * Resolve the absolute path to the `claude-rules` bin.
+ *
+ * NOTE: `rules split` no longer spawns this bin — it runs IN-PROCESS (see
+ * `rulesSplit`/`runSplit`) so the bundled global install is self-contained.
+ * This resolver + `buildSplitArgv` are retained as a workspace-only escape
+ * hatch (the bin exists when running from the monorepo) and because the split
+ * test suite asserts on them. Resolution is via the package's exported
+ * package.json — the only subpath the package's `exports` map exposes — then
+ * `bin.claude-rules` joined against the package dir. Returns null when the
+ * package (or its built bin) is absent — which is the normal case in a bundled
+ * global install, where there is no node_modules `@mcptoolshop/*` at all.
  */
 export function resolveRulesBin(): string | null {
   try {
@@ -399,37 +425,203 @@ export function buildSplitArgv(rulesBin: string, args: string[]): string[] {
   return [rulesBin, "split", ...args];
 }
 
+/** Readline Y/n/skip confirm. Isolated so the split loop reads cleanly. */
+function confirm(question: string): Promise<string> {
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  return new Promise((res) => {
+    rl.question(question, (answer) => {
+      rl.close();
+      res(answer.trim());
+    });
+  });
+}
+
 /**
- * `rules split` — subprocess passthrough to the interactive `claude-rules split`.
+ * `rules split` — runs the CLAUDE.md → topic-files extraction IN-PROCESS.
  *
- * split drives a readline Y/n/skip prompt per proposed extraction, so it cannot
- * be wrapped as a pure library call. We spawn the rules bin with INHERITED
- * stdio (stdin/stdout/stderr) so the prompt works exactly as it does standalone,
- * forwarding the user's args/flags verbatim ([CLAUDE.md], --dry-run, --yes, …).
- * The child's exit code becomes ours.
+ * Why in-process (not a subprocess passthrough): the published loadout-os is a
+ * single self-contained bundle with NO `@mcptoolshop/*` packages on disk, so
+ * there is no `claude-rules` bin to spawn in a global install. We instead drive
+ * the split with the rules library's exported pure generators
+ * (`analyzeFile` → `generateRuleFile`/`generateIndex`/`generateClaudeMd`) and a
+ * `node:readline` confirm loop — the same flow the standalone bin runs, but
+ * bundled into our process. This keeps the one-process / one-arg-parser /
+ * one-error-shape contract and works identically whether installed globally or
+ * run from the workspace.
+ *
+ * Flags forwarded: [CLAUDE.md] --rules-dir <dir> --lazy --dry-run --yes --signals <p> --memory.
+ *
+ * Standards compliance (workflow-standards.md):
+ *   NAMED_COMPENSATORS 3 — every accepted write is staged in a temp dir first;
+ *     CLAUDE.md is backed up to CLAUDE.md.bak before being overwritten (the
+ *     named undo: `mv CLAUDE.md.bak CLAUDE.md`). On any staged-copy failure we
+ *     stop and leave originals intact. --dry-run performs zero writes.
+ *   UNCERTAINTY_GATED_HUMANS 3 — a Y/n/skip checkpoint gates EACH extraction
+ *     (skipped under --yes/--dry-run by explicit user intent).
+ *   EXTERNAL_VERIFIER 2 — extraction logic is the rules library's, not
+ *     re-implemented here; we only render + confirm + write.
  */
 export function rulesSplit(args: string[]): void {
-  const rulesBin = resolveRulesBin();
-  if (!rulesBin) {
-    fail(
-      "RULES_BIN_NOT_FOUND",
-      "Could not resolve the @mcptoolshop/claude-rules bin for the interactive split.",
-      "Ensure @mcptoolshop/claude-rules is installed/built, then retry; or run `claude-rules split` directly.",
-    );
+  void runSplit(args).catch((err) => {
+    fail("RULES_SPLIT_FAILED", `split failed: ${(err as Error).message}`);
+  });
+}
+
+async function runSplit(args: string[]): Promise<void> {
+  // positionalArgs() here filters out --flags but NOT space-separated flag
+  // VALUES; resolveClaudeMd only reads index 0, and our surfaces always put the
+  // CLAUDE.md path FIRST (before any flag), so pos[0] is unambiguous.
+  const filePath = resolveClaudeMd(positionalArgs(args));
+  const lazyLoad = hasFlag(args, "lazy");
+  const rulesDir = flag(args, "rules-dir") ?? (lazyLoad ? ".claude/loadout" : ".claude/rules");
+  const dryRun = hasFlag(args, "dry-run");
+  const yesMode = hasFlag(args, "yes");
+  const signals = loadSignals(flag(args, "signals") ?? undefined);
+
+  if (!existsSync(filePath)) {
+    fail("FILE_NOT_FOUND", `CLAUDE.md not found: ${filePath}`, "Provide a path to your CLAUDE.md.");
   }
-  const argv = buildSplitArgv(rulesBin, args);
-  info(`Handing off to the interactive claude-rules split (${argv[0]}) …`);
-  const res = spawnSync(process.execPath, argv, { stdio: "inherit" });
-  if (res.error) {
-    fail(
-      "RULES_SPLIT_SPAWN_FAILED",
-      `Failed to spawn the claude-rules split bin: ${res.error.message}`,
-    );
+
+  info(`Analyzing ${CYAN}${filePath}${RESET}`);
+  const report = analyzeFile(filePath, rulesDir, signals);
+
+  if (hasFlag(args, "memory")) {
+    const memoryPath = resolveMemoryMd();
+    if (memoryPath) {
+      info(`Also analyzing ${CYAN}${memoryPath}${RESET}`);
+      report.proposals.push(...analyzeFile(memoryPath, rulesDir, signals).proposals);
+    } else {
+      warn("No MEMORY.md found. Skipping --memory.");
+    }
   }
-  // Forward the child's exit code as our own (split owns the outcome).
-  if (typeof res.status === "number" && res.status !== 0) {
-    process.exitCode = res.status;
+
+  if (report.proposals.length === 0) {
+    ok("Nothing to split — all sections are already lean enough.");
+    return;
   }
+
+  log("");
+  log(
+    `${BOLD}Found ${report.proposals.length} sections to extract${RESET} ${DIM}(${report.totalLines} lines, ~${report.totalTokens} tokens)${RESET}`,
+  );
+  log("");
+
+  const accepted: SplitProposal[] = [];
+  for (let i = 0; i < report.proposals.length; i++) {
+    const p = report.proposals[i];
+    log(`${BOLD}${i + 1}/${report.proposals.length}. "${p.section.heading}"${RESET}`);
+    log(`  ${DIM}Lines ${p.section.startLine + 1}-${p.section.endLine} (${p.section.lines} lines, ~${p.section.tokens_est} tokens)${RESET}`);
+    log(`  → ${CYAN}${p.suggestedPath}${RESET}`);
+    log(`  keywords: [${p.suggestedKeywords.join(", ")}]`);
+    if (p.suggestedPatterns.length > 0) log(`  patterns: [${p.suggestedPatterns.join(", ")}]`);
+    log(`  priority: ${p.suggestedPriority}`);
+    log(`  summary: ${p.suggestedSummary}`);
+    log("");
+
+    if (dryRun) {
+      info("(dry run — would extract)");
+      accepted.push(p);
+      log("");
+      continue;
+    }
+    if (yesMode) {
+      accepted.push(p);
+      ok(`Accepted "${p.section.heading}"`);
+      log("");
+      continue;
+    }
+
+    const answer = (await confirm(`  Extract? [${GREEN}Y${RESET}/n/skip] `)).toLowerCase();
+    if (answer === "n" || answer === "skip") {
+      warn(`Skipped "${p.section.heading}"`);
+    } else {
+      accepted.push(p);
+      ok(`Accepted "${p.section.heading}"`);
+    }
+    log("");
+  }
+
+  if (accepted.length === 0) {
+    info("No sections accepted. Nothing to do.");
+    return;
+  }
+
+  const coreTokens = report.coreCandidate.reduce((sum, s) => sum + s.tokens_est, 0);
+  const index = generateRulesIndex(accepted, coreTokens, lazyLoad);
+  const newClaudeMd = generateClaudeMd(report.coreCandidate, accepted, index, rulesDir, lazyLoad);
+
+  if (dryRun) {
+    log(`${BOLD}Dry run complete.${RESET} Would generate:`);
+    log(`  ${accepted.length} rule files in ${rulesDir}/`);
+    log(`  ${rulesDir}/index.json`);
+    log(`  Rewritten ${filePath}`);
+    log("");
+    log(`${BOLD}New CLAUDE.md preview:${RESET}`);
+    log(DIM + "─".repeat(60) + RESET);
+    log(newClaudeMd);
+    log(DIM + "─".repeat(60) + RESET);
+    log("");
+    const after = estimateTokens(newClaudeMd);
+    log(`${BOLD}Budget:${RESET}`);
+    log(`  Before: ${report.totalLines} lines, ~${report.totalTokens} tokens (every session)`);
+    log(`  After:  ~${after} tokens always loaded`);
+    log(`  Savings: ${report.totalTokens > 0 ? Math.round(((report.totalTokens - after) / report.totalTokens) * 100) : 0}%`);
+    return;
+  }
+
+  // ── Atomic write phase (staged → backup → copy) ──────────────
+  const absRulesDir = resolve(dirname(filePath), "..", rulesDir);
+  const writes: { dest: string; content: string }[] = [];
+  for (const p of accepted) {
+    writes.push({ dest: resolve(dirname(filePath), "..", p.suggestedPath), content: generateRuleFile(p) });
+  }
+  writes.push({ dest: resolve(absRulesDir, "index.json"), content: JSON.stringify(index, null, 2) + "\n" });
+  writes.push({ dest: filePath, content: newClaudeMd });
+
+  const stagingDir = mkdtempSync(join(tmpdir(), "loadout-os-split-"));
+  try {
+    for (let i = 0; i < writes.length; i++) {
+      writeFileSync(join(stagingDir, `file-${i}`), writes[i].content, "utf8");
+    }
+    // COMPENSATOR: back up CLAUDE.md before overwrite (undo: mv CLAUDE.md.bak CLAUDE.md).
+    const backupPath = resolve(dirname(filePath), "CLAUDE.md.bak");
+    copyFileSync(filePath, backupPath);
+    info(`Backed up ${relative(process.cwd(), filePath)} → CLAUDE.md.bak`);
+
+    mkdirSync(absRulesDir, { recursive: true });
+    for (const w of writes) mkdirSync(dirname(w.dest), { recursive: true });
+
+    for (let i = 0; i < writes.length; i++) {
+      try {
+        copyFileSync(join(stagingDir, `file-${i}`), writes[i].dest);
+      } catch (copyErr) {
+        warn(`Split failed writing ${relative(process.cwd(), writes[i].dest)}. Original CLAUDE.md backed up to CLAUDE.md.bak.`);
+        warn(`Error: ${(copyErr as Error).message}`);
+        process.exitCode = 1;
+        return;
+      }
+    }
+
+    for (const p of accepted) ok(`${p.suggestedPath}`);
+    ok(`${rulesDir}/index.json`);
+    ok(`Rewrote ${relative(process.cwd(), filePath)}`);
+  } finally {
+    try {
+      rmSync(stagingDir, { recursive: true, force: true });
+    } catch {
+      /* best-effort cleanup */
+    }
+  }
+
+  const after = estimateTokens(newClaudeMd);
+  log("");
+  log(`${BOLD}Split complete.${RESET}`);
+  log(`  ${accepted.length} rule files created`);
+  log(`  Before: ${report.totalLines} lines, ~${report.totalTokens} tokens`);
+  log(`  After:  ~${after} tokens always loaded`);
+  log(`  Savings: ${report.totalTokens > 0 ? Math.round(((report.totalTokens - after) / report.totalTokens) * 100) : 0}%`);
+  log("");
+  info("Run 'loadout-os rules validate' to confirm invariants.");
 }
 
 // ══════════════════════════════════════════════════════════════

@@ -67,6 +67,9 @@ export function runHookTest(opts: HookTestOptions): HookTestResult {
   const liveIndex = opts.liveIndex ?? join(homedir(), ".ai-loadout", "index.json");
 
   if (!existsSync(hookPath)) {
+    // Degrade gracefully: in a global/bundled install there is no
+    // apps/hook/loadout-hook.mjs on disk (it ships only in the repo). Surface a
+    // clear, non-crashing note rather than spawning a missing path.
     return {
       ran: false,
       exitCode: null,
@@ -74,7 +77,9 @@ export function runHookTest(opts: HookTestOptions): HookTestResult {
       stderr: "",
       injected: false,
       additionalContext: null,
-      note: `Hook not found: ${hookPath}`,
+      note:
+        `hook test runs from the loadout-os repo; apps/hook not found ` +
+        `(${hookPath}). Clone/run from the repo to exercise the runtime hook.`,
     };
   }
 

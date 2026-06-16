@@ -6,7 +6,7 @@
   "author": "mcp-tool-shop",
   "type": "module",
   "bin": {
-    "loadout-os": "./dist/cli.js"
+    "loadout-os": "./dist/loadout-os.js"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -17,24 +17,25 @@
     }
   },
   "files": [
-    "dist",
+    "dist/loadout-os.js",
     "README.md",
     "CHANGELOG.md",
     "LICENSE"
   ],
   "scripts": {
     "build": "tsc",
+    "bundle": "node esbuild.config.mjs",
     "test": "node --test dist/tests/*.test.js",
-    "verify": "tsc --noEmit && node --test dist/tests/*.test.js"
-  },
-  "dependencies": {
-    "@mcptoolshop/ai-loadout": "^1.4.3",
-    "@mcptoolshop/claude-memories": "^1.0.3",
-    "@mcptoolshop/claude-rules": "^1.2.2"
+    "verify": "tsc --noEmit && node --test dist/tests/*.test.js",
+    "prepublishOnly": "npm run build && npm run bundle"
   },
   "devDependencies": {
+    "@mcptoolshop/ai-loadout": "^1.4.3",
+    "@mcptoolshop/claude-memories": "^1.0.3",
+    "@mcptoolshop/claude-rules": "^1.2.2",
     "@types/node": "^22",
     "typescript": "^5.7",
+    "esbuild": "^0.28.1",
     "c8": "^11"
   },
   "engines": {
