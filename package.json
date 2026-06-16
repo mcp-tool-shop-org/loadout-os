@@ -1,0 +1,21 @@
+{
+  "name": "memory-os",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Consolidated Knowledge OS for the studio — kernel (ai-loadout) + memories (claude-memories) + rules (claude-rules) + the runtime loadout hook, under one npm-workspaces root.",
+  "license": "MIT",
+  "author": "mcp-tool-shop",
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build": "npm run build -w packages/kernel && npm run build -w packages/memories && npm run build -w packages/rules",
+    "test": "npm run test -w packages/kernel && npm run test -w packages/memories && npm run test -w packages/rules",
+    "verify": "npm run build && npm run verify -w packages/kernel && npm run verify -w packages/memories && npm run verify -w packages/rules"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "//": "Shared base for all workspace packages. Holds only path-independent, behavior-preserving settings. module/moduleResolution and outDir/rootDir stay per-package (the latter resolve relative to the defining tsconfig). Do NOT drop kernel's types:['node'] override — dropping it previously caused a month-long CI red (kernel CHANGELOG).",
+  "compilerOptions": {
+    "target": "ES2022",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "declaration": true,
+    "sourceMap": false
+  }
+}
