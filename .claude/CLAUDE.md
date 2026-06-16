@@ -1,8 +1,8 @@
-# memory-os — project instructions
+# loadout-os — project instructions
 
 ## What this is
 
-**memory-os is the Knowledge OS for the studio**, consolidated into one repo so it can evolve as a single surface. It folds together three previously-separate npm packages plus the live runtime hook:
+**loadout-os is the Knowledge OS for the studio**, consolidated into one repo so it can evolve as a single surface. It folds together three previously-separate npm packages plus the live runtime hook:
 
 | Was | Now lives at | Role |
 |---|---|---|
@@ -48,7 +48,7 @@ Until Phase 6 retirement, **upstream source-of-truth stays at**:
 - `E:/AI/ai-loadout/` (kernel), `E:/AI/claude-memories/`, `E:/AI/claude-rules/` — the globally-installed CLIs come from these dirs
 - `~/.claude/loadout-hook/` — the running hook
 
-**Do not edit the three upstream repos from inside memory-os sessions.** Edits here stay here until the explicit Phase 6 cutover. The one exception is the hook's both-copies rule above.
+**Do not edit the three upstream repos from inside loadout-os sessions.** Edits here stay here until the explicit Phase 6 cutover. The one exception is the hook's both-copies rule above.
 
 ## Repo-first waiver (deliberate — do not "fix")
 

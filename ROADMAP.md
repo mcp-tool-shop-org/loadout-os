@@ -1,4 +1,4 @@
-# memory-os — ROADMAP
+# loadout-os — ROADMAP
 
 > Estimated horizon: **1–2 months** of session work to reach shippable.
 > Picker: whoever opens the next session in this tree. Read `.claude/CLAUDE.md` first — it has the live-system map and the source-of-truth rule.
@@ -36,24 +36,24 @@ The hook went live 2026-06-10 and immediately produced field evidence. Fix the k
 
 Gate: hook is silent on a deliberately off-topic prompt; junk entries absent from a regenerated index; `claude-memories validate` 0 errors; `ai-loadout validate` 0 warnings.
 
-## Phase 3 — Unified CLI surface (1–2 sessions)
+## Phase 3 — Unified CLI surface (DONE 2026-06-16)
 
-Goal: one `memory-os` binary that wraps the three CLI surfaces AND absorbs the operational rituals.
+Goal: one `loadout-os` binary that wraps the three CLI surfaces AND absorbs the operational rituals. **Built this session** — `packages/cli/` (`@mcptoolshop/loadout-os`, bin `loadout-os`): namespaced memories/rules wraps + flat kernel verbs + `doctor`/`report`/`refresh` rituals + `hook test`; 78 tests. `refresh` is built with a NAMED_COMPENSATOR but not yet run live; old-bin deprecating shims deferred to Phase 6.
 
-- [ ] New `packages/cli/` with `bin: { "memory-os": "..." }`
+- [ ] New `packages/cli/` with `bin: { "loadout-os": "..." }`
 - [ ] Wrapping subcommands:
-  - `memory-os memories <index|validate|stats|health>` — wraps `packages/memories/`
-  - `memory-os rules <analyze|split|validate|stats>` — wraps `packages/rules/`
-  - `memory-os resolve|explain|usage|dead|overlaps|budget|validate` — wraps `packages/kernel/`
-  - `memory-os hook test` — drives `apps/hook` with a sample prompt
+  - `loadout-os memories <index|validate|stats|health>` — wraps `packages/memories/`
+  - `loadout-os rules <analyze|split|validate|stats>` — wraps `packages/rules/`
+  - `loadout-os resolve|explain|usage|dead|overlaps|budget|validate` — wraps `packages/kernel/`
+  - `loadout-os hook test` — drives `apps/hook` with a sample prompt
 - [ ] **Ritual subcommands** (this is the consolidation payoff — one command instead of a 3-step ritual):
-  - `memory-os refresh` — store index → validate (halt on errors) → copy/rewrite to `~/.ai-loadout/index.json`. Replaces `~/.ai-loadout/refresh.ps1`; update the Index Freshness Ritual text in the global CLAUDE.md when this lands.
-  - `memory-os doctor` — one health screen: store validates, index `generated` newer than newest store .md mtime, global copy matches store copy, hook wired in `~/.claude/settings.json`, usage.jsonl growing.
-  - `memory-os report` — usage/dead-entry/budget summary over usage.jsonl (the observability loop, run monthly).
+  - `loadout-os refresh` — store index → validate (halt on errors) → copy/rewrite to `~/.ai-loadout/index.json`. Replaces `~/.ai-loadout/refresh.ps1`; update the Index Freshness Ritual text in the global CLAUDE.md when this lands.
+  - `loadout-os doctor` — one health screen: store validates, index `generated` newer than newest store .md mtime, global copy matches store copy, hook wired in `~/.claude/settings.json`, usage.jsonl growing.
+  - `loadout-os report` — usage/dead-entry/budget summary over usage.jsonl (the observability loop, run monthly).
 - [ ] Old binaries (`claude-memories`, `claude-rules`, `ai-loadout`) get thin shims that delegate + deprecation-warn for one minor release
 - [ ] `--help` complete and accurate (Hard Gate C of shipcheck)
 
-Gate: shipcheck `init` + `audit` cleanly on the new CLI; hard gates A–D green; `memory-os refresh` produces a byte-identical result to the manual ritual.
+Gate: shipcheck `init` + `audit` cleanly on the new CLI; hard gates A–D green; `loadout-os refresh` produces a byte-identical result to the manual ritual.
 
 ## Phase 4 — Docs + landing (1 session)
 
@@ -68,21 +68,21 @@ Goal: one Starlight handbook + one landing page covers the whole layer.
 
 Goal: reserve the name, set up Trusted Publishing, create the GitHub repo.
 
-- [ ] **Naming decision deadline is the start of this phase** (`memory-os` vs rebrand; sister pattern: Game Foundry OS / Research OS / Testing OS). The npm-placeholder reserve locks the name.
-- [ ] Reserve `@mcptoolshop/memory-os` via the `npm-placeholder` skill (v0.0.0 placeholder + OIDC/Trusted Publishing)
-- [ ] Create `mcp-tool-shop-org/memory-os` on GitHub (private at first; public at Phase 6 publish) — this closes the repo-first waiver
+- [x] **Naming — RESOLVED 2026-06-16: `loadout-os`** (rebrand from `memory-os`; director call). Matches the `*-os` sister pattern (game-foundry-os, research-os) and keeps continuity with `@mcptoolshop/ai-loadout` + `~/.ai-loadout/`.
+- [ ] Reserve `@mcptoolshop/loadout-os` — **deferred to the Phase 6 real publish**: the `@mcptoolshop` scope already protects the name (no squat risk on a scoped package), and the don't-default-to-empty-placeholder rule favors publishing the real treatment-complete package over a 0.0.0 placeholder. Wire OIDC/Trusted Publishing in the root `publish.yml`.
+- [ ] Create `mcp-tool-shop-org/loadout-os` on GitHub (private at first; public at Phase 6 publish) — this closes the repo-first waiver
 - [ ] Add remote, push everything to date
 - [ ] CI workflow per `github-actions.md` rules: paths-gated, ubuntu-latest only, concurrency block, max 2 workflow files
   - Remove `packages/*/.github/` (8 inert workflow files + 2 dependabot.yml) BEFORE adding the remote; author a single root CI per github-actions.md (max 2 workflows, paths-gated, one pages deploy).
 
 ## Phase 6 — First real publish + upstream retirement (1 session)
 
-Goal: ship `@mcptoolshop/memory-os@1.0.0`, retire the three upstream repos. **Irreversible actions live here — author the six-standards compliance block + compensators table (publish, release, deprecate, settings cutover) in the session dispatch before executing.**
+Goal: ship `@mcptoolshop/loadout-os@1.0.0`, retire the three upstream repos. **Irreversible actions live here — author the six-standards compliance block + compensators table (publish, release, deprecate, settings cutover) in the session dispatch before executing.**
 
 Pre-step — **consumer inventory** (do this BEFORE any cutover; pointer-chain breakage is this workspace's known failure mode):
 - [ ] Grep `E:\AI` for `@mcptoolshop/ai-loadout` imports (known: `apps/hook`; suspected: none — verify)
 - [ ] List global installs to replace: `ai-loadout` (npm), `claude-memories` + `claude-rules` (installed from local upstream dirs)
-- [ ] List config/doc references to update: global CLAUDE.md Index Freshness Ritual text, `~/.ai-loadout/refresh.ps1`, `~/.claude/settings.json` hook command, canonical memory entries (`memory-os-prototype.md`, `ai-loadout.md`, knowledge-os entries)
+- [ ] List config/doc references to update: global CLAUDE.md Index Freshness Ritual text, `~/.ai-loadout/refresh.ps1`, `~/.claude/settings.json` hook command, canonical memory entries (`loadout-os-prototype.md`, `ai-loadout.md`, knowledge-os entries)
 
 Ship:
 - [ ] Shipcheck full audit (31/31; v1.0.0 minimum rule satisfied by 1.0.0)
@@ -90,11 +90,11 @@ Ship:
 - [ ] `npm publish` via Trusted Publishing; `gh release create v1.0.0`
 
 Cut over + retire:
-- [ ] `~/.claude/settings.json` hook command → the memory-os-installed hook entrypoint; verify with a live prompt; keep `~/.claude/loadout-hook/` until verified, then delete
+- [ ] `~/.claude/settings.json` hook command → the loadout-os-installed hook entrypoint; verify with a live prompt; keep `~/.claude/loadout-hook/` until verified, then delete
 - [ ] Replace global CLI installs; update ritual text + refresh script references
-- [ ] `npm deprecate @mcptoolshop/ai-loadout` with a pointer to memory-os (the only published upstream)
+- [ ] `npm deprecate @mcptoolshop/ai-loadout` with a pointer to loadout-os (the only published upstream)
 - [ ] Archive upstream repos on GitHub (`gh repo archive` for ai-loadout / claude-memories / claude-rules) and move the local dirs `E:/AI/{ai-loadout,claude-memories,claude-rules}/` → `E:/DEEP_MEMORY/retired/` with a README pointing here
-- [ ] Update canonical memory: `memory-os-prototype.md` → shipped entry; MEMORY.md one-liner; run the Index Freshness Ritual
+- [ ] Update canonical memory: `loadout-os-prototype.md` → shipped entry; MEMORY.md one-liner; run the Index Freshness Ritual
 
 Gate: shipcheck 31/31, CI green, hook works through the published package on a live prompt, consumer-inventory list fully checked off, no broken pointer chains.
 
@@ -106,12 +106,12 @@ Gate: shipcheck 31/31, CI green, hook works through the published package on a l
 
 ## Open questions (for the director)
 
-- Naming: keep `memory-os` or rebrand? **Decide by Phase 5 start** (the npm reserve locks it).
-- Kernel CLI surface preserved verbatim under `memory-os …` (lower migration cost) or restructured (fix ergonomics warts)? Default: verbatim, restructure later behind the same bin.
+- ~~Naming: keep or rebrand?~~ **RESOLVED 2026-06-16 → `loadout-os`** (see Phase 5).
+- Kernel CLI surface preserved verbatim under `loadout-os …` (lower migration cost) or restructured (fix ergonomics warts)? Default: verbatim, restructure later behind the same bin.
 - License: three sources are MIT; root stays MIT? (Default yes.)
 
 Resolved 2026-06-10: package manager = **npm workspaces** (matches every other studio monorepo; `workspace:*` in the original draft was pnpm syntax and would fail under npm).
 
 ## When this is done
 
-When all six phases pass, flip this file to a CHANGELOG-style retrospective and start the next iteration. The canonical memory entry (`memory-os-prototype.md`) gets rewritten as a shipped-product entry at the same time.
+When all six phases pass, flip this file to a CHANGELOG-style retrospective and start the next iteration. The canonical memory entry (`loadout-os-prototype.md`) gets rewritten as a shipped-product entry at the same time.

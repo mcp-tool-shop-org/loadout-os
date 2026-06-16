@@ -1,4 +1,4 @@
-# memory-os
+# loadout-os
 
 > **Prototype, 2026-06-10.** Consolidated Knowledge OS for the studio — folds `ai-loadout` (kernel) + `claude-memories` (MEMORY.md adapter) + `claude-rules` (CLAUDE.md adapter) + the runtime UserPromptSubmit pointer-injection hook into a single repo. Wired as npm workspaces (Phase 1 done — `npm install` + `npm run build`/`test`/`verify` work at root). Not yet published; no remote yet (a deliberate Phase-5 waiver — see `.claude/CLAUDE.md`).
 
@@ -11,7 +11,7 @@
 ## Layout
 
 ```
-memory-os/
+loadout-os/
 ├── packages/
 │   ├── kernel/       # was @mcptoolshop/ai-loadout (npm 1.4.3 — only one published)
 │   ├── memories/     # was @mcptoolshop/claude-memories (unpublished)
