@@ -55,6 +55,17 @@ export interface Frontmatter {
   triggers: Triggers;
 }
 
+// ── Score components (matcher transparency) ────────────────────
+// Additive breakdown of how a domain entry's score was computed,
+// so callers can see WHY an entry scored the way it did.
+export interface ScoreComponents {
+  matched: number;       // count of matched keywords
+  coverage: number;      // matched / entry.keywords.length (the old pure metric)
+  absolute: number;      // matched / ABSOLUTE_K (recall-aware metric)
+  base: number;          // max(coverage, absolute) — the blended floor
+  patternBonus: number;  // 0 or 0.2 if any pattern matched
+}
+
 // ── Match result from the matcher ──────────────────────────────
 export interface MatchResult {
   entry: LoadoutEntry;
@@ -63,6 +74,7 @@ export interface MatchResult {
   matchedPatterns: string[];
   reason: string;        // human-readable explanation of why this matched
   mode: LoadMode;        // how this entry should be loaded
+  scoreComponents?: ScoreComponents;  // additive: breakdown of the score (domain entries only)
 }
 
 // ── Usage event (append-only log) ─────────────────────────────

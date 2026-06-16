@@ -8,6 +8,7 @@ export type {
   LoadoutIndex,
   Frontmatter,
   MatchResult,
+  ScoreComponents,
   UsageEvent,
   MergeConflict,
   MergedIndex,
@@ -24,7 +25,8 @@ export { parseFrontmatter, serializeFrontmatter } from "./frontmatter.js";
 export { estimateTokens } from "./tokens.js";
 
 // ── Matcher ────────────────────────────────────────────────────
-export { matchLoadout, lookupEntry } from "./match.js";
+export { matchLoadout, lookupEntry, DEFAULT_MIN_SCORE } from "./match.js";
+export type { MatchOptions } from "./match.js";
 
 // ── Validator ──────────────────────────────────────────────────
 export { validateIndex } from "./validate.js";
