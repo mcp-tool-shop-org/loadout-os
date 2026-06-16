@@ -94,6 +94,24 @@ export function defaultDest(): string {
   return join(homedir(), ".ai-loadout", "index.json");
 }
 
+/**
+ * True when two paths resolve to the SAME file on disk. On Windows —
+ * case-insensitive volumes — drive-letter and path case are folded, because
+ * node's `path.resolve` PRESERVES drive-letter case (`resolve("c:/x")` →
+ * `"c:\\x"`, not `"C:\\x"`). A raw `===` would therefore misfire on a
+ * `--dest c:/…/.ai-loadout/index.json` that names the live index in lowercase:
+ * the write hits the real live index, but the comparison says "custom path",
+ * so printRefresh would falsely tell the user the live index was NOT modified.
+ * Folding case on win32 closes that false-negative; POSIX stays case-sensitive.
+ */
+export function sameResolvedPath(a: string, b: string): boolean {
+  const ra = resolve(a);
+  const rb = resolve(b);
+  return process.platform === "win32"
+    ? ra.toLowerCase() === rb.toLowerCase()
+    : ra === rb;
+}
+
 export interface RefreshOptions {
   /** Store directory containing MEMORY.md (default DEFAULT_STORE). */
   store?: string;
@@ -352,9 +370,17 @@ export function printRefresh(r: RefreshResult): void {
     }
   }
   log();
-  log(
-    `  ${DIM}Note: this scratch/CLI run wrote the configured --dest. A LIVE run against the canonical store + ~/.ai-loadout is deferred to a coordinator-supervised step.${RESET}`,
-  );
+  if (sameResolvedPath(r.dest, defaultDest())) {
+    // dest IS the live global resolver index the hook reads every prompt.
+    log(
+      `  ${DIM}This refreshed the LIVE global resolver index the UserPromptSubmit hook reads on every prompt — the change is live now.${RESET}`,
+    );
+  } else {
+    // a custom --dest (scratch/test/alternate): the live index was untouched.
+    log(
+      `  ${DIM}Note: --dest is a custom path, not the live resolver index (${defaultDest()}) — the index the hook reads was NOT modified. Re-run without --dest to refresh the live one.${RESET}`,
+    );
+  }
   log();
 }
 

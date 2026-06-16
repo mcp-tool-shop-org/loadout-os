@@ -1,6 +1,6 @@
 {
   "name": "@mcptoolshop/loadout-os",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Unified Knowledge OS CLI — wraps ai-loadout (kernel) + claude-memories + claude-rules and absorbs the operational rituals (doctor, report, refresh) into one loadout-os binary.",
   "license": "MIT",
   "author": "mcp-tool-shop",

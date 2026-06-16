@@ -77,7 +77,7 @@ La decomposizione per segreti (Parnas 1972) era la soluzione ideale per un team 
 
 ## Stato
 
-Consolidamento in corso. loadout-os unisce il kernel e due adattatori che precedentemente esistevano come pacchetti separati, insieme all'hook di runtime attivo. Il pacchetto pubblicato oggi è **`@mcptoolshop/ai-loadout`** (il kernel); il pacchetto unificato `loadout-os` viene rilasciato da questo repository. I tre binari legacy continueranno a funzionare fino al loro pensionamento previsto.
+Spedito. **`@mcptoolshop/loadout-os`** è stato pubblicato su npm (pubblico) e integra il kernel, i due adattatori (memorie + regole) e l'hook di runtime in un'unica CLI: installalo con `npm install -g @mcptoolshop/loadout-os`. I tre pacchetti legacy che sostituisce sono stati dismessi: il kernel `@mcptoolshop/ai-loadout` è stato contrassegnato come obsoleto su npm (è ancora possibile installarlo, ma non riceverà ulteriori aggiornamenti); `claude-memories` e `claude-rules` erano disponibili solo in locale ed ora sono stati archiviati. Tutti i nuovi sviluppi saranno implementati qui.
 
 ## Modello di fiducia
 

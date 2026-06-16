@@ -77,7 +77,7 @@ Decompose-by-secrets (Parnas 1972) was the clean answer for a team of N humans. 
 
 ## Status
 
-Consolidation in progress. loadout-os folds together the kernel and two adapters that previously lived as separate packages, plus the live runtime hook. The published upstream today is **`@mcptoolshop/ai-loadout`** (the kernel); the unified `loadout-os` package ships from this repo. The three legacy bins keep working until their planned retirement.
+Shipped. **`@mcptoolshop/loadout-os`** is published on npm (public) and folds the kernel, the two adapters (memories + rules), and the live runtime hook into one CLI — install it with `npm install -g @mcptoolshop/loadout-os`. The three legacy packages it supersedes are retired: the kernel `@mcptoolshop/ai-loadout` is deprecated on npm (still installable, but receives no further work); `claude-memories` and `claude-rules` were local-only and are parked. All new work lands here.
 
 ## Trust model
 

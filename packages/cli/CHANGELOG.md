@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > history (workspace wiring, the runtime hook, the adapters), see the
 > [root CHANGELOG](../../CHANGELOG.md).
 
+## [1.0.2] - 2026-06-16
+
+### Fixed
+
+- `refresh` no longer prints a stale closing note claiming "this scratch/CLI run … a LIVE
+  run … is deferred to a coordinator-supervised step" after it has already written the
+  live resolver index. The note is now contrastive and accurate: a default-dest run
+  confirms "the change is live now"; a custom `--dest` run states the live index the hook
+  reads was **not** modified. Behaviour was always correct — only the message was wrong.
+  Adds a `printRefresh` regression test asserting the stale phrasing is gone in both paths.
+
 ## [1.0.1] - 2026-06-16
 
 ### Fixed
