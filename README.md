@@ -1,6 +1,6 @@
-<p align="center"><img src="logo.png" alt="loadout-os" width="220"></p>
+<p align="center"><img src="logo.png" alt="loadout-os" width="500"></p>
 
-# loadout-os
+
 
 **A Knowledge OS for AI coding agents.** One CLI that routes the right context to the model on demand — instead of dumping every memory file and rule into the context window at the start of each session.
 
