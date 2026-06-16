@@ -6,6 +6,7 @@ on:
     paths:
       - "packages/**"
       - "apps/**"
+      - "site/**"
       - "package.json"
       - "package-lock.json"
       - "tsconfig.base.json"
@@ -14,6 +15,7 @@ on:
     paths:
       - "packages/**"
       - "apps/**"
+      - "site/**"
       - "package.json"
       - "package-lock.json"
       - "tsconfig.base.json"
@@ -39,3 +41,35 @@ jobs:
       - run: npm run build
       - run: npm test
       - run: npm audit --audit-level=moderate
+
+  # Deploy the handbook + landing to GitHub Pages — only on a push to main,
+  # only after build-and-test passes. Folded into this workflow (rather than a
+  # separate pages.yml) to honor the github-actions.md max-2-workflows rule
+  # (ci.yml + release.yml).
+  deploy-pages:
+    needs: build-and-test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install site dependencies
+        working-directory: site
+        run: npm ci
+      - name: Build site
+        working-directory: site
+        run: npm run build
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site/dist
+      - id: deployment
+        uses: actions/deploy-pages@v4
