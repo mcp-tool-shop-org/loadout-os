@@ -28,7 +28,7 @@ loadout-os memories health   [path] [--json]
 loadout-os rules analyze  <CLAUDE.md> [--rules-dir <dir>] [--json]
 loadout-os rules validate [--rules-dir <dir>] [--lazy] [--repo-root <dir>] [--json]
 loadout-os rules stats    <CLAUDE.md> [--rules-dir <dir>] [--json]
-loadout-os rules split    # interactive — not wrapped; use the claude-rules bin
+loadout-os rules split    # interactive — wrapped via passthrough to the claude-rules bin
 ```
 
 ### Flat verbs (knowledge router / kernel)
@@ -53,7 +53,7 @@ loadout-os validate <index>         # validate index STRUCTURE (kernel)
 loadout-os doctor [--json]                    # read-only health screen
 loadout-os report [--index <p>] [--jsonl <p>] # observability over usage.jsonl
 loadout-os hook test [--prompt "<text>"]      # drive the runtime hook on a sample prompt
-loadout-os refresh                            # not yet implemented (see below)
+loadout-os refresh [--store <d>] [--dest <p>] [--dry-run]   # index → validate → publish
 ```
 
 - **`doctor`** — one read-only screen: store `MEMORY.md` validates, the global
@@ -67,9 +67,11 @@ loadout-os refresh                            # not yet implemented (see below)
   machine-readable shape. Exit 2 when an input is missing. **Read-only.**
 - **`hook test`** — runs the real `loadout-hook.mjs` against a sample prompt in an
   isolated HOME so the live `usage.jsonl` is never written.
-- **`refresh`** — *stubbed this wave.* It writes the live global index and needs a
-  named compensator, so it is handled separately; for now run the Index Freshness
-  Ritual (memories index → validate → copy to `~/.ai-loadout/index.json`).
+- **`refresh`** — folds the Index Freshness Ritual into one command: regenerate the
+  store index → validate (andon halt on any error) → rewrite relative paths to
+  absolute + publish to `~/.ai-loadout/index.json`. The irreversible write is guarded
+  by a `.bak` named compensator (restored on failure, undo line printed); `--dry-run`
+  previews without writing. Exit `1` on validation/write failure, `2` on a missing store.
 
 ## Build & test
 

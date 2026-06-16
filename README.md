@@ -1,33 +1,80 @@
+<p align="center"><img src="logo.png" alt="loadout-os" width="220"></p>
+
 # loadout-os
 
-> **Prototype, 2026-06-10.** Consolidated Knowledge OS for the studio — folds `ai-loadout` (kernel) + `claude-memories` (MEMORY.md adapter) + `claude-rules` (CLAUDE.md adapter) + the runtime UserPromptSubmit pointer-injection hook into a single repo. Wired as npm workspaces (Phase 1 done — `npm install` + `npm run build`/`test`/`verify` work at root). Not yet published; no remote yet (a deliberate Phase-5 waiver — see `.claude/CLAUDE.md`).
+**A Knowledge OS for AI coding agents.** One CLI that routes the right context to the model on demand — instead of dumping every memory file and rule into the context window at the start of each session.
 
-## Pickers start here
+Your instruction files and memory stores grow without bound. Every line costs tokens on every prompt, whether or not it matters to the task at hand. loadout-os keeps a tiny dispatch index always loaded and loads the heavy payloads — memory topics, rule files — only when the task keywords match. Think of it like a game loadout: equip the agent with exactly the knowledge it needs for the mission ahead.
 
-- Read [`.claude/CLAUDE.md`](.claude/CLAUDE.md) — project instructions and source-of-truth rules
-- Read [`ROADMAP.md`](ROADMAP.md) — five-phase consolidation plan, ~1–2 months of session work
-- Then dive in
+## What's inside
 
-## Layout
+loadout-os unifies four surfaces under one `loadout-os` binary:
+
+| Surface | What it does |
+|---|---|
+| **Kernel** (knowledge router) | Deterministic keyword/pattern matcher, hierarchical layered resolver (global → org → project → session), and the agent runtime contract. Core entries always load; domain entries load on match; manual entries load on explicit lookup. |
+| **Memories adapter** | Turns a `MEMORY.md` store into a machine-readable dispatch table and lints it (missing files, orphans, duplicates, over-long entries). |
+| **Rules adapter** | Splits a bloated `CLAUDE.md` into a lean always-loaded index plus on-demand rule files, and validates frontmatter against the index. |
+| **Runtime hook** | A `UserPromptSubmit` hook that injects ≤5 pointer lines (≤200 tokens) to the entries relevant to your prompt. Fail-silent: every error path exits 0, so a broken hook can never block a prompt. |
+
+Plus three rituals that keep the system honest: **`refresh`** (regenerate → validate → publish the dispatch index, with a backup compensator), **`doctor`** (a read-only 8-check health screen), and **`report`** (usage / dead-entry / token-budget observability).
+
+## Command surface
 
 ```
-loadout-os/
-├── packages/
-│   ├── kernel/       # was @mcptoolshop/ai-loadout (npm 1.4.3 — only one published)
-│   ├── memories/     # was @mcptoolshop/claude-memories (unpublished)
-│   └── rules/        # was @mcptoolshop/claude-rules (unpublished)
-├── apps/
-│   └── hook/         # workspace member; mirrors ~/.claude/loadout-hook/ (the LIVE one)
-├── .claude/
-│   └── CLAUDE.md
-├── ROADMAP.md
-└── README.md
+# Memory store adapter
+loadout-os memories index    <MEMORY.md> [--lazy] [--json]
+loadout-os memories validate <MEMORY.md> [--json]
+loadout-os memories stats    <MEMORY.md> [--json]
+loadout-os memories health   [path] [--json]
+
+# Instruction-file adapter
+loadout-os rules analyze  <CLAUDE.md> [--rules-dir <dir>] [--json]
+loadout-os rules validate [--rules-dir <dir>] [--lazy] [--repo-root <dir>] [--json]
+loadout-os rules stats    <CLAUDE.md> [--rules-dir <dir>] [--json]
+loadout-os rules split    [CLAUDE.md] [--yes] [--dry-run]
+
+# Knowledge router (flat kernel verbs)
+loadout-os resolve                  # resolve layered loadouts
+loadout-os explain <entry-id>       # how an entry resolved across layers
+loadout-os usage <jsonl>            # usage summary from the event log
+loadout-os dead <index> <jsonl>     # entries never loaded
+loadout-os overlaps <index>         # keyword routing ambiguities
+loadout-os budget <index> [jsonl]   # token budget breakdown
+loadout-os validate <index>         # validate index STRUCTURE (kernel)
+
+# Rituals + hook
+loadout-os doctor [--json]                    # read-only health screen
+loadout-os report [--index <p>] [--jsonl <p>] # observability over usage.jsonl
+loadout-os hook test [--prompt "<text>"]      # drive the runtime hook on a sample prompt
+loadout-os refresh [--store <d>] [--dest <p>] [--dry-run]  # index → validate → publish
 ```
+
+> **Name collision, resolved by namespacing.** The flat `validate <index>` is the kernel's index-structure validator. The store and rules linters are namespaced — `memories validate <MEMORY.md>` and `rules validate` — so all three coexist. Run `loadout-os <command> --help` for per-command synopsis, arguments, and exit codes.
+
+## Install
+
+```bash
+npm install -g @mcptoolshop/loadout-os    # the loadout-os CLI
+loadout-os --help            # the full command tree
+loadout-os doctor            # confirm the system is healthy
+```
+
+The kernel is also importable as a library — `@mcptoolshop/ai-loadout` exposes `planLoad`, `matchLoadout`, `resolveLoadout`, `recordLoad`, and the dispatch-table types.
+
+## Documentation
+
+- **[Handbook](https://mcp-tool-shop-org.github.io/loadout-os/handbook/)** — overview, install, architecture, command reference, rituals, and migration from the legacy packages.
+- **[Repository](https://github.com/mcp-tool-shop-org/loadout-os)** — source, roadmap, and issues.
 
 ## Why consolidate
 
-Decompose-by-secrets (Parnas 1972) was the clean answer for a team of N humans. The studio runs 1 human + LLM crew — multi-repo work fragments Claude context across sessions and lets unpublished adapters rot. One named umbrella repo serves the operator. Full reasoning: `memory/Feedback/feedback_consolidate_when_cant_juggle_repos.md` in the canonical memory store.
+Decompose-by-secrets (Parnas 1972) was the clean answer for a team of N humans. For a solo operator plus an LLM crew it is operationally broken: multi-repo work fragments the agent's context across sessions, unpublished adapters rot (only the kernel ever shipped), and advancement serializes across repos. One named umbrella repo with one CLI serves the operator. Full reasoning lives in the canonical memory store (`feedback_consolidate_when_cant_juggle_repos.md`).
+
+## Status
+
+Consolidation in progress. loadout-os folds together the kernel and two adapters that previously lived as separate packages, plus the live runtime hook. The published upstream today is **`@mcptoolshop/ai-loadout`** (the kernel); the unified `loadout-os` package ships from this repo. The three legacy bins keep working until their planned retirement.
 
 ## License
 
-MIT (matches all three upstream sources).
+MIT — matches all upstream sources.

@@ -5,7 +5,7 @@
  *
  * One binary that wraps the three library packages (kernel = ai-loadout,
  * memories = claude-memories, rules = claude-rules) and absorbs the operational
- * rituals (doctor / report / hook test; refresh is stubbed this wave).
+ * rituals (doctor / report / hook test / refresh).
  *
  * Command tree:
  *   loadout-os memories <index|validate|stats|health> <MEMORY.md>   (namespaced)
@@ -14,7 +14,7 @@
  *   loadout-os doctor [--json]                                       (ritual, read-only)
  *   loadout-os report  [--jsonl <p>] [--index <p>] [--json]          (ritual, read-only)
  *   loadout-os hook test [--prompt "<text>"]                         (read-only)
- *   loadout-os refresh                                               (STUB this wave)
+ *   loadout-os refresh [--store <d>] [--dest <p>] [--dry-run]        (ritual; index→validate→publish)
  *   loadout-os --help | --version
  *
  * The flat `validate <index>` is the KERNEL index-structure validator; the
