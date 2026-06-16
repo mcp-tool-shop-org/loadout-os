@@ -5,8 +5,14 @@
   "license": "MIT",
   "author": "mcp-tool-shop",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mcp-tool-shop-org/loadout-os.git"
+  },
+  "homepage": "https://github.com/mcp-tool-shop-org/loadout-os#readme",
+  "bugs": "https://github.com/mcp-tool-shop-org/loadout-os/issues",
   "bin": {
-    "loadout-os": "./dist/loadout-os.js"
+    "loadout-os": "dist/loadout-os.js"
   },
   "files": [
     "dist/loadout-os.js",
