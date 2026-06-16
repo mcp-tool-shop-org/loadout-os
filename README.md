@@ -75,6 +75,16 @@ Decompose-by-secrets (Parnas 1972) was the clean answer for a team of N humans. 
 
 Consolidation in progress. loadout-os folds together the kernel and two adapters that previously lived as separate packages, plus the live runtime hook. The published upstream today is **`@mcptoolshop/ai-loadout`** (the kernel); the unified `loadout-os` package ships from this repo. The three legacy bins keep working until their planned retirement.
 
+## Trust model
+
+loadout-os runs entirely on your machine. There is no network call, no telemetry, and no account.
+
+- **Data it touches (local only):** your memory store (`MEMORY.md` + topic files), your instruction files (`CLAUDE.md` + `.claude/rules/`), the generated dispatch index next to the store, the global resolver index (`~/.ai-loadout/index.json`), and the append-only usage log (`~/.ai-loadout/usage.jsonl`).
+- **Data it does NOT touch:** no network egress, no telemetry, no remote services, no credentials or secrets. Nothing is read, stored, or transmitted off the local disk paths above.
+- **Permissions required:** local filesystem only. `doctor` and `report` are pure reads (they never write). The only writes are the index files, the interactive `rules split` output, and the usage log — all in the expected local locations above. The irreversible write (`refresh` publishing the live global index) is guarded by an andon halt on validation failure and a `<dest>.bak` compensator. The runtime hook is fail-silent: every error path exits `0`, so it can never block a prompt.
+
+Full threat model and reporting process: [SECURITY.md](./SECURITY.md).
+
 ## License
 
 MIT — matches all upstream sources.
