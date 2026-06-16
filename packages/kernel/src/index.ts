@@ -33,7 +33,7 @@ export { validateIndex } from "./validate.js";
 export { mergeIndexes } from "./merge.js";
 
 // ── Usage ─────────────────────────────────────────────────────
-export { recordUsage, readUsage, summarizeUsage, summaryToJSON } from "./usage.js";
+export { recordUsage, readUsage, readUsageWithStats, summarizeUsage, summaryToJSON } from "./usage.js";
 export type { UsageSummary, UsageSummaryJSON } from "./usage.js";
 
 // ── Analysis ──────────────────────────────────────────────────

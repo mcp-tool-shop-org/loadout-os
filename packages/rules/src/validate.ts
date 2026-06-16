@@ -17,6 +17,37 @@ import { log, ok, warn, info, fail, BOLD, DIM, RESET, RED, GREEN, YELLOW } from 
 import { positionalArgs, flagValue, hasFlag } from "./cli.js";
 import type { RuleIndex, RuleEntry, FsValidationIssue } from "./types.js";
 
+// ── Fix hints per issue code (humanization — say which side is canonical) ──
+// Frontmatter is the source of truth; index.json is regenerated from it. Drift
+// hints always point the user back to the frontmatter (or to re-running split),
+// so they know which side to edit instead of guessing.
+const FIX_HINTS: Record<string, string> = {
+  DRIFT_ID:
+    "frontmatter is canonical; update index.json (or re-run `claude-rules split`)",
+  DRIFT_PRIORITY:
+    "frontmatter is canonical; update index.json (or re-run `claude-rules split`)",
+  DRIFT_KEYWORDS:
+    "frontmatter is canonical; update index.json (or re-run `claude-rules split`)",
+  ORPHAN_FILE: "add it to index.json or delete the file",
+  DUPLICATE_ID: "rename one rule's id",
+};
+
+// Find the 1-based line of a `<key>:` entry inside a file's frontmatter block.
+// Cheap, best-effort: scans the leading `---` … `---` fence only. Returns
+// undefined when the key isn't found (so we never attach a bogus line number).
+function frontmatterKeyLine(
+  content: string,
+  key: string,
+): number | undefined {
+  const lines = content.split("\n");
+  if (lines[0]?.trim() !== "---") return undefined;
+  for (let i = 1; i < lines.length; i++) {
+    if (lines[i].trim() === "---") break; // end of frontmatter fence
+    if (new RegExp(`^\\s*${key}\\s*:`).test(lines[i])) return i + 1;
+  }
+  return undefined;
+}
+
 // ── Core validation logic ──────────────────────────────────────
 export function validateRules(
   rulesDir: string,
@@ -46,6 +77,33 @@ export function validateRules(
       severity: "error",
       code: "INVALID_INDEX",
       message: `Failed to parse index.json: ${(e as Error).message}`,
+      file: indexPath,
+    });
+    return issues;
+  }
+
+  // Trust-boundary shape guard (RUL-B1): index.json is user data. JSON.parse
+  // only proves it's valid JSON, not that it has the shape we dereference. A
+  // valid-but-wrong-shape index (e.g. `{}` or `{"entries": "oops"}`) would
+  // throw "not iterable" downstream and surface as the catch-all RUNTIME_FATAL
+  // ("This is a bug. Please report it.") for what is really a user data error.
+  // Validate the shape here and emit a structured, actionable INVALID_INDEX.
+  if (!Array.isArray(index.entries)) {
+    issues.push({
+      severity: "error",
+      code: "INVALID_INDEX",
+      message:
+        "index.json is missing an `entries` array — regenerate with `claude-rules split`",
+      file: indexPath,
+    });
+    return issues;
+  }
+  if (index.budget === null || typeof index.budget !== "object") {
+    issues.push({
+      severity: "error",
+      code: "INVALID_INDEX",
+      message:
+        "index.json is missing a `budget` object — regenerate with `claude-rules split`",
       file: indexPath,
     });
     return issues;
@@ -89,6 +147,8 @@ export function validateRules(
         code: "DRIFT_ID",
         message: `ID mismatch: index says "${rule.id}" but frontmatter says "${frontmatter.id}" in ${rule.path}`,
         file: absPath,
+        line: frontmatterKeyLine(content, "id"),
+        hint: FIX_HINTS.DRIFT_ID,
       });
     }
 
@@ -98,6 +158,8 @@ export function validateRules(
         code: "DRIFT_PRIORITY",
         message: `Priority mismatch: index says "${rule.priority}" but frontmatter says "${frontmatter.priority}" in ${rule.path}`,
         file: absPath,
+        line: frontmatterKeyLine(content, "priority"),
+        hint: FIX_HINTS.DRIFT_PRIORITY,
       });
     }
 
@@ -113,6 +175,8 @@ export function validateRules(
         code: "DRIFT_KEYWORDS",
         message: `Keywords mismatch in ${rule.path}: index has [${rule.keywords.join(", ")}], frontmatter has [${frontmatter.keywords.join(", ")}]`,
         file: absPath,
+        line: frontmatterKeyLine(content, "keywords"),
+        hint: FIX_HINTS.DRIFT_KEYWORDS,
       });
     }
 
@@ -156,6 +220,7 @@ export function validateRules(
           code: "ORPHAN_FILE",
           message: `Rule file exists but not in index.json: ${relativePath}`,
           file: join(absRulesDir, file),
+          hint: FIX_HINTS.ORPHAN_FILE,
         });
       }
     }
@@ -170,6 +235,7 @@ export function validateRules(
         severity: "error",
         code: "DUPLICATE_ID",
         message: `Duplicate rule ID: "${id}"`,
+        hint: FIX_HINTS.DUPLICATE_ID,
       });
     }
     seen.add(id);
@@ -197,9 +263,27 @@ export function validateRules(
   return issues;
 }
 
+// ── Format one issue line, with optional line ref + fix hint ───
+function formatIssue(label: string, issue: FsValidationIssue): string {
+  // Append a `:line` suffix when we resolved a frontmatter line number, so the
+  // user can jump straight to the offending field.
+  const where = issue.line !== undefined ? `${RESET}:${issue.line}` : "";
+  let out = `${label} [${issue.code}] ${issue.message}${where}`;
+  if (issue.hint) {
+    out += `\n      ${DIM}fix: ${issue.hint}${RESET}`;
+  }
+  return out;
+}
+
 // ── CLI command: validate ──────────────────────────────────────
 export async function cmdValidate(args: string[]): Promise<void> {
-  const rulesDir = flagValue(args, "--rules-dir") ?? ".claude/rules";
+  const lazy = hasFlag(args, "--lazy");
+  // RUL-B2: mirror split's --lazy default. split --lazy writes to
+  // .claude/loadout; validate must look there too, otherwise the very
+  // `claude-rules validate` the tool suggests after a lazy split reports a
+  // false MISSING_INDEX against the wrong directory.
+  const rulesDir =
+    flagValue(args, "--rules-dir") ?? (lazy ? ".claude/loadout" : ".claude/rules");
   const repoRoot = process.cwd();
 
   if (hasFlag(args, "--dry-run")) {
@@ -220,12 +304,12 @@ export async function cmdValidate(args: string[]): Promise<void> {
 
   // Print errors
   for (const issue of errors) {
-    log(`${RED}error${RESET} [${issue.code}] ${issue.message}`);
+    log(formatIssue(`${RED}error${RESET}`, issue));
   }
 
   // Print warnings
   for (const issue of warnings) {
-    log(`${YELLOW}warn${RESET}  [${issue.code}] ${issue.message}`);
+    log(formatIssue(`${YELLOW}warn${RESET} `, issue));
   }
 
   log("");

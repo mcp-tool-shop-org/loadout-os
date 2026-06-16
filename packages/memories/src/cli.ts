@@ -10,7 +10,7 @@
  *   stats     — Token budget dashboard
  */
 
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, existsSync, statSync } from "node:fs";
 import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { analyzeMemoryMd } from "./analyze.js";
@@ -45,7 +45,21 @@ function hasFlag(args: string[], flag: string): boolean {
 
 function flagValue(args: string[], flag: string): string | undefined {
   const idx = args.indexOf(`--${flag}`);
-  return idx !== -1 && idx + 1 < args.length ? args[idx + 1] : undefined;
+  if (idx === -1 || idx + 1 >= args.length) return undefined;
+  const next = args[idx + 1];
+  // MEM-B05: a flag's value must be an actual value, not the next flag.
+  // `index --out --lazy` used to silently take "--lazy" as the --out path and
+  // write a file literally named "--lazy". If the next token is itself a flag,
+  // the user forgot the value — bail loudly with an actionable hint rather than
+  // doing something surprising and destructive on disk.
+  if (next.startsWith("--")) {
+    fail(
+      "MISSING_FLAG_VALUE",
+      `--${flag} is missing its value`,
+      `--${flag} needs a path, e.g. --${flag} memory/index.json`,
+    );
+  }
+  return next;
 }
 
 function positionalArgs(args: string[]): string[] {
@@ -90,15 +104,44 @@ ${BOLD}Examples:${RESET}
 }
 
 // ── Resolve MEMORY.md ─────────────────────────────────────────
+
+/**
+ * Is `p` an existing regular file?
+ *
+ * MEM-B02: existsSync() is true for directories too, so a matched directory
+ * sailed straight into readFileSync() and blew up with a raw EISDIR. Resolution
+ * must confirm the path is a *file* before handing it downstream.
+ */
+function isFile(p: string): boolean {
+  try {
+    return statSync(p).isFile();
+  } catch {
+    return false;
+  }
+}
+
 function resolveMemoryMd(args: string[]): string {
   const positional = positionalArgs(args);
   if (positional.length > 0) {
     const p = resolve(positional[0]);
-    if (existsSync(p)) return p;
-    fail("FILE_NOT_FOUND", `File not found: ${positional[0]}`);
+    if (!existsSync(p)) {
+      fail("FILE_NOT_FOUND", `File not found: ${positional[0]}`);
+    }
+    // MEM-B02: an explicit path that points at a directory is a user mistake we
+    // can name precisely — far kinder than a downstream EISDIR stack trace.
+    if (!isFile(p)) {
+      fail(
+        "NOT_A_FILE",
+        `Not a file: ${positional[0]}`,
+        "point at a MEMORY.md file, not a directory",
+      );
+    }
+    return p;
   }
 
-  // Auto-detect common locations
+  // Auto-detect common locations. Note the ~/.claude/projects candidate is a
+  // directory — MEM-B02: it must be skipped as a candidate (isFile guard),
+  // never returned, or auto-detect would feed a directory into readFileSync.
   const candidates = [
     "MEMORY.md",
     ".claude/MEMORY.md",
@@ -107,7 +150,7 @@ function resolveMemoryMd(args: string[]): string {
 
   for (const c of candidates) {
     const p = resolve(c);
-    if (existsSync(p)) return p;
+    if (isFile(p)) return p;
   }
 
   fail(
@@ -170,6 +213,15 @@ async function cmdIndex(args: string[]) {
   mkdirSync(dirname(outPath), { recursive: true });
   writeFileSync(outPath, JSON.stringify(index, null, 2) + "\n");
   ok(`Index written: ${outPath} (${index.entries.length} entries)`);
+
+  // MEM-B03: render the unresolved-ref summary HERE (the CLI), not in the
+  // library. generateIndex records every skipped ref in analysis.missingFiles
+  // (data, not stderr noise), so a single human-readable line belongs at the
+  // command boundary. Detail (which files, which lines) lives in `validate`.
+  if (analysis.missingFiles.length > 0) {
+    const n = analysis.missingFiles.length;
+    warn(`${n} unresolved ref${n === 1 ? "" : "s"} skipped — run \`validate\` for detail`);
+  }
 
   // Validate
   const issues = validateMemoryIndex(index);
@@ -303,21 +355,68 @@ if (hasFlag(args, "help") || args.length === 0) {
 const cmd = args[0];
 const cmdArgs = args.slice(1);
 
+/**
+ * Classify a thrown error into a structured (code, hint) pair.
+ *
+ * MEM-B01: command handlers (and the libraries they call, e.g. analyzeMemoryMd
+ * throwing "Cannot read MEMORY.md at …") can throw a plain Error. Without this,
+ * the throw escaped `main` as an unhandled rejection and the user saw a raw V8
+ * stack trace — a Gate-B violation. We map known failure shapes to a real code
+ * + actionable hint and exit cleanly via the existing structured `fail`.
+ */
+function classifyError(err: unknown): { code: string; message: string; hint?: string } {
+  const message = err instanceof Error ? err.message : String(err);
+  // Read failures surface from analyzeMemoryMd ("Cannot read MEMORY.md at …")
+  // and from any readFileSync on a topic file. EISDIR means a directory slipped
+  // through as a path despite the resolve guard.
+  if (/EISDIR/.test(message) || /Cannot read MEMORY\.md/.test(message)) {
+    return {
+      code: "READ_FAILED",
+      message,
+      hint: "check the path exists, is a file, and is readable",
+    };
+  }
+  if (/EACCES|EPERM|ENOENT/.test(message)) {
+    // Could be either read or write depending on the op; bias to the command.
+    const isWrite = cmd === "index";
+    return isWrite
+      ? { code: "WRITE_FAILED", message, hint: "check the output directory is writable" }
+      : { code: "READ_FAILED", message, hint: "check the path exists and is readable" };
+  }
+  if (cmd === "index") {
+    return { code: "WRITE_FAILED", message, hint: "check the output path and directory permissions" };
+  }
+  return { code: "READ_FAILED", message, hint: "check the input file and try again" };
+}
+
+/**
+ * Run a command handler, routing any escaping error through structured `fail`.
+ * MEM-B01: this single wrapper guarantees no command throws a raw stack.
+ */
+async function runCommand(fn: () => Promise<void> | void): Promise<void> {
+  try {
+    await fn();
+  } catch (err) {
+    const { code, message, hint } = classifyError(err);
+    fail(code, message, hint);
+  }
+}
+
 switch (cmd) {
   case "analyze":
-    await cmdAnalyze(cmdArgs);
+    await runCommand(() => cmdAnalyze(cmdArgs));
     break;
   case "index":
-    await cmdIndex(cmdArgs);
+    await runCommand(() => cmdIndex(cmdArgs));
     break;
   case "validate":
-    await cmdValidate(cmdArgs);
+    await runCommand(() => cmdValidate(cmdArgs));
     break;
   case "stats":
-    await cmdStats(cmdArgs);
+    await runCommand(() => cmdStats(cmdArgs));
     break;
   case "health":
-    await cmdHealth();
+    await runCommand(() => cmdHealth());
     break;
   default:
     fail("UNKNOWN_COMMAND", `Unknown command: ${cmd}`, "Run claude-memories --help for usage");

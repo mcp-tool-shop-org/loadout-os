@@ -16,7 +16,12 @@ import type { RuleIndex, RuleEntry } from "./types.js";
 // ── CLI command: stats ─────────────────────────────────────────
 export async function cmdStats(args: string[]): Promise<void> {
   const jsonMode = hasFlag(args, "--json");
-  const rulesDir = flagValue(args, "--rules-dir") ?? ".claude/rules";
+  const lazy = hasFlag(args, "--lazy");
+  // RUL-B2: mirror split's --lazy default (.claude/loadout) so stats reports on
+  // the directory a lazy split actually wrote to, instead of an empty
+  // .claude/rules.
+  const rulesDir =
+    flagValue(args, "--rules-dir") ?? (lazy ? ".claude/loadout" : ".claude/rules");
   const repoRoot = process.cwd();
   const absRulesDir = resolve(repoRoot, rulesDir);
   const indexPath = join(absRulesDir, "index.json");

@@ -18,14 +18,25 @@ export function recordUsage(event: UsageEvent, filePath: string): void {
 }
 
 /**
- * Read all usage events from a JSONL file.
- * Silently skips malformed lines.
+ * Read all usage events from a JSONL file, with parse statistics.
+ *
+ * Malformed lines are skipped (a corrupt line shouldn't sink the whole report)
+ * but are COUNTED so callers can surface the loss instead of silently hiding
+ * it — silent data loss is misleading observability. Blank lines are not
+ * malformed and are not counted.
+ *
+ * @returns `{ events, skipped }` where `skipped` is the number of non-blank
+ *          lines that failed to parse.
  */
-export function readUsage(filePath: string): UsageEvent[] {
-  if (!existsSync(filePath)) return [];
+export function readUsageWithStats(filePath: string): {
+  events: UsageEvent[];
+  skipped: number;
+} {
+  if (!existsSync(filePath)) return { events: [], skipped: 0 };
 
   const content = readFileSync(filePath, "utf-8");
   const events: UsageEvent[] = [];
+  let skipped = 0;
 
   for (const line of content.split("\n")) {
     const trimmed = line.trim();
@@ -33,11 +44,23 @@ export function readUsage(filePath: string): UsageEvent[] {
     try {
       events.push(JSON.parse(trimmed) as UsageEvent);
     } catch {
-      // Skip malformed lines
+      // Malformed line — skip but count so the caller can warn.
+      skipped++;
     }
   }
 
-  return events;
+  return { events, skipped };
+}
+
+/**
+ * Read all usage events from a JSONL file.
+ * Silently skips malformed lines.
+ *
+ * Thin wrapper over {@link readUsageWithStats} that drops the skip count, kept
+ * for callers (and the published API) that only need the events array.
+ */
+export function readUsage(filePath: string): UsageEvent[] {
+  return readUsageWithStats(filePath).events;
 }
 
 /**

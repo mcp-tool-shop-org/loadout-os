@@ -14,11 +14,17 @@ import { readFileSync, existsSync } from "node:fs";
 import { resolve, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { LoadoutIndex } from "./types.js";
-import { readUsage, summarizeUsage, summaryToJSON } from "./usage.js";
+import { readUsage, readUsageWithStats, summarizeUsage, summaryToJSON } from "./usage.js";
 import { findDeadEntries, findKeywordOverlaps, analyzeBudget } from "./analysis.js";
 import { resolveLoadout, explainEntry } from "./resolve.js";
 import type { ResolveOptions } from "./resolve.js";
 import { validateIndex } from "./validate.js";
+import {
+  isLoadoutIndex,
+  describeIndexShapeProblem,
+  getFlagValue,
+  diagnoseFlagValue,
+} from "./cli-helpers.js";
 
 // ── Colors ────────────────────────────────────────────────────
 const BOLD = "\x1b[1m";
@@ -49,24 +55,35 @@ function positionalArgs(args: string[]): string[] {
   return args.filter((a) => !a.startsWith("--"));
 }
 
-function getFlagValue(args: string[], flag: string): string | undefined {
-  const prefix = `--${flag}=`;
-  for (const a of args) {
-    if (a.startsWith(prefix)) return a.slice(prefix.length);
+// getFlagValue / diagnoseFlagValue live in cli-helpers.ts (testable, pure).
+
+/**
+ * Read a path-valued flag, failing with a clear, actionable error when the
+ * value was swallowed by a following flag (e.g. `--project --json`). A truly
+ * absent flag returns undefined (these flags all have sensible defaults).
+ */
+function getPathFlag(args: string[], flag: string): string | undefined {
+  if (diagnoseFlagValue(args, flag) === "swallowed") {
+    fail(
+      "MISSING_FLAG_VALUE",
+      `--${flag} was given without a value (the next token "--${nextToken(args, flag)}" is a flag, not a value).`,
+      `Provide a value, e.g. '--${flag} <path>' or '--${flag}=<path>'.`
+    );
   }
+  return getFlagValue(args, flag);
+}
+
+function nextToken(args: string[], flag: string): string {
   const idx = args.indexOf(`--${flag}`);
-  if (idx !== -1 && idx + 1 < args.length && !args[idx + 1].startsWith("--")) {
-    return args[idx + 1];
-  }
-  return undefined;
+  return idx !== -1 ? (args[idx + 1] ?? "").replace(/^--/, "") : "";
 }
 
 function getResolveOpts(args: string[]): ResolveOptions {
   return {
-    projectRoot: getFlagValue(args, "project"),
-    globalDir: getFlagValue(args, "global"),
-    orgPath: getFlagValue(args, "org"),
-    sessionPath: getFlagValue(args, "session"),
+    projectRoot: getPathFlag(args, "project"),
+    globalDir: getPathFlag(args, "global"),
+    orgPath: getPathFlag(args, "org"),
+    sessionPath: getPathFlag(args, "session"),
   };
 }
 
@@ -74,11 +91,24 @@ function loadIndex(path: string): LoadoutIndex {
   if (!existsSync(path)) {
     fail("FILE_NOT_FOUND", `Index not found: ${path}`);
   }
+  let parsed: unknown;
   try {
-    return JSON.parse(readFileSync(path, "utf-8")) as LoadoutIndex;
+    parsed = JSON.parse(readFileSync(path, "utf-8"));
   } catch (e) {
     fail("PARSE_ERROR", `Failed to parse index: ${path}`, (e as Error).message);
   }
+  // Trust boundary: valid JSON is not necessarily a valid index. Assert the
+  // shape here so a wrong-but-parseable file fails with a clear, actionable
+  // message instead of a raw TypeError later in validate/budget/dead/overlaps.
+  if (!isLoadoutIndex(parsed)) {
+    const problem = describeIndexShapeProblem(parsed);
+    fail(
+      "INVALID_INDEX",
+      `File is valid JSON but not a loadout index: ${path}`,
+      `Expected an object with an 'entries' array${problem ? ` (${problem})` : ""}. Run 'ai-loadout validate' for details.`
+    );
+  }
+  return parsed;
 }
 
 function getVersion(): string {
@@ -135,8 +165,14 @@ function cmdUsage(args: string[]) {
   }
 
   const jsonlPath = resolve(positional[0]);
-  const events = readUsage(jsonlPath);
+  const { events, skipped } = readUsageWithStats(jsonlPath);
   const json = hasFlag(args, "json");
+
+  // Surface dropped lines so a corrupt log doesn't silently undercount.
+  // (Stay quiet in --json mode to keep stdout machine-parseable.)
+  if (skipped > 0 && !json) {
+    warn(`Skipped ${skipped} malformed line(s) in ${jsonlPath}`);
+  }
 
   if (events.length === 0) {
     if (json) { log("[]"); return; }
@@ -346,14 +382,25 @@ function cmdResolve(args: string[]) {
   for (const s of result.searched) {
     if (s.found) {
       ok(`${s.name.padEnd(10)} ${DIM}${s.path}${RESET}`);
+    } else if (s.malformed) {
+      // Present but unparseable — call it out distinctly from a missing file
+      // so the user knows there's a corrupt file to fix, not one to create.
+      warn(`${s.name.padEnd(10)} ${DIM}${s.path}${RESET} ${YELLOW}(malformed JSON — skipped)${RESET}`);
     } else {
       log(`  ${DIM}—${RESET} ${s.name.padEnd(10)} ${DIM}${s.path} (not found)${RESET}`);
     }
   }
 
   if (result.layers.length === 0) {
-    log(`\n  ${YELLOW}No loadout indexes found.${RESET}`);
-    log(`  ${DIM}Create .claude/loadout/index.json or ~/.ai-loadout/index.json${RESET}\n`);
+    // Echo the ACTUAL searched paths rather than a hardcoded default list, so
+    // the message reflects any --global/--org/--project/--session overrides and
+    // tells the user exactly where to put a file.
+    const searchedPaths = result.searched.map((s) => s.path);
+    log(`\n  ${YELLOW}No loadout indexes found in any of:${RESET}`);
+    for (const p of searchedPaths) {
+      log(`  ${DIM}  • ${p}${RESET}`);
+    }
+    log(`  ${DIM}Create one of the above to get started.${RESET}\n`);
     return;
   }
 

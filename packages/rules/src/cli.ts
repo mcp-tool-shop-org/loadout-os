@@ -62,7 +62,14 @@ export function flagValue(
   flag: string,
 ): string | undefined {
   const idx = args.indexOf(flag);
-  return idx !== -1 && idx + 1 < args.length ? args[idx + 1] : undefined;
+  if (idx === -1 || idx + 1 >= args.length) return undefined;
+  const next = args[idx + 1];
+  // Guard against a missing value: `split --rules-dir --dry-run` must not treat
+  // the following flag as a directory name (which would create a dir literally
+  // named "--dry-run"). A value-flag whose next token is itself a flag has no
+  // value — return undefined so callers fall back to their default.
+  if (next.startsWith("--")) return undefined;
+  return next;
 }
 
 // Every flag in the CLI surface that consumes the following argument as its
@@ -113,7 +120,7 @@ ${BOLD}Options:${RESET}
   --memory          Also process MEMORY.md (analyze, split)
   --dry-run         Show what would be generated without writing (split)
   --yes             Accept all proposals without prompting (split)
-  --lazy            Lazy-load rules: store in .claude/loadout/ (not auto-loaded)
+  --lazy            Lazy-load rules: use .claude/loadout/ (split, validate, stats)
   --json            Machine-readable JSON output (stats)
   --signals <path>  Custom signals config path (default: .claude/signals.json)
   --rules-dir <p>   Custom rules directory (default: .claude/rules/)

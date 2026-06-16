@@ -87,6 +87,36 @@ describe("generateIndex", () => {
     assert.ok(!ids.includes("see-also"), "see-also must not be an entry");
   });
 
+  // MEM-B03: the library export must NOT write to console.warn for unresolved
+  // refs (it spammed SDK consumers + rendered inconsistently). The unresolved
+  // paths must instead land in analysis.missingFiles (the data channel the CLI
+  // reads). Keep the library quiet.
+  it("records unresolved refs in missingFiles, never via console.warn (MEM-B03)", () => {
+    const analysis = analyzeMemoryMd(join(FIXTURES, "MEMORY.md"));
+
+    const originalWarn = console.warn;
+    const warnings: string[] = [];
+    console.warn = (...a: unknown[]) => { warnings.push(a.join(" ")); };
+    try {
+      generateIndex(analysis);
+    } finally {
+      console.warn = originalWarn;
+    }
+
+    // Fixture has unresolved refs (nullout.md, xrpl-lab.md) — they must be in
+    // the data channel...
+    assert.ok(
+      analysis.missingFiles.some((f) => f.includes("nullout")),
+      "unresolved ref must be recorded in missingFiles",
+    );
+    // ...and the library must have stayed silent on stderr.
+    assert.equal(
+      warnings.filter((w) => /unresolved ref/.test(w)).length,
+      0,
+      "generateIndex must not console.warn about unresolved refs",
+    );
+  });
+
   // MEM-007: entryFromFrontmatter must truncate the summary to 120 chars,
   // same as entryFromContent. The "Long Summary" ref points at a
   // frontmatter-bearing topic file and carries a >120-char description.

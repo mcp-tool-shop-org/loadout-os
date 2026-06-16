@@ -55,6 +55,38 @@ describe("validateMemory", () => {
       "short ids must not be flagged",
     );
   });
+
+  // MEM-B08: ID_TOO_LONG must also fire on a frontmatter-supplied id, not just
+  // the name-derived one. long-fm-id.md has a SHORT ref name ("Short FM" →
+  // "short-fm") but an over-long frontmatter id — exactly the gap MEM-004 left.
+  it("flags an over-long frontmatter id (MEM-B08)", () => {
+    const analysis = analyzeMemoryMd(join(FIXTURES, "MEMORY.md"));
+    const issues = validateMemory(analysis);
+    const tooLong = issues.filter((i) => i.code === "ID_TOO_LONG");
+    const fmFlag = tooLong.find((i) => /Frontmatter id/.test(i.message));
+    assert.ok(fmFlag, "the over-long frontmatter id must be flagged");
+    assert.equal(fmFlag.severity, "warning");
+    assert.match(
+      fmFlag.message,
+      /this-is-an-intentionally-very-long-frontmatter-id/,
+      "message names the offending frontmatter id",
+    );
+    assert.ok(fmFlag.hint, "frontmatter ID_TOO_LONG carries a hint");
+    assert.match(fmFlag.hint, /long-fm-id\.md/, "hint points at the topic file");
+  });
+
+  it("does not flag a short frontmatter id via the name path (MEM-B08)", () => {
+    // "Short FM" derives "short-fm" — the derived path must NOT flag this ref;
+    // only its over-long frontmatter id should (asserted above). Confirm there
+    // is no "Derived id" flag for the short name.
+    const analysis = analyzeMemoryMd(join(FIXTURES, "MEMORY.md"));
+    const issues = validateMemory(analysis);
+    const tooLong = issues.filter((i) => i.code === "ID_TOO_LONG");
+    assert.ok(
+      !tooLong.some((i) => /Derived id.*short-fm/.test(i.message)),
+      "short derived id short-fm must not be flagged",
+    );
+  });
 });
 
 describe("validateMemoryIndex", () => {

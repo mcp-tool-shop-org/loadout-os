@@ -73,6 +73,9 @@ export interface FsValidationIssue {
   message: string;
   file?: string;
   line?: number;
+  // Actionable, human-facing fix guidance — says which side is canonical and
+  // how to resolve the issue (e.g. "frontmatter is canonical; update index.json").
+  hint?: string;
 }
 
 // ── Signals configuration (configurable scoring) ─────────────

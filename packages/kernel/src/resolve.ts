@@ -32,6 +32,15 @@ export interface SearchedLayer {
   name: string;
   path: string;
   found: boolean;
+  /**
+   * The file exists on disk but its JSON could not be parsed. Distinct from
+   * `found: false` (file absent) so callers don't report a present-but-corrupt
+   * layer as "not found" — that's misleading. Additive/optional: undefined
+   * means "not malformed" (either absent, or found and parsed fine).
+   */
+  malformed?: boolean;
+  /** Parse error message when `malformed` is true (for diagnostics). */
+  error?: string;
 }
 
 /** Result of resolving the full layer stack. */
@@ -119,9 +128,15 @@ export function discoverLayers(opts?: ResolveOptions): {
         const raw = readFileSync(path, "utf-8");
         const index = JSON.parse(raw) as LoadoutIndex;
         layers.push({ name, path, index });
-      } catch {
-        // Malformed file — skip silently, same as missing
-        searched[searched.length - 1].found = false;
+      } catch (e) {
+        // Malformed file — skip it (don't sink the whole resolve), but record
+        // that it was malformed (not merely absent) so callers can report the
+        // difference. A present-but-corrupt file shown as "not found" hides a
+        // problem the user needs to fix.
+        const rec = searched[searched.length - 1];
+        rec.found = false;
+        rec.malformed = true;
+        rec.error = (e as Error).message;
       }
     }
   }

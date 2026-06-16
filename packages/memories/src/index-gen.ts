@@ -44,13 +44,16 @@ export function generateIndex(
       // doesn't resolve (a non-existent file, a glob like `memory/*.md`,
       // or an absolute path) used to vanish here with zero trace — that's
       // exactly how parser junk slipped through undetected. Surface it.
+      //
+      // MEM-B03: surface it through DATA, not console.warn. This is a library
+      // export consumed by SDK callers — writing to stderr here spammed every
+      // consumer and rendered inconsistently across index/analyze/stats. The
+      // unresolved path already lands in analysis.missingFiles; that is the
+      // observability channel. The CLI (cmdIndex) reads missingFiles and prints
+      // a one-line summary; the library stays quiet.
       if (!analysis.missingFiles.includes(ref.path)) {
         analysis.missingFiles.push(ref.path);
       }
-      console.warn(
-        `[claude-memories] unresolved ref "${ref.name || ref.path}" ` +
-          `→ ${ref.path} (line ${ref.line + 1}); skipped from index`,
-      );
       continue;
     }
 

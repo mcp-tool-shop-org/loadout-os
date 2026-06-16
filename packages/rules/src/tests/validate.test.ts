@@ -478,6 +478,209 @@ describe("validateRules", () => {
     assert.equal(long[0].severity, "warning");
   });
 
+  // ── RUL-B1: trust-boundary shape guard ───────────────────────
+  it("reports INVALID_INDEX (not a TypeError) when entries is not an array", () => {
+    const tmp = setupRulesDir();
+    const rulesDir = join(tmp, ".claude", "rules");
+
+    // Valid JSON, wrong shape: entries is a string. Before the guard this threw
+    // "index.entries is not iterable" → surfaced as the catch-all RUNTIME_FATAL.
+    writeFileSync(
+      join(rulesDir, "index.json"),
+      JSON.stringify({
+        version: "1.0.0",
+        generated: new Date().toISOString(),
+        entries: "oops",
+        budget: {
+          always_loaded_est: 0,
+          on_demand_total_est: 0,
+          avg_task_load_est: 0,
+          avg_task_load_observed: null,
+        },
+      }),
+    );
+
+    const issues = validateRules(".claude/rules", tmp);
+    assert.equal(issues.length, 1);
+    assert.equal(issues[0].code, "INVALID_INDEX");
+    assert.equal(issues[0].severity, "error");
+    assert.match(issues[0].message, /entries/);
+  });
+
+  it("reports INVALID_INDEX when entries is missing entirely", () => {
+    const tmp = setupRulesDir();
+    const rulesDir = join(tmp, ".claude", "rules");
+
+    writeFileSync(join(rulesDir, "index.json"), JSON.stringify({}));
+
+    const issues = validateRules(".claude/rules", tmp);
+    assert.equal(issues.length, 1);
+    assert.equal(issues[0].code, "INVALID_INDEX");
+  });
+
+  it("reports INVALID_INDEX when budget is missing", () => {
+    const tmp = setupRulesDir();
+    const rulesDir = join(tmp, ".claude", "rules");
+
+    // entries is a (valid, empty) array but budget is absent → guarded too,
+    // since stats dereferences index.budget unguarded as well.
+    writeFileSync(
+      join(rulesDir, "index.json"),
+      JSON.stringify({ version: "1.0.0", entries: [] }),
+    );
+
+    const issues = validateRules(".claude/rules", tmp);
+    assert.equal(issues.length, 1);
+    assert.equal(issues[0].code, "INVALID_INDEX");
+    assert.match(issues[0].message, /budget/);
+  });
+
+  // ── RUL-B4: drift/orphan/dup hints + line refs ────────────────
+  it("attaches a fix hint and frontmatter line to DRIFT_ID", () => {
+    const tmp = setupRulesDir();
+    const rulesDir = join(tmp, ".claude", "rules");
+
+    writeFileSync(
+      join(rulesDir, "test.md"),
+      "---\nid: different-id\nkeywords: [test]\npriority: domain\n---\n\n# Test",
+    );
+    writeFileSync(
+      join(rulesDir, "index.json"),
+      JSON.stringify({
+        version: "1.0.0",
+        generated: new Date().toISOString(),
+        entries: [
+          {
+            id: "test",
+            path: ".claude/rules/test.md",
+            keywords: ["test"],
+            patterns: [],
+            priority: "domain",
+            summary: "Test rule",
+            triggers: { task: true, plan: true, edit: false },
+            tokens_est: 50,
+            lines: 3,
+          },
+        ],
+        budget: {
+          always_loaded_est: 0,
+          on_demand_total_est: 50,
+          avg_task_load_est: 50,
+          avg_task_load_observed: null,
+        },
+      }),
+    );
+
+    const issues = validateRules(".claude/rules", tmp);
+    const drift = issues.find((i) => i.code === "DRIFT_ID");
+    assert.ok(drift, "expected a DRIFT_ID issue");
+    assert.match(drift!.hint ?? "", /frontmatter is canonical/);
+    // `id:` is the 2nd line of the file (line 1 is the opening `---`).
+    assert.equal(drift!.line, 2);
+  });
+
+  it("attaches the priority frontmatter line to DRIFT_PRIORITY", () => {
+    const tmp = setupRulesDir();
+    const rulesDir = join(tmp, ".claude", "rules");
+
+    writeFileSync(
+      join(rulesDir, "prio.md"),
+      "---\nid: prio\nkeywords: [alpha]\npriority: core\n---\n\n# Prio",
+    );
+    writeFileSync(
+      join(rulesDir, "index.json"),
+      JSON.stringify({
+        version: "1.0.0",
+        generated: new Date().toISOString(),
+        entries: [
+          {
+            id: "prio",
+            path: ".claude/rules/prio.md",
+            keywords: ["alpha"],
+            patterns: [],
+            priority: "domain",
+            summary: "Priority drift rule",
+            triggers: { task: true, plan: true, edit: false },
+            tokens_est: 50,
+            lines: 3,
+          },
+        ],
+        budget: {
+          always_loaded_est: 0,
+          on_demand_total_est: 50,
+          avg_task_load_est: 50,
+          avg_task_load_observed: null,
+        },
+      }),
+    );
+
+    const issues = validateRules(".claude/rules", tmp);
+    const drift = issues.find((i) => i.code === "DRIFT_PRIORITY");
+    assert.ok(drift, "expected a DRIFT_PRIORITY issue");
+    assert.match(drift!.hint ?? "", /frontmatter is canonical/);
+    // `priority:` is the 4th line.
+    assert.equal(drift!.line, 4);
+  });
+
+  it("attaches actionable hints to ORPHAN_FILE and DUPLICATE_ID", () => {
+    const tmp = setupRulesDir();
+    const rulesDir = join(tmp, ".claude", "rules");
+
+    // Orphan file present + two index entries sharing an id.
+    writeFileSync(
+      join(rulesDir, "orphan.md"),
+      "---\nid: orphan\nkeywords: [lost]\npriority: domain\n---\n\n# Orphan",
+    );
+    const fm = "---\nid: dup\nkeywords: [alpha]\npriority: domain\n---\n\n# Dup";
+    writeFileSync(join(rulesDir, "dup-a.md"), fm);
+    writeFileSync(join(rulesDir, "dup-b.md"), fm);
+    writeFileSync(
+      join(rulesDir, "index.json"),
+      JSON.stringify({
+        version: "1.0.0",
+        generated: new Date().toISOString(),
+        entries: [
+          {
+            id: "dup",
+            path: ".claude/rules/dup-a.md",
+            keywords: ["alpha"],
+            patterns: [],
+            priority: "domain",
+            summary: "First dup",
+            triggers: { task: true, plan: true, edit: false },
+            tokens_est: 50,
+            lines: 3,
+          },
+          {
+            id: "dup",
+            path: ".claude/rules/dup-b.md",
+            keywords: ["beta"],
+            patterns: [],
+            priority: "domain",
+            summary: "Second dup",
+            triggers: { task: true, plan: true, edit: false },
+            tokens_est: 50,
+            lines: 3,
+          },
+        ],
+        budget: {
+          always_loaded_est: 0,
+          on_demand_total_est: 100,
+          avg_task_load_est: 100,
+          avg_task_load_observed: null,
+        },
+      }),
+    );
+
+    const issues = validateRules(".claude/rules", tmp);
+    const orphan = issues.find((i) => i.code === "ORPHAN_FILE");
+    const dup = issues.find((i) => i.code === "DUPLICATE_ID");
+    assert.ok(orphan, "expected an ORPHAN_FILE issue");
+    assert.match(orphan!.hint ?? "", /add it to index\.json or delete the file/);
+    assert.ok(dup, "expected a DUPLICATE_ID issue");
+    assert.match(dup!.hint ?? "", /rename one rule's id/);
+  });
+
   it("passes clean for valid setup", () => {
     const tmp = setupRulesDir();
     const rulesDir = join(tmp, ".claude", "rules");

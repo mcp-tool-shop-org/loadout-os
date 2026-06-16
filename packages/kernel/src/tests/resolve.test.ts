@@ -120,6 +120,48 @@ describe("discoverLayers", () => {
     cleanup(root);
   });
 
+  it("distinguishes malformed from missing layers (KER-B2)", () => {
+    const { root, globalDir, projectRoot } = setupTmpDirs();
+    // global: present but corrupt; project: simply absent (no file written)
+    writeFileSync(join(globalDir, "index.json"), "{ not valid json");
+
+    const { searched } = discoverLayers({ globalDir, projectRoot });
+
+    const global = searched.find((s) => s.name === "global")!;
+    const project = searched.find((s) => s.name === "project")!;
+
+    // Corrupt: found=false but flagged malformed with a diagnostic message.
+    assert.equal(global.found, false);
+    assert.equal(global.malformed, true);
+    assert.ok(typeof global.error === "string" && global.error.length > 0);
+
+    // Truly missing: found=false and NOT flagged malformed.
+    assert.equal(project.found, false);
+    assert.notEqual(project.malformed, true);
+    assert.equal(project.error, undefined);
+    cleanup(root);
+  });
+
+  it("searched list echoes the actual override paths (KER-B10)", () => {
+    // The empty-resolve message reads searched[].path; confirm those paths
+    // reflect the caller's overrides so the rendered list is accurate.
+    const { root, globalDir, projectRoot } = setupTmpDirs();
+    const sessionFile = join(root, "my-session.json");
+
+    const { layers, searched } = discoverLayers({
+      globalDir,
+      projectRoot,
+      sessionPath: sessionFile,
+    });
+
+    assert.equal(layers.length, 0); // nothing written → empty resolve
+    const paths = searched.map((s) => s.path);
+    assert.ok(paths.some((p) => p.includes(globalDir)), "global path echoed");
+    assert.ok(paths.some((p) => p.includes(projectRoot)), "project path echoed");
+    assert.ok(paths.includes(sessionFile), "session override path echoed");
+    cleanup(root);
+  });
+
   it("includes org layer when path is provided", () => {
     const { root, globalDir, projectRoot } = setupTmpDirs();
     const orgDir = join(root, "org");

@@ -6,13 +6,27 @@
  * and adds memory-specific checks.
  */
 
-import { validateIndex as validateLoadoutIndex } from "@mcptoolshop/ai-loadout";
+import { readFileSync, existsSync } from "node:fs";
+import { join, dirname, resolve } from "node:path";
+import { validateIndex as validateLoadoutIndex, parseFrontmatter } from "@mcptoolshop/ai-loadout";
 import type { ValidationIssue } from "@mcptoolshop/ai-loadout";
 import type { MemoryAnalysis, MemoryIndex } from "./types.js";
 import { nameToId } from "./index-gen.js";
 
 /** ROADMAP Phase 2 (MEM-004): derived ids longer than this are flagged. */
 const MAX_ID_LENGTH = 60;
+
+/**
+ * Resolve a ref path against MEMORY.md's dir then its parent (the same
+ * two-base strategy analyze/index-gen use), returning the first that exists.
+ */
+function resolveRefPath(refPath: string, fileDir: string, parentDir: string): string | null {
+  for (const base of [fileDir, parentDir]) {
+    const full = join(base, refPath);
+    if (existsSync(full)) return full;
+  }
+  return null;
+}
 
 /**
  * Validate a memory analysis for structural issues.
@@ -76,18 +90,44 @@ export function validateMemory(analysis: MemoryAnalysis): ValidationIssue[] {
     }
   }
 
-  // Over-long derived ids (MEM-004 / ROADMAP Phase 2).
-  // The id is derived from the ref name the same way index-gen does
-  // (nameToId, reused via MEM-009), so this flags what would become an
-  // unwieldy dispatch-table key.
+  // Over-long ids (MEM-004 / ROADMAP Phase 2; MEM-B08).
+  // The id that lands in the dispatch table is EITHER derived from the ref name
+  // (nameToId, reused via MEM-009) OR, when the topic file carries frontmatter,
+  // the frontmatter-supplied `id` (entryFromFrontmatter uses fm.id verbatim).
+  // MEM-004 only checked the derived path, so an 80-char frontmatter id sailed
+  // through validate and became an unwieldy key. MEM-B08: apply MAX_ID_LENGTH to
+  // whichever id index-gen would actually use.
+  const fileDir = dirname(resolve(analysis.filePath));
+  const parentDir = dirname(fileDir);
   for (const ref of analysis.refs) {
-    const id = nameToId(ref.name);
-    if (id.length > MAX_ID_LENGTH) {
+    // The effective id: frontmatter id wins (matches entryFromFrontmatter),
+    // else the derived kebab id (matches entryFromContent).
+    let effectiveId = nameToId(ref.name);
+    let source = "Derived";
+
+    const resolved = resolveRefPath(ref.path, fileDir, parentDir);
+    if (resolved) {
+      try {
+        const { frontmatter } = parseFrontmatter(readFileSync(resolved, "utf-8"));
+        if (frontmatter && typeof frontmatter.id === "string" && frontmatter.id.length > 0) {
+          effectiveId = frontmatter.id;
+          source = "Frontmatter";
+        }
+      } catch {
+        // Unreadable topic file — already flagged via MISSING_TOPIC_FILE above.
+        // Fall back to the derived id for the length check.
+      }
+    }
+
+    if (effectiveId.length > MAX_ID_LENGTH) {
       issues.push({
         severity: "warning",
         code: "ID_TOO_LONG",
-        message: `Derived id at line ${ref.line + 1} is ${id.length} chars (max ${MAX_ID_LENGTH}): "${id}"`,
-        hint: "Shorten the reference name so its kebab-case id stays under 60 chars",
+        message: `${source} id at line ${ref.line + 1} is ${effectiveId.length} chars (max ${MAX_ID_LENGTH}): "${effectiveId}"`,
+        hint:
+          source === "Frontmatter"
+            ? `Shorten the frontmatter id in ${ref.path} so it stays under ${MAX_ID_LENGTH} chars`
+            : `Shorten the reference name so its kebab-case id stays under ${MAX_ID_LENGTH} chars`,
       });
     }
   }

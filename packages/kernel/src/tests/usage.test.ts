@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { writeFileSync, unlinkSync, mkdtempSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { recordUsage, readUsage, summarizeUsage, summaryToJSON } from "../usage.js";
+import { recordUsage, readUsage, readUsageWithStats, summarizeUsage, summaryToJSON } from "../usage.js";
 import type { UsageEvent } from "../types.js";
 
 function makeTmp(): string {
@@ -55,6 +55,62 @@ describe("readUsage", () => {
     writeFileSync(path, "");
     const events = readUsage(path);
     assert.equal(events.length, 0);
+    unlinkSync(path);
+  });
+});
+
+describe("readUsageWithStats (KER-B5 observability)", () => {
+  it("counts malformed lines instead of silently dropping them", () => {
+    const path = makeTmp();
+    writeFileSync(
+      path,
+      '{"entryId":"a","timestamp":"t","taskHash":"h","trigger":"t","mode":"lazy","tokensEst":1}\n' +
+        "not json\n" +
+        "also { broken\n" +
+        '{"entryId":"b","timestamp":"t","taskHash":"h","trigger":"t","mode":"lazy","tokensEst":2}\n'
+    );
+    const { events, skipped } = readUsageWithStats(path);
+    assert.equal(events.length, 2);
+    assert.equal(skipped, 2);
+    unlinkSync(path);
+  });
+
+  it("reports zero skipped for a clean file", () => {
+    const path = makeTmp();
+    writeFileSync(
+      path,
+      '{"entryId":"a","timestamp":"t","taskHash":"h","trigger":"t","mode":"lazy","tokensEst":1}\n'
+    );
+    const { events, skipped } = readUsageWithStats(path);
+    assert.equal(events.length, 1);
+    assert.equal(skipped, 0);
+    unlinkSync(path);
+  });
+
+  it("does not count blank lines as malformed", () => {
+    const path = makeTmp();
+    writeFileSync(
+      path,
+      '{"entryId":"a","timestamp":"t","taskHash":"h","trigger":"t","mode":"lazy","tokensEst":1}\n\n   \n'
+    );
+    const { events, skipped } = readUsageWithStats(path);
+    assert.equal(events.length, 1);
+    assert.equal(skipped, 0);
+    unlinkSync(path);
+  });
+
+  it("returns zero skipped for a missing file", () => {
+    const { events, skipped } = readUsageWithStats("/nonexistent/path/usage.jsonl");
+    assert.equal(events.length, 0);
+    assert.equal(skipped, 0);
+  });
+
+  it("readUsage remains a thin wrapper returning just the events", () => {
+    const path = makeTmp();
+    writeFileSync(path, "broken\n" + '{"entryId":"a","timestamp":"t","taskHash":"h","trigger":"t","mode":"lazy","tokensEst":1}\n');
+    const events = readUsage(path);
+    assert.equal(events.length, 1);
+    assert.equal(events[0].entryId, "a");
     unlinkSync(path);
   });
 });

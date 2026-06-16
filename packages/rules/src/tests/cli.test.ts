@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { resolve, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, writeFileSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { positionalArgs, flagValue } from "../cli.js";
 
@@ -98,6 +98,94 @@ describe("flagValue bounds safety", () => {
       flagValue(["--rules-dir", "custom/rules"], "--rules-dir"),
       "custom/rules",
     );
+  });
+
+  it("returns undefined when the next token is itself a flag (RUL-B6)", () => {
+    // `split --rules-dir --dry-run` must NOT treat `--dry-run` as the value —
+    // doing so would create a directory literally named "--dry-run".
+    assert.equal(
+      flagValue(["--rules-dir", "--dry-run"], "--rules-dir"),
+      undefined,
+    );
+    assert.equal(
+      flagValue(["split", "--signals", "--lazy"], "--signals"),
+      undefined,
+    );
+  });
+});
+
+describe("--lazy directory awareness (RUL-B2)", () => {
+  // Build a CLAUDE.md with one fat, extractable section so split has work to do.
+  function writeClaudeMd(dir: string): string {
+    const claudeMd = join(dir, "CLAUDE.md");
+    const content = [
+      "# Project",
+      "",
+      "## GitHub Actions Rules",
+      "CI minutes are finite. Every workflow must be paths-gated.",
+      ...Array(20).fill("Detail line for a long extractable section."),
+    ].join("\n");
+    writeFileSync(claudeMd, content, "utf8");
+    return claudeMd;
+  }
+
+  it("validate --lazy reads .claude/loadout after a lazy split (no false MISSING_INDEX)", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "lazy-validate-"));
+    // split resolves the rules dir relative to the file's parent's parent, so
+    // place CLAUDE.md under <tmp>/.claude/CLAUDE.md → loadout at <tmp>/.claude/loadout.
+    const claudeDir = join(tmp, ".claude");
+    mkdirSync(claudeDir, { recursive: true });
+    const claudeMd = writeClaudeMd(claudeDir);
+
+    // Lazy split writes rule files + index.json under .claude/loadout/.
+    execFileSync(process.execPath, [CLI, "split", "--lazy", "--yes", claudeMd], {
+      encoding: "utf8",
+      timeout: 10000,
+      cwd: tmp,
+    });
+
+    // validate --lazy must find the index there and NOT report MISSING_INDEX.
+    const out = execFileSync(
+      process.execPath,
+      [CLI, "validate", "--lazy"],
+      { encoding: "utf8", timeout: 10000, cwd: tmp },
+    );
+    assert.ok(
+      !out.includes("MISSING_INDEX"),
+      `validate --lazy should not report MISSING_INDEX, got:\n${out}`,
+    );
+    assert.ok(out.includes(".claude/loadout"), "should validate the loadout dir");
+  });
+
+  it("validate WITHOUT --lazy still looks at .claude/rules (false MISSING_INDEX reproduces the bug)", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "lazy-validate-default-"));
+    const claudeDir = join(tmp, ".claude");
+    mkdirSync(claudeDir, { recursive: true });
+    const claudeMd = writeClaudeMd(claudeDir);
+
+    execFileSync(process.execPath, [CLI, "split", "--lazy", "--yes", claudeMd], {
+      encoding: "utf8",
+      timeout: 10000,
+      cwd: tmp,
+    });
+
+    // Without --lazy, validate defaults to .claude/rules (empty) → MISSING_INDEX,
+    // exit 1. This documents that --lazy is required to match the lazy split.
+    const { status, out } = (() => {
+      try {
+        const o = execFileSync(process.execPath, [CLI, "validate"], {
+          encoding: "utf8",
+          timeout: 10000,
+          cwd: tmp,
+        });
+        return { status: 0, out: o };
+      } catch (e) {
+        const err = e as { status?: number; stdout?: string };
+        return { status: err.status ?? -1, out: err.stdout ?? "" };
+      }
+    })();
+    assert.equal(status, 1);
+    assert.ok(out.includes("MISSING_INDEX"), `expected MISSING_INDEX, got:\n${out}`);
   });
 });
 
