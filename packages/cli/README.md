@@ -1,3 +1,5 @@
+<p align="center"><img src="https://raw.githubusercontent.com/mcp-tool-shop-org/loadout-os/main/logo.png" alt="loadout-os" width="320"></p>
+
 # @mcptoolshop/loadout-os
 
 The unified **Knowledge OS** CLI. One `loadout-os` binary that wraps the three

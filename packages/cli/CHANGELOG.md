@@ -9,7 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > history (workspace wiring, the runtime hook, the adapters), see the
 > [root CHANGELOG](../../CHANGELOG.md).
 
-## [Unreleased]
+## [1.0.1] - 2026-06-16
+
+### Fixed
+
+- npm README now renders the loadout-os logo (absolute raw-GitHub URL — npm does not
+  resolve relative image paths). README + version only; the published bundle is
+  unchanged from 1.0.0.
+
+## [1.0.0] - 2026-06-16
 
 ### Added
 
@@ -22,5 +30,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   compensator); plus `hook test`.
 - Per-command `--help` (synopsis, arguments, flags, example, exit codes) for every leaf
   command.
-
-<!-- ## [1.0.0] - YYYY-MM-DD -->
