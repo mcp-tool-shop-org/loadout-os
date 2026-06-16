@@ -56,17 +56,19 @@ jobs:
       - name: Build (kernel -> memories -> rules -> cli)
         run: npm run build
 
+      - name: Bundle the CLI (self-contained publish artifact)
+        run: npm run bundle -w packages/cli
+
       - name: Test
         run: npm test
 
       - name: npm pack dry-run (verify shape)
         run: npm pack --dry-run -w packages/cli
 
-      # NOTE (Phase 6): @mcptoolshop/loadout-os depends on the workspace packages
-      # @mcptoolshop/claude-memories + @mcptoolshop/claude-rules, which are NOT yet
-      # published. Before the first real publish, either publish those deps (see
-      # multi-repo-publish-sequencing) or bundle/inline them. Until then this
-      # publish step would produce an install-broken package.
+      # The published package is SELF-CONTAINED: packages/cli prepublishOnly runs
+      # build + esbuild bundle, inlining the kernel + memories + rules logic into
+      # dist/loadout-os.js — no external @mcptoolshop runtime deps (we also bundle
+      # explicitly above so the pack-dry-run shape check sees the real artifact).
       - name: Publish to npm with provenance (OIDC trusted publisher)
         run: npm publish -w packages/cli --provenance --access public
 
