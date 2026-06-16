@@ -1,6 +1,6 @@
 # memory-os
 
-> **Prototype, 2026-06-10.** Consolidated Knowledge OS for the studio — folds `ai-loadout` (kernel) + `claude-memories` (MEMORY.md adapter) + `claude-rules` (CLAUDE.md adapter) + the runtime UserPromptSubmit pointer-injection hook into a single repo. Not yet wired as workspaces, not yet published, not yet on a remote.
+> **Prototype, 2026-06-10.** Consolidated Knowledge OS for the studio — folds `ai-loadout` (kernel) + `claude-memories` (MEMORY.md adapter) + `claude-rules` (CLAUDE.md adapter) + the runtime UserPromptSubmit pointer-injection hook into a single repo. Wired as npm workspaces (Phase 1 done — `npm install` + `npm run build`/`test`/`verify` work at root). Not yet published; no remote yet (a deliberate Phase-5 waiver — see `.claude/CLAUDE.md`).
 
 ## Pickers start here
 
@@ -17,7 +17,7 @@ memory-os/
 │   ├── memories/     # was @mcptoolshop/claude-memories (unpublished)
 │   └── rules/        # was @mcptoolshop/claude-rules (unpublished)
 ├── apps/
-│   └── hook/         # mirror of ~/.claude/loadout-hook/ (the LIVE one)
+│   └── hook/         # workspace member; mirrors ~/.claude/loadout-hook/ (the LIVE one)
 ├── .claude/
 │   └── CLAUDE.md
 ├── ROADMAP.md

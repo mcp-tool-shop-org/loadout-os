@@ -39,7 +39,7 @@ Operational consequences:
 
 ## Status — PROTOTYPE (bootstrapped 2026-06-10)
 
-Phase 0 of 6 done. Pick up via `ROADMAP.md` (six phases: wiring → runtime quality → unified CLI → docs → npm/GitHub bootstrap → publish + retirement).
+Phase 1 done (workspace wiring); Health Pass (dogfood-swarm) in progress; Phase 2 hook-threshold landed. Pick up via `ROADMAP.md` (six phases: wiring → runtime quality → unified CLI → docs → npm/GitHub bootstrap → publish + retirement).
 
 ## Source-of-truth rule (load-bearing)
 
@@ -69,17 +69,22 @@ Decompose-by-secrets (Parnas 1972) is right for N humans, operationally broken f
 
 ## Verification
 
-- Per-package (until Phase 1 wires the root): `npm test` inside `packages/{kernel,memories,rules}` — all three have real suites.
+- Root: `npm run verify` (build + per-package verify across kernel/memories/rules); `npm test` / `npm run build` also run at root. Per-package still works: `npm test` inside `packages/{kernel,memories,rules}` — all three have real suites (228 green as of Stage A).
 - Hook: `apps/hook/smoke-test.ps1` (drives the hook with sample stdin JSON; also run it against the live copy after any hook change).
 - System: `claude-memories validate <store>/MEMORY.md` (expect 0 errors) and `ai-loadout validate <store>/index.json` / `~/.ai-loadout/index.json`.
 - This is a CLI/library repo — never use preview/browser tools here.
 
 ## Known issues (field evidence, 2026-06-10 — Phase 2 owns these)
 
-1. **Hook has no score threshold.** Design said below-threshold → silence; implementation injects top-5 regardless (observed: irrelevant claude-guardian/duel-system pointers on a memory-os prompt).
-2. **Junk index entries** derived from prose lines: `memory-files`, `full-frame`, `see-also-…` (100+-char id). Root cause is in `packages/memories` parsing/index-gen, not the data.
-3. **Weak keyword matching** on auto-extracted keywords; `ai-loadout overlaps` shows routing ambiguities. Hand-curated frontmatter keywords is the cheap fix.
-4. One LONG_SUMMARY warning left in the store index (`newsletter-publishing-…`).
+**Resolved (Stage A health pass):**
+
+- ~~**Hook has no score threshold.**~~ **FIXED (HOK-01, commit `43155a8`)** — `apps/hook/loadout-hook.mjs` now applies a `HOOK_MIN_SCORE=0.3` floor, so below-threshold matches emit nothing (the design's silence behavior). The off-topic claude-guardian/duel-system pointers were the symptom.
+- ~~**Junk index entries** derived from prose lines (`memory-files`, `full-frame`, `see-also-…`).~~ **FIXED in-package (commit `a4fa04f`)** — `packages/memories` parser/index-gen no longer turns prose citations into index entries, plus an `ID_TOO_LONG` validate rule. The live store/global index regenerates upstream via the Index Freshness Ritual (the fix is in the package; the data clears on the next regen).
+
+**Open (Phase 2):**
+
+1. **Weak keyword matching** on auto-extracted keywords; `ai-loadout overlaps` shows routing ambiguities. Hand-curated frontmatter keywords is the cheap fix.
+2. One LONG_SUMMARY warning left in the store index (`newsletter-publishing-…`).
 
 ## Quick orientation
 

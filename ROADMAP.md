@@ -11,15 +11,15 @@
 - [x] Drop CLAUDE.md and this ROADMAP for the next picker
 - [x] `git init` + initial commit (no remote yet — deliberate; see the repo-first waiver in CLAUDE.md)
 
-## Phase 1 — Workspace wiring (1 session)
+## Phase 1 — Workspace wiring (DONE 2026-06-16, commit `ab8aad8`)
 
 Goal: make the four trees install + build + test under one root.
 
-- [ ] Root `package.json` with `workspaces: ["packages/*", "apps/*"]` — **npm workspaces** (studio standard; not pnpm/yarn — `workspace:*` protocol is NOT valid npm, depend by package name and let the workspace resolve it)
-- [ ] One root `tsconfig.base.json` extended by each package
+- [x] Root `package.json` with `workspaces: ["packages/*", "apps/*"]` — **npm workspaces** (studio standard; not pnpm/yarn — `workspace:*` protocol is NOT valid npm, depend by package name and let the workspace resolve it) — commit `ab8aad8`
+- [x] One root `tsconfig.base.json` extended by each package — commit `ab8aad8`
 - [ ] **Package names do not change in this phase.** `packages/kernel` keeps `@mcptoolshop/ai-loadout` (it is published under that name; renaming is a Phase 5 decision). `apps/hook`'s existing `"@mcptoolshop/ai-loadout"` dependency then resolves to the workspace copy automatically.
 - [ ] Each package keeps its own `package.json`; versions follow the root version from Phase 5 onward
-- [ ] `npm ci` at root → working install; `npm run build --workspaces` builds all four; `npm test --workspaces` green
+- [x] `npm ci` at root → working install; root `build`/`test`/`verify` scripts run the three TS packages in order, all green (203 baseline → 228 after Stage A) — commit `ab8aad8`
 - [ ] Sync check: `git diff --no-index apps/hook ~/.claude/loadout-hook` shows no drift (run `apps/hook/smoke-test.ps1` after any hook change)
 
 Gate: green root build, all existing suites pass, hook still injects when driven with stdin JSON, mirror-vs-live diff clean.
@@ -28,7 +28,7 @@ Gate: green root build, all existing suites pass, hook still injects when driven
 
 The hook went live 2026-06-10 and immediately produced field evidence. Fix the known defects before building more surface on top of them.
 
-- [ ] **Score threshold in the hook.** The design said "below-threshold match → emit nothing"; the implementation takes top-5 regardless (`apps/hook/loadout-hook.mjs` filters only `manual` entries). Observed result: a memory-os prompt got claude-guardian and duel-system pointers. Add a minimum-score floor to the filter; calibrate against `~/.ai-loadout/usage.jsonl` + a sample of real prompts.
+- [x] **Score threshold in the hook.** (DONE — commit `43155a8`, HOK-01.) `apps/hook/loadout-hook.mjs` now applies a `HOOK_MIN_SCORE=0.3` floor alongside the `manual`-entry filter, so below-threshold matches emit nothing. Resolves the observed off-topic claude-guardian/duel-system pointers. (Calibration against accumulated `usage.jsonl` can still tune the floor later.)
 - [ ] **Index hygiene at the source.** The generated index contains junk entries derived from prose lines that aren't topic refs — confirmed examples: `memory-files` (from a "- Memory files:" line), `full-frame` (from "Full frame: …"), `see-also-…` (a 100+-char id from a "See also:" line). Fix in `packages/memories`' parser/index-gen: skip refs whose derived name is empty/generic, and add a `validate` rule flagging ids > 60 chars. Then regenerate the store index + global copy and confirm the junk is gone.
 - [ ] **Fix the 1 remaining LONG_SUMMARY entry** (`newsletter-publishing-…`, 159-char summary) — shorten its MEMORY.md line.
 - [ ] **Keyword quality pass.** Weak matches come from generic auto-extracted keywords. Use `ai-loadout overlaps` to find routing ambiguities; hand-curate keywords (via frontmatter) for the worst offenders.
@@ -73,6 +73,7 @@ Goal: reserve the name, set up Trusted Publishing, create the GitHub repo.
 - [ ] Create `mcp-tool-shop-org/memory-os` on GitHub (private at first; public at Phase 6 publish) — this closes the repo-first waiver
 - [ ] Add remote, push everything to date
 - [ ] CI workflow per `github-actions.md` rules: paths-gated, ubuntu-latest only, concurrency block, max 2 workflow files
+  - Remove `packages/*/.github/` (8 inert workflow files + 2 dependabot.yml) BEFORE adding the remote; author a single root CI per github-actions.md (max 2 workflows, paths-gated, one pages deploy).
 
 ## Phase 6 — First real publish + upstream retirement (1 session)
 
