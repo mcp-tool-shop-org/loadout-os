@@ -181,6 +181,88 @@ It carries frontmatter so it becomes a domain dispatch entry.
   };
 }
 
+export interface RefreshSandbox {
+  dir: string;
+  storeDir: string;
+  memoryMd: string;
+  /** Where a refresh --dest would write (NOT the live ~/.ai-loadout). */
+  destPath: string;
+  cleanup: () => void;
+}
+
+/**
+ * Build a self-contained SCRATCH store for refresh tests: a temp dir with a
+ * MEMORY.md + one valid topic file (when `valid`), plus a temp `dest` path that
+ * is NEVER the live ~/.ai-loadout/index.json. When `valid: false` the MEMORY.md
+ * references a topic file that does not exist (MISSING_TOPIC_FILE) so the andon
+ * gate halts. This keeps every refresh test off the canonical store + live
+ * global index entirely.
+ */
+export function makeRefreshSandbox(opts?: { valid?: boolean }): RefreshSandbox {
+  const valid = opts?.valid !== false;
+  const dir = mkdtempSync(join(tmpdir(), "loadout-os-refresh-"));
+  const storeDir = join(dir, "store");
+  mkdirSync(storeDir, { recursive: true });
+
+  if (valid) {
+    writeFileSync(
+      join(storeDir, "alpha-topic.md"),
+      `---
+id: alpha-topic
+keywords: [alpha, scratch, refresh]
+patterns: []
+priority: domain
+triggers:
+  task: true
+  plan: true
+  edit: false
+---
+
+# Alpha Topic
+
+A scratch topic for refresh tests.
+`,
+    );
+    writeFileSync(
+      join(storeDir, "MEMORY.md"),
+      `# MEMORY
+
+## Topics
+
+- Alpha Topic — a scratch topic → \`alpha-topic.md\`
+`,
+    );
+  } else {
+    // references a topic file that does NOT exist → MISSING_TOPIC_FILE (error)
+    writeFileSync(
+      join(storeDir, "MEMORY.md"),
+      `# MEMORY
+
+## Topics
+
+- Ghost Topic — points at a missing file → \`ghost-topic.md\`
+`,
+    );
+  }
+
+  const destPath = join(dir, "out", "index.json");
+  mkdirSync(join(dir, "out"), { recursive: true });
+
+  return {
+    dir,
+    storeDir,
+    memoryMd: join(storeDir, "MEMORY.md"),
+    destPath,
+    cleanup: () => {
+      try {
+        rmSync(dir, { recursive: true, force: true });
+      } catch {
+        /* best-effort */
+      }
+    },
+  };
+}
+
 /** Capture console.log output produced while `fn` runs. */
 export function captureLog(fn: () => void): string {
   const orig = console.log;

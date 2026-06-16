@@ -32,7 +32,6 @@ import {
   DIM,
   RESET,
   RED,
-  YELLOW,
   log,
   hasFlag,
   flagValue,
@@ -47,7 +46,7 @@ import {
   rulesAnalyze,
   rulesValidate,
   rulesStats,
-  rulesSplitNotice,
+  rulesSplit,
   kernelResolve,
   kernelExplain,
   kernelUsage,
@@ -60,6 +59,8 @@ import {
 import { runDoctor, printDoctor, defaultDoctorPaths } from "./doctor.js";
 import { buildReport, printReport } from "./report.js";
 import { runHookTest, printHookTest, defaultHookPath } from "./hook.js";
+import { dispatchRefresh } from "./refresh.js";
+import { interceptHelp } from "./help.js";
 
 // ── Version ───────────────────────────────────────────────────
 export function getVersion(): string {
@@ -94,7 +95,7 @@ ${BOLD}Rituals:${RESET}
   loadout-os doctor [--json]                       Read-only health screen
   loadout-os report [--index <p>] [--jsonl <p>]    Observability over usage.jsonl
   loadout-os hook test [--prompt "<text>"]         Drive the runtime hook on a sample prompt
-  loadout-os refresh                               (not yet implemented — use the Index Freshness Ritual)
+  loadout-os refresh [--store <d>] [--dest <p>] [--dry-run]   Index Freshness Ritual (index → validate → write global)
 
 ${BOLD}Options:${RESET}
   --json       Machine-readable output (doctor/report/most verbs)
@@ -129,18 +130,23 @@ ${BOLD}loadout-os rules${RESET} — wraps @mcptoolshop/claude-rules
   loadout-os rules analyze <CLAUDE.md> [--rules-dir <dir>] [--json]
   loadout-os rules validate [--rules-dir <dir>] [--lazy] [--repo-root <dir>] [--json]
   loadout-os rules stats <CLAUDE.md> [--rules-dir <dir>] [--json]
-  loadout-os rules split    (interactive — not wrapped; use the claude-rules bin)
+  loadout-os rules split [CLAUDE.md] [--yes] [--dry-run]   (interactive — passes through to claude-rules)
 `;
 }
 
 // ── Namespace dispatchers ─────────────────────────────────────
 function dispatchMemories(args: string[]): void {
-  if (hasFlag(args, "help") || args.length === 0) {
+  // Namespace-level help: `memories --help` or `memories` (no subcommand).
+  // A help flag WITH a subcommand falls through to per-command help below.
+  const firstIsSub = args.length > 0 && !args[0].startsWith("-");
+  if (args.length === 0 || (hasFlag(args, "help") && !firstIsSub)) {
     log(memoriesHelp());
     return;
   }
   const sub = args[0];
   const rest = args.slice(1);
+  // Per-command help: `memories index --help`, etc.
+  if (interceptHelp(`memories ${sub}`, rest)) return;
   switch (sub) {
     case "index":
       return memoriesIndex(rest);
@@ -160,12 +166,20 @@ function dispatchMemories(args: string[]): void {
 }
 
 function dispatchRules(args: string[]): void {
-  if (hasFlag(args, "help") || args.length === 0) {
+  // Namespace-level help: `rules --help` or `rules` (no subcommand). A help flag
+  // WITH a subcommand falls through to per-command help below — except `split`,
+  // whose --help we own here (we never forward --help into the interactive bin).
+  const firstIsSub = args.length > 0 && !args[0].startsWith("-");
+  if (args.length === 0 || (hasFlag(args, "help") && !firstIsSub)) {
     log(rulesHelp());
     return;
   }
   const sub = args[0];
   const rest = args.slice(1);
+  // Per-command help: `rules analyze --help`, `rules split --help`, etc.
+  // For split we intercept --help BEFORE the passthrough so the readline prompt
+  // is never spawned just to ask for usage.
+  if (interceptHelp(`rules ${sub}`, rest)) return;
   switch (sub) {
     case "analyze":
       return rulesAnalyze(rest);
@@ -174,7 +188,7 @@ function dispatchRules(args: string[]): void {
     case "stats":
       return rulesStats(rest);
     case "split":
-      return rulesSplitNotice();
+      return rulesSplit(rest);
     default:
       throw new CliError(
         "UNKNOWN_COMMAND",
@@ -231,6 +245,8 @@ function dispatchReport(args: string[]): void {
 
 function dispatchHook(args: string[]): void {
   const sub = args[0];
+  // `hook test --help` (or `hook --help`) → per-command help for "hook test".
+  if (interceptHelp("hook test", args)) return;
   if (sub !== "test") {
     throw new CliError(
       "UNKNOWN_COMMAND",
@@ -253,14 +269,6 @@ function dispatchHook(args: string[]): void {
   if (!result.ran) {
     process.exitCode = 1;
   }
-}
-
-function refreshStub(): void {
-  log();
-  log(`  ${YELLOW}!${RESET} ${BOLD}loadout-os refresh${RESET} is not yet implemented.`);
-  log(`  ${DIM}It writes the live global index and needs a named compensator; deferred to a later wave.${RESET}`);
-  log(`  ${DIM}For now, run the Index Freshness Ritual (claude-memories index → validate → copy to ~/.ai-loadout/index.json).${RESET}`);
-  log();
 }
 
 // ── Main dispatch ─────────────────────────────────────────────
@@ -287,13 +295,28 @@ export function dispatch(args: string[]): void {
     return;
   }
 
-  if (args.length === 0 || (hasFlag(args, "help") && !["memories", "rules"].includes(args[0]))) {
+  // Top-level help: no args, or a help flag with NO command in front of it
+  // (the first token is itself a flag). A help flag AFTER a command routes to
+  // that command's per-command help, handled inside each dispatcher / below.
+  const firstIsCmd = args.length > 0 && !args[0].startsWith("-");
+  if (args.length === 0 || (hasFlag(args, "help") && !firstIsCmd)) {
     log(topLevelHelp());
     return;
   }
 
   const cmd = args[0];
   const rest = args.slice(1);
+
+  // Per-command help for the flat verbs + rituals (namespaces handle their own
+  // inside dispatchMemories/dispatchRules; hook handles "hook test" below).
+  if (
+    cmd !== "memories" &&
+    cmd !== "rules" &&
+    cmd !== "hook" &&
+    interceptHelp(cmd, rest)
+  ) {
+    return;
+  }
 
   switch (cmd) {
     case "memories":
@@ -307,7 +330,7 @@ export function dispatch(args: string[]): void {
     case "hook":
       return dispatchHook(rest);
     case "refresh":
-      return refreshStub();
+      return dispatchRefresh(rest);
     case "resolve":
       return kernelResolve(rest);
     case "explain":

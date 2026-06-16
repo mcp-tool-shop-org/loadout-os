@@ -34,9 +34,11 @@ test("--help prints the same top-level help", () => {
   assert.match(out, /Rituals/);
 });
 
-test("topLevelHelp() includes refresh stub note", () => {
+test("topLevelHelp() lists refresh as an implemented ritual", () => {
   assert.match(topLevelHelp(), /refresh/);
-  assert.match(topLevelHelp(), /not yet implemented/);
+  assert.match(topLevelHelp(), /Index Freshness Ritual/);
+  // it is no longer a stub
+  assert.doesNotMatch(topLevelHelp(), /not yet implemented/);
 });
 
 test("memories --help prints the namespace help", () => {
@@ -60,16 +62,10 @@ test("memories with no subcommand prints namespace help (not an error)", () => {
   assert.match(out, /loadout-os memories/);
 });
 
-test("rules split prints the deferred-notice (not yet wrapped)", () => {
-  const out = captureLog(() => dispatch(["rules", "split"]));
-  assert.match(out, /not yet wrapped/i);
-  assert.match(out, /claude-rules/);
-});
-
-test("refresh prints the stub notice and does not throw", () => {
-  const out = captureLog(() => dispatch(["refresh"]));
-  assert.match(out, /not yet implemented/i);
-  assert.match(out, /Index Freshness Ritual/);
+test("rules --help still lists split (namespace help)", () => {
+  const out = captureLog(() => dispatch(["rules", "--help"]));
+  assert.match(out, /split/);
+  assert.match(out, /interactive/i);
 });
 
 test("unknown top-level command throws structured CliError", () => {

@@ -13,7 +13,9 @@
  */
 
 import { readFileSync, existsSync, statSync } from "node:fs";
-import { resolve } from "node:path";
+import { resolve, dirname, join } from "node:path";
+import { createRequire } from "node:module";
+import { spawnSync } from "node:child_process";
 
 // memories
 import {
@@ -362,9 +364,72 @@ export function rulesStats(args: string[]): void {
   log("");
 }
 
-export function rulesSplitNotice(): void {
-  warn("`rules split` is interactive and not yet wrapped by loadout-os.");
-  info("Use the `claude-rules split` bin directly for the interactive extraction workflow.");
+/**
+ * Resolve the absolute path to the `claude-rules` bin (its `split` command is
+ * interactive). We resolve via the package's exported package.json — the only
+ * subpath the package's `exports` map exposes — then read `bin.claude-rules`
+ * and join it against the package dir. This works whether the dependency is the
+ * published node_modules copy or a symlinked workspace package; both expose
+ * `./package.json`. Returns null when the package (or its built bin) is absent.
+ */
+export function resolveRulesBin(): string | null {
+  try {
+    const req = createRequire(import.meta.url);
+    const pkgJsonPath = req.resolve("@mcptoolshop/claude-rules/package.json");
+    const pkg = req("@mcptoolshop/claude-rules/package.json") as {
+      bin?: string | Record<string, string>;
+    };
+    const binRel =
+      typeof pkg.bin === "string" ? pkg.bin : pkg.bin?.["claude-rules"];
+    if (!binRel) return null;
+    const binAbs = join(dirname(pkgJsonPath), binRel);
+    return existsSync(binAbs) ? binAbs : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Build the argv for the subprocess passthrough: `node <rules-bin> split <args>`.
+ * Pure + exported so a test can assert the argv is constructed correctly
+ * (right bin, the literal "split", forwarded user args) WITHOUT spawning the
+ * interactive readline prompt.
+ */
+export function buildSplitArgv(rulesBin: string, args: string[]): string[] {
+  return [rulesBin, "split", ...args];
+}
+
+/**
+ * `rules split` — subprocess passthrough to the interactive `claude-rules split`.
+ *
+ * split drives a readline Y/n/skip prompt per proposed extraction, so it cannot
+ * be wrapped as a pure library call. We spawn the rules bin with INHERITED
+ * stdio (stdin/stdout/stderr) so the prompt works exactly as it does standalone,
+ * forwarding the user's args/flags verbatim ([CLAUDE.md], --dry-run, --yes, …).
+ * The child's exit code becomes ours.
+ */
+export function rulesSplit(args: string[]): void {
+  const rulesBin = resolveRulesBin();
+  if (!rulesBin) {
+    fail(
+      "RULES_BIN_NOT_FOUND",
+      "Could not resolve the @mcptoolshop/claude-rules bin for the interactive split.",
+      "Ensure @mcptoolshop/claude-rules is installed/built, then retry; or run `claude-rules split` directly.",
+    );
+  }
+  const argv = buildSplitArgv(rulesBin, args);
+  info(`Handing off to the interactive claude-rules split (${argv[0]}) …`);
+  const res = spawnSync(process.execPath, argv, { stdio: "inherit" });
+  if (res.error) {
+    fail(
+      "RULES_SPLIT_SPAWN_FAILED",
+      `Failed to spawn the claude-rules split bin: ${res.error.message}`,
+    );
+  }
+  // Forward the child's exit code as our own (split owns the outcome).
+  if (typeof res.status === "number" && res.status !== 0) {
+    process.exitCode = res.status;
+  }
 }
 
 // ══════════════════════════════════════════════════════════════

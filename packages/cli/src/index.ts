@@ -40,3 +40,24 @@ export type { ReportResult, ScoreBucket } from "./report.js";
 // ── Ritual: hook test ──────────────────────────────────────────
 export { runHookTest, printHookTest, defaultHookPath } from "./hook.js";
 export type { HookTestOptions, HookTestResult } from "./hook.js";
+
+// ── Ritual: refresh (Index Freshness Ritual) ───────────────────
+export {
+  runRefresh,
+  printRefresh,
+  printRefreshAndon,
+  dispatchRefresh,
+  rewritePathsAbsolute,
+  defaultDest,
+  DEFAULT_STORE,
+  RefreshError,
+} from "./refresh.js";
+export type { RefreshOptions, RefreshResult } from "./refresh.js";
+
+// ── Per-command help (Hard Gate C) ─────────────────────────────
+export {
+  COMMAND_HELP,
+  renderCommandHelp,
+  interceptHelp,
+  wantsHelp,
+} from "./help.js";
