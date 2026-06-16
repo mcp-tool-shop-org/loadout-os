@@ -6,7 +6,7 @@
 //   • matchLoadout(prompt, index) against it
 //   • Emit AT MOST 5 entries as one-line pointers: "- <id> — <summary> → <path>"
 //   • Total additionalContext kept ≤ ~200 tokens
-//   • Below-threshold match  emit nothing (silent)
+//   • Below-threshold match (score < HOOK_MIN_SCORE) → emit nothing (silent)
 //   • Always-record loaded events to ~/.ai-loadout/usage.jsonl
 //
 // Off-switch: AI_LOADOUT_HOOK=off  no-op exit 0.
@@ -25,6 +25,13 @@ const INDEX_PATH = resolve(HOME, '.ai-loadout', 'index.json');
 const USAGE_PATH = resolve(HOME, '.ai-loadout', 'usage.jsonl');
 const MAX_ENTRIES = 5;
 const MAX_LINE_CHARS = 180;
+// Minimum match score for a DOMAIN entry to be injected. Core entries (score 1.0)
+// always pass. Calibrated 2026-06-16 against the live 336-entry index: observed
+// incidental single-keyword noise tops out at ~0.25, genuine topical matches begin
+// ~0.33+, so 0.3 is the "confident match" floor that delivers the design's
+// "below-threshold → emit nothing". Recall on keyword-rich entries (e.g. game
+// canon) is a separate Phase-2 keyword-curation concern, not this floor's job.
+const HOOK_MIN_SCORE = 0.3;
 
 function readStdinSync() {
   try {
@@ -66,7 +73,9 @@ async function main() {
 
   let results;
   try { results = matchLoadout(prompt, index); } catch { safeExit(0); return; }
-  const top = (results || []).filter(r => r && r.entry && r.entry.priority !== 'manual').slice(0, MAX_ENTRIES);
+  const top = (results || [])
+    .filter(r => r && r.entry && r.entry.priority !== 'manual' && r.score >= HOOK_MIN_SCORE)
+    .slice(0, MAX_ENTRIES);
   if (top.length === 0) { safeExit(0); return; }
 
   const lines = top.map(r => {
