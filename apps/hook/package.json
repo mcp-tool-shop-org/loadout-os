@@ -7,12 +7,14 @@
   "main": "loadout-hook.mjs",
   "scripts": {
     "test": "node --check loadout-hook.mjs",
+    "bundle": "node esbuild.config.mjs",
     "smoke": "pwsh -NoProfile -File smoke-test.ps1"
   },
   "engines": {
     "node": ">=20"
   },
-  "dependencies": {
-    "@mcptoolshop/ai-loadout": "^1.4.3"
+  "devDependencies": {
+    "@mcptoolshop/ai-loadout": "^1.4.3",
+    "esbuild": "^0.28.1"
   }
 }

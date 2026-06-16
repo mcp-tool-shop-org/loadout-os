@@ -2,41 +2,61 @@
 <#
   Smoke test for the loadout hook.
 
-  - Drift check (HOK-05): mirror (apps/hook) vs live (~/.claude/loadout-hook) must be byte-identical.
-  - Threshold check (HOK-01): drives the hook with representative prompts and shows what it injects.
-    A min-score floor means weak/incidental matches and off-topic prompts go silent.
+  - Drift check (HOK-05): the LIVE hook (~/.claude/loadout-hook) must be byte-identical
+    to the BUNDLE (apps/hook/dist/loadout-hook.mjs) — the dependency-free deployable
+    that the coordinator copies to the live location. (The source loadout-hook.mjs is
+    NOT the deployable: it `import`s @mcptoolshop/ai-loadout, which the live dir cannot
+    resolve. The bundle inlines the kernel matcher.) The bundle is (re)built here first.
+  - Threshold check (HOK-01): drives the hook with representative prompts and shows what
+    it injects. The min-score floor (default 0.5 under the recall-aware scoring) means
+    weak/incidental matches and off-topic prompts go silent.
 
   Isolation: runs the hook under a SCRATCH HOME (a copy of the live ~/.ai-loadout/index.json),
   so testing never appends to the live usage.jsonl.
 
   Usage:
-    ./smoke-test.ps1                 # tests the MIRROR copy (this repo) by default
-    ./smoke-test.ps1 -HookPath live  # tests the LIVE copy (~/.claude/loadout-hook)
+    ./smoke-test.ps1                  # tests the BUNDLE (apps/hook/dist) by default
+    ./smoke-test.ps1 -HookPath source # tests the SOURCE copy (needs the workspace node_modules)
+    ./smoke-test.ps1 -HookPath live   # tests the LIVE copy (~/.claude/loadout-hook)
 #>
 param(
-  [string]$HookPath = 'mirror'
+  [ValidateSet('bundle', 'source', 'live')]
+  [string]$HookPath = 'bundle'
 )
 $ErrorActionPreference = 'Continue'
 
-$mirror = Join-Path $PSScriptRoot 'loadout-hook.mjs'
+$source = Join-Path $PSScriptRoot 'loadout-hook.mjs'
+$bundle = Join-Path $PSScriptRoot 'dist/loadout-hook.mjs'
 $live   = Join-Path $HOME '.claude/loadout-hook/loadout-hook.mjs'
 
-# ── Drift check (HOK-05) ────────────────────────────────────────
+# ── (Re)build the bundle so the drift check compares against a fresh artifact ──
 Write-Output ('=' * 78)
-Write-Output 'DRIFT CHECK — mirror vs live (must be byte-identical)'
+Write-Output 'BUILD — esbuild bundle (apps/hook/dist/loadout-hook.mjs)'
 Write-Output ('=' * 78)
-$mirrorHash = (Get-FileHash $mirror -Algorithm SHA256).Hash
+& node (Join-Path $PSScriptRoot 'esbuild.config.mjs')
+if ($LASTEXITCODE -ne 0) { Write-Output "BUILD FAILED (esbuild exit $LASTEXITCODE)"; exit 1 }
+Write-Output ''
+
+# ── Drift check (HOK-05): live must equal the BUNDLE ────────────
+Write-Output ('=' * 78)
+Write-Output 'DRIFT CHECK — live vs bundle (must be byte-identical)'
+Write-Output ('=' * 78)
+$bundleHash = (Get-FileHash $bundle -Algorithm SHA256).Hash
 if (Test-Path $live) {
   $liveHash = (Get-FileHash $live -Algorithm SHA256).Hash
-  if ($mirrorHash -eq $liveHash) { Write-Output "OK — identical ($mirrorHash)" }
-  else { Write-Output "DRIFT — mirror=$mirrorHash  live=$liveHash" }
+  if ($bundleHash -eq $liveHash) { Write-Output "OK — identical ($bundleHash)" }
+  else { Write-Output "DRIFT — bundle=$bundleHash  live=$liveHash" }
 } else {
   Write-Output "live copy not found at $live"
 }
 Write-Output ''
 
 # ── Resolve which hook to drive ─────────────────────────────────
-$hook = if ($HookPath -eq 'live') { $live } else { $mirror }
+$hook = switch ($HookPath) {
+  'live'   { $live }
+  'source' { $source }
+  default  { $bundle }
+}
 Write-Output "Driving: $hook"
 Write-Output ''
 

@@ -14,7 +14,7 @@
 //   • AI_LOADOUT_HOOK=debug     → print why-silent + top near-misses to STDERR only
 //                                 (never stdout; the suppressOutput / fail-silent
 //                                 contract and the ≤200-token budget are untouched)
-//   • AI_LOADOUT_MIN_SCORE=<n>  → override the score floor (default 0.3) for
+//   • AI_LOADOUT_MIN_SCORE=<n>  → override the score floor (default 0.5) for
 //                                 calibration, without an edit + mirror→live cutover
 // Latency budget: < 500 ms cold. Never blocks.
 
@@ -32,14 +32,17 @@ const USAGE_PATH = resolve(HOME, '.ai-loadout', 'usage.jsonl');
 const MAX_ENTRIES = 5;
 const MAX_LINE_CHARS = 180;
 // Minimum match score for a DOMAIN entry to be injected. Core entries (score 1.0)
-// always pass. Calibrated 2026-06-16 against the live 336-entry index: observed
-// incidental single-keyword noise tops out at ~0.25, genuine topical matches begin
-// ~0.33+, so 0.3 is the "confident match" floor that delivers the design's
-// "below-threshold → emit nothing". Override per-run with AI_LOADOUT_MIN_SCORE for
-// calibration without an edit + cutover. Recall on keyword-rich entries (e.g. game
-// canon) is a separate Phase-2 keyword-curation concern, not this floor's job.
+// always pass. Re-calibrated 2026-06-16 for the NEW recall-aware scoring in the
+// inlined kernel matcher: score = max(coverage, matched/ABSOLUTE_K=5) + patternBonus.
+// Under this blend a genuine multi-keyword match lands at ~0.6+ (3 matched keywords
+// → absolute 3/5 = 0.6, plus the 0.2 patternBonus if a pattern also fires), while
+// incidental / generic single- or double-keyword noise tops out around ~0.4
+// (2/5 = 0.4). So 0.5 is the new "confident match" floor that delivers the design's
+// "below-threshold → emit nothing" (was 0.3 under the OLD matched/total coverage
+// scoring, where genuine matches began ~0.33). Override per-run with
+// AI_LOADOUT_MIN_SCORE for calibration without an edit + cutover.
 const _envMin = Number(process.env.AI_LOADOUT_MIN_SCORE);
-const HOOK_MIN_SCORE = Number.isFinite(_envMin) ? _envMin : 0.3;
+const HOOK_MIN_SCORE = Number.isFinite(_envMin) ? _envMin : 0.5;
 
 // Debug diagnostics → STDERR only (never stdout, so suppressOutput + fail-silent
 // are preserved). Answers "why was the hook silent on a prompt I expected a hit for".
