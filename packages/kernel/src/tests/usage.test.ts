@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { writeFileSync, unlinkSync, mkdtempSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { recordUsage, readUsage, summarizeUsage } from "../usage.js";
+import { recordUsage, readUsage, summarizeUsage, summaryToJSON } from "../usage.js";
 import type { UsageEvent } from "../types.js";
 
 function makeTmp(): string {
@@ -108,5 +108,52 @@ describe("summarizeUsage", () => {
     ];
     const summary = summarizeUsage(events);
     assert.equal(summary[0].lastLoaded, "2026-03-06T12:00:00Z");
+  });
+
+  it("tracks unique modes as a Set", () => {
+    const events = [
+      makeEvent({ entryId: "a", mode: "eager" }),
+      makeEvent({ entryId: "a", mode: "lazy" }),
+      makeEvent({ entryId: "a", mode: "eager" }),
+    ];
+    const summary = summarizeUsage(events);
+    assert.ok(summary[0].modes instanceof Set);
+    assert.equal(summary[0].modes.size, 2);
+    assert.ok(summary[0].modes.has("eager"));
+    assert.ok(summary[0].modes.has("lazy"));
+  });
+});
+
+describe("summaryToJSON (KER-06)", () => {
+  it("serializes modes as an array, not an empty object", () => {
+    // Regression: JSON.stringify(summary) drops the modes Set to {}.
+    // summaryToJSON projects modes to an array so --json output keeps them.
+    const events = [
+      makeEvent({ entryId: "a", mode: "eager" }),
+      makeEvent({ entryId: "a", mode: "lazy" }),
+    ];
+    const summary = summarizeUsage(events);
+
+    // The raw Set would serialize to {} — confirm the bug we are fixing.
+    assert.equal(JSON.stringify(summary[0].modes), "{}");
+
+    const json = summary.map(summaryToJSON);
+    assert.ok(Array.isArray(json[0].modes));
+    assert.deepEqual([...json[0].modes].sort(), ["eager", "lazy"]);
+
+    // The serialized JSON string actually contains the modes.
+    const serialized = JSON.stringify(json, null, 2);
+    const parsed = JSON.parse(serialized) as Array<{ modes: string[] }>;
+    assert.deepEqual(parsed[0].modes.sort(), ["eager", "lazy"]);
+  });
+
+  it("preserves all other summary fields", () => {
+    const events = [makeEvent({ entryId: "x", trigger: "kw-ci", tokensEst: 42 })];
+    const json = summaryToJSON(summarizeUsage(events)[0]);
+    assert.equal(json.entryId, "x");
+    assert.equal(json.loadCount, 1);
+    assert.equal(json.totalTokens, 42);
+    assert.deepEqual(json.triggers, ["kw-ci"]);
+    assert.deepEqual(json.modes, ["lazy"]);
   });
 });

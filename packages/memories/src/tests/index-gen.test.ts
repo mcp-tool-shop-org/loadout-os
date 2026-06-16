@@ -76,4 +76,29 @@ describe("generateIndex", () => {
     assert.ok(aiLoadout);
     assert.ok(aiLoadout.summary.includes("routing core"));
   });
+
+  // MEM-003: junk prose path-citations must not surface as index entries.
+  it("does not emit junk prose path-citations as entries (MEM-003)", () => {
+    const analysis = analyzeMemoryMd(join(FIXTURES, "MEMORY.md"));
+    const index = generateIndex(analysis);
+    const ids = index.entries.map((e) => e.id);
+    assert.ok(!ids.includes("memory-files"), "memory-files must not be an entry");
+    assert.ok(!ids.includes("full-frame"), "full-frame must not be an entry");
+    assert.ok(!ids.includes("see-also"), "see-also must not be an entry");
+  });
+
+  // MEM-007: entryFromFrontmatter must truncate the summary to 120 chars,
+  // same as entryFromContent. The "Long Summary" ref points at a
+  // frontmatter-bearing topic file and carries a >120-char description.
+  it("truncates frontmatter-branch summaries to 120 chars (MEM-007)", () => {
+    const analysis = analyzeMemoryMd(join(FIXTURES, "MEMORY.md"));
+    const index = generateIndex(analysis);
+    // long-summary.md has frontmatter id "long-summary".
+    const entry = index.entries.find((e) => e.id === "long-summary");
+    assert.ok(entry, "long-summary entry should exist (frontmatter branch)");
+    assert.ok(
+      entry.summary.length <= 120,
+      `summary should be truncated to <=120 chars, got ${entry.summary.length}`,
+    );
+  });
 });

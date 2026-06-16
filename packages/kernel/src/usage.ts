@@ -96,3 +96,36 @@ export function summarizeUsage(events: UsageEvent[]): UsageSummary[] {
     }))
     .sort((a, b) => b.loadCount - a.loadCount);
 }
+
+/**
+ * A JSON-safe projection of a UsageSummary.
+ *
+ * `UsageSummary.modes` is a `Set<string>`, which `JSON.stringify` serializes to
+ * `{}` — silently dropping the data. This shape replaces the Set with an array
+ * so `--json` output (and any other JSON consumer) round-trips the modes.
+ */
+export interface UsageSummaryJSON {
+  entryId: string;
+  loadCount: number;
+  totalTokens: number;
+  lastLoaded: string;
+  triggers: string[];
+  modes: string[];
+}
+
+/**
+ * Convert a UsageSummary to a JSON-safe shape (Set<string> modes → string[]).
+ *
+ * Use this at any JSON serialization boundary instead of stringifying the
+ * summary directly, which would drop `modes`.
+ */
+export function summaryToJSON(summary: UsageSummary): UsageSummaryJSON {
+  return {
+    entryId: summary.entryId,
+    loadCount: summary.loadCount,
+    totalTokens: summary.totalTokens,
+    lastLoaded: summary.lastLoaded,
+    triggers: summary.triggers,
+    modes: [...summary.modes],
+  };
+}

@@ -8,7 +8,7 @@
 import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { parseSections, estimateTokens, headingToId } from "./parser.js";
-import { log, ok, warn, info, BOLD, DIM, RESET, CYAN, YELLOW } from "./cli.js";
+import { log, ok, warn, info, BOLD, DIM, RESET, CYAN } from "./cli.js";
 import { hasFlag, positionalArgs, flagValue } from "./cli.js";
 import { loadSignals, DEFAULT_SIGNALS } from "./signals.js";
 import type { Section, SplitProposal, AnalysisReport, Priority, SignalsConfig } from "./types.js";
@@ -131,7 +131,6 @@ export function analyzeFile(
   const totalLines = content.split("\n").length;
 
   const proposals: SplitProposal[] = [];
-  const unsplittable: Section[] = [];
   const coreCandidate: Section[] = [];
 
   for (const section of sections) {
@@ -180,7 +179,6 @@ export function analyzeFile(
     totalTokens,
     sections,
     proposals,
-    unsplittable,
     coreCandidate,
   };
 }
@@ -188,9 +186,7 @@ export function analyzeFile(
 // ── CLI command: analyze ───────────────────────────────────────
 export async function cmdAnalyze(args: string[]): Promise<void> {
   const filePath = resolveClaudeMd(positionalArgs(args, ["--rules-dir", "--signals"]));
-  const rulesDir = hasFlag(args, "--rules-dir")
-    ? args[args.indexOf("--rules-dir") + 1]
-    : ".claude/rules";
+  const rulesDir = flagValue(args, "--rules-dir") ?? ".claude/rules";
   const signals = loadSignals(flagValue(args, "--signals") ?? undefined);
 
   if (!existsSync(filePath)) {
@@ -252,15 +248,6 @@ export async function cmdAnalyze(args: string[]): Promise<void> {
       log(`     ${DIM}${p.reason}${RESET}`);
       log("");
     }
-  }
-
-  // Unsplittable
-  if (report.unsplittable.length > 0) {
-    log(`${YELLOW}Unsplittable sections:${RESET} ${report.unsplittable.length}`);
-    for (const s of report.unsplittable) {
-      warn(`${s.heading} (L${s.startLine + 1}-${s.endLine}) — no clean heading boundary`);
-    }
-    log("");
   }
 
   // Budget summary

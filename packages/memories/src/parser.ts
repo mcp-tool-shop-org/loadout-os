@@ -14,12 +14,34 @@
  */
 
 import type { MemorySection, MemoryRef } from "./types.js";
+import { nameToId } from "./index-gen.js";
 
 // Match: "Name — description → `path`" with optional bullet prefix
 const ARROW_REF_RE = /^(?:[-*]\s+)?(.+?)\s+→\s+`?([^\s`]+)`?\s*$/;
 
 // Match inline code path at end: `memory/foo.md`
 const INLINE_PATH_RE = /`(memory\/[^\s`]+|[^\s`]+\.md)`/;
+
+/**
+ * Is `path` a genuine relative topic ref (not a prose path-citation)?
+ *
+ * MEM-001: the inline-path branch used to treat ANY backticked path token
+ * anywhere in a line as a ref, turning prose like
+ *   "- Memory files: see `memory/index.json`"  or
+ *   "Full frame in `.../memory/user_profile.md`" into junk kebab ids.
+ * A real ref points at a relative topic file. Reject:
+ *   - absolute paths with a drive letter (C:/…, F:\…)
+ *   - POSIX-absolute paths (leading /)
+ *   - glob patterns (contain *)
+ */
+function isRelativeTopicPath(path: string): boolean {
+  if (!path) return false;
+  if (path.includes("*")) return false; // glob
+  if (path.startsWith("/")) return false; // posix-absolute
+  if (/^[a-zA-Z]:[\\/]/.test(path)) return false; // drive-letter absolute
+  if (/^\\\\/.test(path)) return false; // UNC
+  return true;
+}
 
 /**
  * Parse MEMORY.md content into sections and references.
@@ -100,19 +122,40 @@ function parseRefLine(line: string, lineNum: number): MemoryRef | null {
     return { name, description, path, line: lineNum };
   }
 
-  // Try inline path pattern (backtick path anywhere in line)
-  const pathMatch = stripped.match(INLINE_PATH_RE);
-  if (pathMatch) {
-    const path = pathMatch[1];
-    // Everything before the path reference is name + description
-    const pathIdx = stripped.indexOf("`" + path);
-    if (pathIdx === -1) return null;
-    const beforePath = stripped.slice(0, pathIdx).trim();
-    // Remove trailing arrow if present
-    const cleaned = beforePath.replace(/\s*→\s*$/, "").trim();
-    if (!cleaned) return null;
-    const { name, description } = splitNameDesc(cleaned);
-    return { name, description, path, line: lineNum };
+  // Try inline path pattern (backtick path anywhere in line).
+  //
+  // MEM-001: this branch is the source of the junk-index defect. It used to
+  // accept ANY line containing a backticked `memory/…`/`*.md` token, which
+  // swept up prose citations ("Memory files: see `memory/index.json`",
+  // "Full frame in `…/memory/user_profile.md`", "See also: … `memory/x.md` …").
+  // Gate it: a genuine list entry is a BULLET line with an arrow ( → ), whose
+  // captured path is a relative topic ref, and whose derived kebab id is a
+  // clean, non-empty token (not starting/ending with '-'). The three junk
+  // shapes all fail "bullet + arrow"; absolute/glob paths fail the path check.
+  const isBullet = /^[-*]\s+/.test(line);
+  const hasArrow = line.includes(" → ");
+  if (isBullet && hasArrow) {
+    const pathMatch = stripped.match(INLINE_PATH_RE);
+    if (pathMatch) {
+      const path = pathMatch[1];
+      if (isRelativeTopicPath(path)) {
+        // Everything before the path reference is name + description
+        const pathIdx = stripped.indexOf("`" + path);
+        if (pathIdx !== -1) {
+          const beforePath = stripped.slice(0, pathIdx).trim();
+          // Remove trailing arrow if present
+          const cleaned = beforePath.replace(/\s*→\s*$/, "").trim();
+          if (cleaned) {
+            const { name, description } = splitNameDesc(cleaned);
+            const id = nameToId(name);
+            // Reject junk kebab ids: empty, or leading/trailing dash.
+            if (id && !id.startsWith("-") && !id.endsWith("-")) {
+              return { name, description, path, line: lineNum };
+            }
+          }
+        }
+      }
+    }
   }
 
   return null;

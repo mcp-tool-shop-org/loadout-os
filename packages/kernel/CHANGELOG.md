@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.4.3 — unreleased
+## 1.4.3 — 2026-06-16
 
 - **`validate` CLI command** (2026-03-25): validate index structure from the command line (`ai-loadout validate <index>`)
 - **Fix**: `loadIndex()` now emits structured error on malformed JSON instead of raw stack trace (2026-03-25)

@@ -33,6 +33,28 @@ describe("validateMemory", () => {
       assert.ok(issue.hint);
     }
   });
+
+  // MEM-004: derived ids longer than 60 chars get an ID_TOO_LONG warning.
+  it("flags over-long derived ids (MEM-004)", () => {
+    const analysis = analyzeMemoryMd(join(FIXTURES, "MEMORY.md"));
+    const issues = validateMemory(analysis);
+    const tooLong = issues.filter((i) => i.code === "ID_TOO_LONG");
+    assert.ok(tooLong.length >= 1, "should flag at least one over-long id");
+    assert.equal(tooLong[0].severity, "warning");
+    assert.ok(tooLong[0].hint, "ID_TOO_LONG should carry a hint");
+    assert.match(tooLong[0].message, /line \d+/); // carries a line number
+  });
+
+  it("does not flag normal-length ids (MEM-004)", () => {
+    const analysis = analyzeMemoryMd(join(FIXTURES, "MEMORY.md"));
+    const issues = validateMemory(analysis);
+    const tooLong = issues.filter((i) => i.code === "ID_TOO_LONG");
+    // ai-loadout, claude-rules, artifact etc. are all short.
+    assert.ok(
+      !tooLong.some((i) => /ai-loadout|claude-rules|artifact/.test(i.message)),
+      "short ids must not be flagged",
+    );
+  });
 });
 
 describe("validateMemoryIndex", () => {

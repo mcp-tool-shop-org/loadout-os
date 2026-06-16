@@ -110,4 +110,66 @@ Claude Rules — optimizer → \`memory/claude-rules.md\`
     assert.equal(refs[0].path, "memory/ai-loadout.md");
     assert.equal(refs[1].name, "Claude Rules");
   });
+
+  // MEM-001 / MEM-003: prose path-citations must NOT become refs.
+  it("rejects prose path-citation junk shapes (MEM-001)", () => {
+    const content = `## Prose
+
+- Memory files: see \`memory/index.json\` for the generated dispatch table
+Full frame in \`C:/Users/mikey/.claude/projects/memory/user_profile.md\` — read it if unsure
+See also: the post-proof balance tuning notes live at \`memory/post-proof-balance-tuning.md\` and cover wave-based tuning
+
+## Real
+
+- Genuine Tool — a real entry → \`memory/genuine.md\`
+`;
+    const { refs } = parseMemoryMd(content);
+    // Only the genuine bullet+arrow entry survives.
+    assert.equal(refs.length, 1, "exactly one ref should parse");
+    assert.equal(refs[0].name, "Genuine Tool");
+    assert.equal(refs[0].path, "memory/genuine.md");
+
+    // None of the junk shapes leak through under any derived name.
+    const junkNames = ["Memory files", "Full frame in", "See also"];
+    for (const junk of junkNames) {
+      assert.ok(
+        !refs.some((r) => r.name.startsWith(junk)),
+        `junk shape "${junk}" must not be parsed as a ref`,
+      );
+    }
+    // The kebab ids that used to leak (memory-files / full-frame / see-also)
+    // are absent because the lines are not parsed as refs at all.
+    const paths = refs.map((r) => r.path);
+    assert.ok(!paths.includes("memory/index.json"));
+    assert.ok(!paths.includes("memory/post-proof-balance-tuning.md"));
+  });
+
+  it("rejects absolute/glob paths reached via the inline-path branch (MEM-001)", () => {
+    // These lines have a bullet + arrow but the backtick path is NOT the
+    // arrow target (text follows it), so the well-behaved arrow branch does
+    // NOT match and they fall through to the inline-path branch — which is
+    // the branch MEM-001 tightens. Absolute and glob paths must be rejected
+    // there; only the relative topic ref survives.
+    const content = `## Edge
+
+- Drive Path — see \`C:/Users/mikey/memory/x.md\` → for more details here
+- Glob Path — see \`memory/*.md\` → for all the files
+- Real One — see \`memory/real.md\` → for the real one
+`;
+    const { refs } = parseMemoryMd(content);
+    assert.equal(refs.length, 1);
+    assert.equal(refs[0].path, "memory/real.md");
+  });
+
+  it("still parses a genuine bullet + arrow inline-path ref (MEM-001 regression guard)", () => {
+    // No em-dash separator, path in backticks, bullet + arrow present.
+    const content = `## Active
+
+- MyTopic → \`memory/my-topic.md\`
+`;
+    const { refs } = parseMemoryMd(content);
+    assert.equal(refs.length, 1);
+    assert.equal(refs[0].name, "MyTopic");
+    assert.equal(refs[0].path, "memory/my-topic.md");
+  });
 });

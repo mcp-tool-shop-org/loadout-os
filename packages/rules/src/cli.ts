@@ -65,23 +65,29 @@ export function flagValue(
   return idx !== -1 && idx + 1 < args.length ? args[idx + 1] : undefined;
 }
 
+// Every flag in the CLI surface that consumes the following argument as its
+// value. Kept here as the single source of truth so positionalArgs can always
+// skip a value-flag's argument even if a caller forgets to list it — otherwise
+// `--rules-dir foo path` would mis-parse `foo` as a positional.
+const VALUE_FLAGS = ["--rules-dir", "--signals"];
+// Boolean flags take no argument.
+const BOOL_FLAGS = ["--memory", "--dry-run", "--help", "-h", "--yes", "--lazy", "--json"];
+
 export function positionalArgs(
   args: string[],
   flags: string[],
 ): string[] {
   const flagIndices = new Set<number>();
-  for (const flag of flags) {
-    const idx = args.indexOf(flag);
-    if (idx !== -1) {
-      flagIndices.add(idx);
-      flagIndices.add(idx + 1);
+  // Union of the caller-supplied value-flags and the known CLI value-flags,
+  // so a value-flag's argument can never be mis-parsed as a positional.
+  const valueFlags = new Set([...flags, ...VALUE_FLAGS]);
+  for (let i = 0; i < args.length; i++) {
+    if (valueFlags.has(args[i])) {
+      flagIndices.add(i);
+      flagIndices.add(i + 1); // skip the flag's value (if present)
+    } else if (BOOL_FLAGS.includes(args[i])) {
+      flagIndices.add(i);
     }
-  }
-  // Also skip boolean flags
-  const boolFlags = ["--memory", "--dry-run", "--help", "-h", "--yes", "--lazy", "--json"];
-  for (const bf of boolFlags) {
-    const idx = args.indexOf(bf);
-    if (idx !== -1) flagIndices.add(idx);
   }
   return args.filter((_, i) => !flagIndices.has(i) && !args[i].startsWith("--"));
 }

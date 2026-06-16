@@ -41,7 +41,8 @@ export function parseFrontmatter(
   let currentArray: string[] | null = null;
   let currentObject: Record<string, boolean> | null = null;
 
-  for (const line of fmLines) {
+  for (let i = 0; i < fmLines.length; i++) {
+    const line = fmLines[i];
     const trimmed = line.trim();
     if (trimmed === "") continue;
 
@@ -81,13 +82,14 @@ export function parseFrontmatter(
     currentKey = key;
 
     if (rawVal === "") {
-      // Peek at next line to determine if block array or object
-      const lineIdx = fmLines.indexOf(line);
-      if (lineIdx + 1 < fmLines.length) {
-        const nextTrimmed = fmLines[lineIdx + 1].trim();
+      // Peek at next line to determine if block array or object.
+      // Use the loop index `i` directly: indexOf(line) would return the
+      // first byte-identical line, mis-resolving duplicate-value keys.
+      if (i + 1 < fmLines.length) {
+        const nextTrimmed = fmLines[i + 1].trim();
         if (nextTrimmed.startsWith("- ")) {
           currentArray = [];
-        } else if (fmLines[lineIdx + 1].startsWith("  ")) {
+        } else if (fmLines[i + 1].startsWith("  ")) {
           currentObject = {};
         }
       }

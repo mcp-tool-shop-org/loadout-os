@@ -9,6 +9,10 @@
 import { validateIndex as validateLoadoutIndex } from "@mcptoolshop/ai-loadout";
 import type { ValidationIssue } from "@mcptoolshop/ai-loadout";
 import type { MemoryAnalysis, MemoryIndex } from "./types.js";
+import { nameToId } from "./index-gen.js";
+
+/** ROADMAP Phase 2 (MEM-004): derived ids longer than this are flagged. */
+const MAX_ID_LENGTH = 60;
 
 /**
  * Validate a memory analysis for structural issues.
@@ -68,6 +72,22 @@ export function validateMemory(analysis: MemoryAnalysis): ValidationIssue[] {
         severity: "warning",
         code: "EMPTY_NAME",
         message: `Reference at line ${ref.line + 1} has no name`,
+      });
+    }
+  }
+
+  // Over-long derived ids (MEM-004 / ROADMAP Phase 2).
+  // The id is derived from the ref name the same way index-gen does
+  // (nameToId, reused via MEM-009), so this flags what would become an
+  // unwieldy dispatch-table key.
+  for (const ref of analysis.refs) {
+    const id = nameToId(ref.name);
+    if (id.length > MAX_ID_LENGTH) {
+      issues.push({
+        severity: "warning",
+        code: "ID_TOO_LONG",
+        message: `Derived id at line ${ref.line + 1} is ${id.length} chars (max ${MAX_ID_LENGTH}): "${id}"`,
+        hint: "Shorten the reference name so its kebab-case id stays under 60 chars",
       });
     }
   }

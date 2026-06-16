@@ -62,7 +62,6 @@ export interface AnalysisReport {
   totalTokens: number;
   sections: Section[];
   proposals: SplitProposal[];
-  unsplittable: Section[];      // sections that can't be cleanly split
   coreCandidate: Section[];     // sections that should stay inline
 }
 

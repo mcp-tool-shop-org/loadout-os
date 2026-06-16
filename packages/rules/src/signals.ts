@@ -7,7 +7,7 @@
 
 import { readFileSync, existsSync, writeFileSync, mkdirSync } from "node:fs";
 import { resolve, dirname } from "node:path";
-import { ok, warn, info } from "./cli.js";
+import { ok, warn, info, fail } from "./cli.js";
 import { flagValue } from "./cli.js";
 import type { SignalsConfig } from "./types.js";
 
@@ -50,7 +50,16 @@ export function loadSignals(signalsPath?: string): SignalsConfig {
     return DEFAULT_SIGNALS;
   }
 
-  const raw = JSON.parse(readFileSync(effectivePath, "utf8"));
+  let raw: Record<string, unknown>;
+  try {
+    raw = JSON.parse(readFileSync(effectivePath, "utf8"));
+  } catch (e) {
+    return fail(
+      "INVALID_SIGNALS",
+      `Failed to parse signals config: ${(e as Error).message}`,
+      `Check that ${effectivePath} is valid JSON, or run 'claude-rules init-signals' to regenerate it.`,
+    );
+  }
 
   // Merge with defaults: user can override any subset
   return {
@@ -62,7 +71,7 @@ export function loadSignals(signalsPath?: string): SignalsConfig {
       : DEFAULT_SIGNALS.stopWords,
     patterns:
       raw.patterns && typeof raw.patterns === "object"
-        ? raw.patterns
+        ? (raw.patterns as Record<string, string[]>)
         : DEFAULT_SIGNALS.patterns,
   };
 }

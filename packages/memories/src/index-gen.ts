@@ -39,7 +39,20 @@ export function generateIndex(
   for (const ref of analysis.refs) {
     // Try relative to MEMORY.md, then relative to parent
     const fullPath = resolveRefPath(ref.path, fileDir, parentDir);
-    if (!fullPath) continue;
+    if (!fullPath) {
+      // MEM-002: don't drop unresolved refs silently. A ref whose path
+      // doesn't resolve (a non-existent file, a glob like `memory/*.md`,
+      // or an absolute path) used to vanish here with zero trace — that's
+      // exactly how parser junk slipped through undetected. Surface it.
+      if (!analysis.missingFiles.includes(ref.path)) {
+        analysis.missingFiles.push(ref.path);
+      }
+      console.warn(
+        `[claude-memories] unresolved ref "${ref.name || ref.path}" ` +
+          `→ ${ref.path} (line ${ref.line + 1}); skipped from index`,
+      );
+      continue;
+    }
 
     const content = readFileSync(fullPath, "utf-8");
     const { frontmatter } = parseFrontmatter(content);
@@ -82,6 +95,14 @@ export function generateIndex(
   };
 }
 
+/** Max summary length — keep entry summaries compact in the dispatch table. */
+const MAX_SUMMARY = 120;
+
+/** Truncate a summary to MAX_SUMMARY chars. Shared by both entry builders. */
+function truncateSummary(summary: string): string {
+  return summary.slice(0, MAX_SUMMARY);
+}
+
 function entryFromFrontmatter(
   fm: Frontmatter,
   ref: MemoryRef,
@@ -94,7 +115,9 @@ function entryFromFrontmatter(
     keywords: fm.keywords,
     patterns: fm.patterns,
     priority: fm.priority,
-    summary: ref.description || `Memory: ${ref.name}`,
+    // MEM-007: truncate here too — entryFromContent already truncated to
+    // 120, this branch did not, so a long summary survived asymmetrically.
+    summary: truncateSummary(ref.description || `Memory: ${ref.name}`),
     triggers: fm.triggers,
     tokens_est: estimateTokens(content),
     lines,
@@ -113,7 +136,7 @@ function entryFromContent(ref: MemoryRef, content: string): LoadoutEntry {
     patterns: [],
     priority: "domain",
     summary: ref.description
-      ? ref.description.slice(0, 120)
+      ? truncateSummary(ref.description)
       : `Memory: ${ref.name}`,
     triggers: { ...DEFAULT_TRIGGERS },
     tokens_est: estimateTokens(content),
@@ -125,8 +148,13 @@ function entryFromContent(ref: MemoryRef, content: string): LoadoutEntry {
  * Convert a display name to kebab-case ID.
  * "AI Loadout" → "ai-loadout"
  * "Claude Guardian" → "claude-guardian"
+ *
+ * Exported (MEM-009) so the parser and validator can reuse the exact
+ * same derivation — the kebab id is the contract shared between
+ * ref-parsing (MEM-001 junk-id rejection) and validate (MEM-004
+ * ID_TOO_LONG length check).
  */
-function nameToId(name: string): string {
+export function nameToId(name: string): string {
   return name
     .toLowerCase()
     .replace(/[^a-z0-9\s-]/g, "")

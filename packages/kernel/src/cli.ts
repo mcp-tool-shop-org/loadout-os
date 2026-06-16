@@ -14,7 +14,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { resolve, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { LoadoutIndex } from "./types.js";
-import { readUsage, summarizeUsage } from "./usage.js";
+import { readUsage, summarizeUsage, summaryToJSON } from "./usage.js";
 import { findDeadEntries, findKeywordOverlaps, analyzeBudget } from "./analysis.js";
 import { resolveLoadout, explainEntry } from "./resolve.js";
 import type { ResolveOptions } from "./resolve.js";
@@ -147,7 +147,9 @@ function cmdUsage(args: string[]) {
   const summary = summarizeUsage(events);
 
   if (json) {
-    log(JSON.stringify(summary, null, 2));
+    // summary.modes is a Set<string>; JSON.stringify would drop it to {}.
+    // Project to a JSON-safe shape (modes → array) before serializing.
+    log(JSON.stringify(summary.map(summaryToJSON), null, 2));
     return;
   }
 
