@@ -17,7 +17,7 @@ XRPL Lab — CLI training workbook → `memory/xrpl-lab.md`
 ## Prose (junk-shape regression — MEM-001)
 
 - Memory files: see `memory/index.json` for the generated dispatch table
-Full frame in `C:/Users/mikey/.claude/projects/memory/user_profile.md` — read it if unsure
+Full frame in `C:/Users/Public/.claude/projects/memory/user_profile.md` — read it if unsure
 See also: the post-proof balance tuning notes live at `memory/post-proof-balance-tuning.md` and cover wave-based tuning
 
 ## Edge cases (MEM-007 / MEM-004 / MEM-B08)

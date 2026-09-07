@@ -1,6 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { join, dirname } from "node:path";
+import { existsSync } from "node:fs";
+import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { analyzeMemoryMd } from "../analyze.js";
 import { generateIndex } from "../index-gen.js";
@@ -130,5 +131,53 @@ describe("generateIndex", () => {
       entry.summary.length <= 120,
       `summary should be truncated to <=120 chars, got ${entry.summary.length}`,
     );
+  });
+});
+
+/**
+ * FT-MR11 — the store-relative path contract.
+ *
+ * The original fixture puts MEMORY.md ABOVE its `memory/` directory, so every
+ * ref resolved against the first base and the parent-base fallback was never
+ * exercised. The canonical store is the other shape: MEMORY.md sits INSIDE the
+ * store and its pointers carry a `memory/` namespace prefix. Recording the raw
+ * pointer there made `loadout-os refresh` re-apply the prefix, breaking 420 of
+ * 492 live entries. These tests pin the resolved location instead.
+ */
+describe("generateIndex — store-relative paths (FT-MR11)", () => {
+  const FLAT_STORE = join(FIXTURES, "flat-store", "memory");
+  const flatIndex = () => generateIndex(analyzeMemoryMd(join(FLAT_STORE, "MEMORY.md")));
+
+  it("strips the namespace prefix when the ref resolves via the parent base", () => {
+    const entry = flatIndex().entries.find((e) => e.id === "flat-topic");
+    assert.ok(entry, "flat-topic should be indexed");
+    // Written `memory/flat-topic.md`; actually lives at the store root.
+    assert.equal(entry.path, "flat-topic.md");
+  });
+
+  it("keeps the nested segment when the ref genuinely resolves under the store", () => {
+    const entry = flatIndex().entries.find((e) => e.id === "nested-topic");
+    assert.ok(entry, "nested-topic should be indexed");
+    assert.equal(entry.path, "memory/nested-topic.md");
+  });
+
+  it("records POSIX separators regardless of host platform", () => {
+    for (const entry of flatIndex().entries) {
+      assert.ok(!entry.path.includes("\\"), `entry ${entry.id} must not carry backslashes`);
+    }
+  });
+
+  it("every entry path resolves on disk once joined onto the store root", () => {
+    // This is the miniature of the live acceptance test: resolve(store, path)
+    // must exist for EVERY entry, which is exactly what the CLI's
+    // rewritePathsAbsolute does before publishing the global index.
+    const entries = flatIndex().entries;
+    assert.equal(entries.length, 2);
+    for (const entry of entries) {
+      assert.ok(
+        existsSync(resolve(FLAT_STORE, entry.path)),
+        `entry ${entry.id} path "${entry.path}" must resolve under the store root`,
+      );
+    }
   });
 });

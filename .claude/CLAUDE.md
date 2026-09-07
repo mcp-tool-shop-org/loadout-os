@@ -16,7 +16,7 @@
 The production data flow, running on this rig right now:
 
 ```
-canonical store  C:/Users/mikey/.claude/projects/F--AI/memory/   (~330 .md files + MEMORY.md)
+canonical store  ~/.claude/projects/F--AI/memory/   (~330 .md files + MEMORY.md)
       │  claude-memories index + validate           ← "Index Freshness Ritual" in global CLAUDE.md
       ▼
 store dispatch table  <store>/index.json
@@ -61,7 +61,7 @@ Decompose-by-secrets (Parnas 1972) is right for N humans, operationally broken f
 ## Working rules
 
 - **Read `ROADMAP.md` first** — it's the dispatch table for this repo, and each phase has a gate that halts on failure.
-- Global rules (`C:/Users/mikey/.claude/CLAUDE.md`) and workspace rules (`E:/AI/.claude/CLAUDE.md`) apply here.
+- Global rules (`~/.claude/CLAUDE.md`) and workspace rules (`E:/AI/.claude/CLAUDE.md`) apply here.
 - **Cost discipline:** no agent fleets, no Workflow orchestration without explicit pricing + director approval. This layer's work is deterministic-first: scripts, validators, hand edits.
 - The loadout-hook injects pointer lines on prompts — open the pointed file before acting; don't paraphrase from the summary line.
 - Any new pipeline/script/SKILL.md authored here needs the six-standards compliance block (`workflow_standards.md`). Phase 6 (publish/deprecate/cutover) additionally requires a compensators table — no skip allowed.
