@@ -45,6 +45,27 @@ ship together under `loadout-os`.
 
 ### Fixed
 
+- **Index entries recorded the raw pointer instead of the resolved file** (FT-MR11) —
+  `generateIndex` resolved each MEMORY.md reference correctly (trying the store dir,
+  then its parent) and then discarded the result, storing `ref.path` verbatim. The
+  store's own convention writes pointers as `memory/foo.md`, where `memory/` is a
+  namespace label for the store rather than a subdirectory of it, so `refresh`'s
+  `rewritePathsAbsolute` re-applied the prefix and emitted a doubled
+  `…/memory/memory/foo.md`. On the canonical store that left **420 of 492 published
+  entries (85%) pointing at files that do not exist** — and because the
+  UserPromptSubmit hook reads that published index on every prompt, every session was
+  silently handed dead paths and fell back to paraphrasing one-line summaries, which
+  is precisely what the store's own rule forbids. Entries now record the location that
+  actually resolved, relative to the store root with POSIX separators, so both store
+  layouts resolve. Live index went 72/492 → **492/492**. Regression fixture
+  `fixtures/flat-store/` pins the shape the original fixture never exercised: the
+  previous fixture put MEMORY.md *above* its `memory/` directory, so every ref
+  matched on the first base and the parent-base fallback was never under test.
+- **`DEFAULT_STORE` hardcoded one machine's home directory** — the shipped default
+  store path was an absolute literal containing a username, so it resolved on exactly
+  one computer and leaked that username into a public package. It is now derived from
+  `homedir()`, matching `defaultDest()` directly below it.
+
 - **Matcher recall** (FT-K1) — domain entries were scored by pure coverage
   (`matched / declared keyword count`), which starved keyword-rich entries: a genuine
   2–3 keyword match on the live 30+-keyword entries scored below the 0.1 inclusion floor.

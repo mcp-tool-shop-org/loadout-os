@@ -6,7 +6,7 @@
  */
 
 import { readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { dirname, relative, resolve, sep } from "node:path";
 import { estimateTokens, parseFrontmatter } from "@mcptoolshop/ai-loadout";
 import type { LoadoutEntry, Budget, Frontmatter } from "@mcptoolshop/ai-loadout";
 import { DEFAULT_TRIGGERS } from "@mcptoolshop/ai-loadout";
@@ -66,15 +66,16 @@ export function generateIndex(
       continue;
     }
 
+    const storePath = toStoreRelative(fileDir, fullPath);
     const content = readFileSync(fullPath, "utf-8");
     const { frontmatter } = parseFrontmatter(content);
 
     if (frontmatter) {
       // Frontmatter is source of truth
-      entries.push(entryFromFrontmatter(frontmatter, ref, content));
+      entries.push(entryFromFrontmatter(frontmatter, ref, content, storePath));
     } else {
       // Auto-generate from name + content
-      entries.push(entryFromContent(ref, content));
+      entries.push(entryFromContent(ref, content, storePath));
     }
   }
 
@@ -107,6 +108,28 @@ export function generateIndex(
   };
 }
 
+/**
+ * FT-MR11: record the path that ACTUALLY resolved, expressed relative to the
+ * store root (the directory holding MEMORY.md) with POSIX separators.
+ *
+ * `ref.path` is the pointer exactly as written in MEMORY.md, and the canonical
+ * store writes it `memory/foo.md` — a namespace label for the store, not a
+ * subdirectory of it. `resolveRefPath` already copes with that by falling back
+ * to the parent base, but recording `ref.path` threw that work away. The CLI's
+ * `rewritePathsAbsolute` then re-absolutized the raw pointer against the store
+ * root ALONE, re-applying the prefix and yielding a doubled `memory/memory/`
+ * segment. On the canonical store that broke 420 of 492 entries (85%): the
+ * UserPromptSubmit hook reads the published index on every prompt, so every
+ * session was silently handed paths to files that do not exist.
+ *
+ * Store-RELATIVE rather than absolute, because a portable on-disk index is the
+ * contract `rewritePathsAbsolute` depends on; POSIX separators because the
+ * index is written on Windows and read everywhere.
+ */
+function toStoreRelative(storeRoot: string, fullPath: string): string {
+  return relative(storeRoot, fullPath).split(sep).join("/");
+}
+
 /** Max summary length — keep entry summaries compact in the dispatch table. */
 const MAX_SUMMARY = 120;
 
@@ -119,11 +142,12 @@ function entryFromFrontmatter(
   fm: Frontmatter,
   ref: MemoryRef,
   content: string,
+  storePath: string,
 ): LoadoutEntry {
   const lines = content.split("\n").length;
   return {
     id: fm.id,
-    path: ref.path,
+    path: storePath,
     keywords: fm.keywords,
     patterns: fm.patterns,
     priority: fm.priority,
@@ -136,14 +160,18 @@ function entryFromFrontmatter(
   };
 }
 
-function entryFromContent(ref: MemoryRef, content: string): LoadoutEntry {
+function entryFromContent(
+  ref: MemoryRef,
+  content: string,
+  storePath: string,
+): LoadoutEntry {
   const id = nameToId(ref.name);
   const keywords = extractKeywords(ref.name, content);
   const lines = content.split("\n").length;
 
   return {
     id,
-    path: ref.path,
+    path: storePath,
     keywords,
     patterns: [],
     priority: "domain",

@@ -85,9 +85,21 @@ import {
   flagValue,
 } from "./console.js";
 
-/** Canonical memory store (holds MEMORY.md + topic files). */
-export const DEFAULT_STORE =
-  "C:/Users/mikey/.claude/projects/F--AI/memory";
+/**
+ * Canonical memory store (holds MEMORY.md + topic files).
+ *
+ * Derived from the running user's home directory, not hardcoded. The literal
+ * path baked in here was one machine's, which made this shipped default resolve
+ * on exactly one computer — and put a username into a public package.
+ * `defaultDest()` below already derived its path this way; this matches it.
+ */
+export const DEFAULT_STORE = join(
+  homedir(),
+  ".claude",
+  "projects",
+  "F--AI",
+  "memory",
+);
 
 /** Default destination: the live global resolver index the hook reads. */
 export function defaultDest(): string {

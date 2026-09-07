@@ -116,7 +116,7 @@ Claude Rules — optimizer → \`memory/claude-rules.md\`
     const content = `## Prose
 
 - Memory files: see \`memory/index.json\` for the generated dispatch table
-Full frame in \`C:/Users/mikey/.claude/projects/memory/user_profile.md\` — read it if unsure
+Full frame in \`C:/Users/Public/.claude/projects/memory/user_profile.md\` — read it if unsure
 See also: the post-proof balance tuning notes live at \`memory/post-proof-balance-tuning.md\` and cover wave-based tuning
 
 ## Real
@@ -152,7 +152,7 @@ See also: the post-proof balance tuning notes live at \`memory/post-proof-balanc
     // there; only the relative topic ref survives.
     const content = `## Edge
 
-- Drive Path — see \`C:/Users/mikey/memory/x.md\` → for more details here
+- Drive Path — see \`C:/Users/Public/memory/x.md\` → for more details here
 - Glob Path — see \`memory/*.md\` → for all the files
 - Real One — see \`memory/real.md\` → for the real one
 `;
