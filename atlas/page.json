@@ -1,0 +1,301 @@
+{
+  "authored": [
+    ".github/",
+    "packages/kernel/",
+    "packages/memories/",
+    "packages/rules/",
+    "root"
+  ],
+  "breaks": [
+    {
+      "doors": 2,
+      "importedBy": [
+        "cli",
+        "hook",
+        "memories",
+        "rules"
+      ],
+      "importedByTests": [],
+      "kind": "part",
+      "name": "kernel"
+    },
+    {
+      "doors": 2,
+      "importedBy": [
+        "cli"
+      ],
+      "importedByTests": [],
+      "kind": "part",
+      "name": "memories"
+    },
+    {
+      "doors": 2,
+      "importedBy": [
+        "cli"
+      ],
+      "importedByTests": [],
+      "kind": "part",
+      "name": "rules"
+    },
+    {
+      "doors": 2,
+      "importedBy": [],
+      "importedByTests": [],
+      "kind": "part",
+      "name": "cli"
+    },
+    {
+      "kind": "place",
+      "readers": [
+        "cli",
+        "rules"
+      ],
+      "target": ".claude/",
+      "writers": [
+        "cli",
+        "rules"
+      ]
+    }
+  ],
+  "changes": {
+    "first": true
+  },
+  "changesTogether": [],
+  "changesTogetherNote": [
+    "Window: 180 days; a pair counts from 3 shared commits."
+  ],
+  "changesTogetherWithTests": 0,
+  "commit": "741a0923029b4c5c494f6a2f0089c08f18a6d8e7",
+  "doors": [
+    {
+      "file": ".github/workflows/ci.yml",
+      "landings": [
+        ".claude/"
+      ],
+      "name": "CI",
+      "pushes": false,
+      "reach": [
+        {
+          "boundary": "cli",
+          "depth": 0,
+          "files": 19
+        },
+        {
+          "boundary": "kernel",
+          "depth": 0,
+          "files": 23
+        },
+        {
+          "boundary": "memories",
+          "depth": 0,
+          "files": 17
+        },
+        {
+          "boundary": "rules",
+          "depth": 0,
+          "files": 17
+        }
+      ],
+      "runs": [
+        "packages/cli/src/",
+        "packages/kernel/src/",
+        "packages/memories/src/",
+        "packages/rules/src/"
+      ],
+      "runsCount": 4,
+      "sends": [
+        "deploys the site"
+      ],
+      "stages": [],
+      "triggers": [
+        "on a pull request touching 8 paths",
+        "on a push to main touching 8 paths",
+        "or by hand"
+      ]
+    },
+    {
+      "file": ".github/workflows/release.yml",
+      "landings": [
+        ".claude/"
+      ],
+      "name": "Release",
+      "pushes": false,
+      "reach": [
+        {
+          "boundary": "cli",
+          "depth": 0,
+          "files": 20
+        },
+        {
+          "boundary": "kernel",
+          "depth": 0,
+          "files": 23
+        },
+        {
+          "boundary": "memories",
+          "depth": 0,
+          "files": 17
+        },
+        {
+          "boundary": "rules",
+          "depth": 0,
+          "files": 17
+        }
+      ],
+      "runs": [
+        "packages/cli/esbuild.config.mjs",
+        "packages/cli/src/",
+        "packages/kernel/src/",
+        "packages/memories/src/",
+        "packages/rules/src/"
+      ],
+      "runsCount": 5,
+      "sends": [
+        "publishes to npm",
+        "creates a GitHub release"
+      ],
+      "stages": [],
+      "triggers": [
+        "when a tag matching `v*` is pushed"
+      ]
+    }
+  ],
+  "duplicates": [
+    {
+      "files": [
+        "packages/memories/src/analyze.ts",
+        "packages/rules/src/analyze.ts"
+      ],
+      "name": "extractKeywords",
+      "partLabels": [
+        "memories",
+        "rules"
+      ],
+      "parts": [
+        "memories",
+        "rules"
+      ]
+    },
+    {
+      "files": [
+        "packages/cli/src/console.ts",
+        "packages/rules/src/console.ts"
+      ],
+      "name": "fail",
+      "partLabels": [
+        "cli",
+        "rules"
+      ],
+      "parts": [
+        "cli",
+        "rules"
+      ]
+    },
+    {
+      "files": [
+        "packages/cli/src/console.ts",
+        "packages/rules/src/console.ts"
+      ],
+      "name": "flagValue",
+      "partLabels": [
+        "cli",
+        "rules"
+      ],
+      "parts": [
+        "cli",
+        "rules"
+      ]
+    },
+    {
+      "files": [
+        "packages/cli/src/console.ts",
+        "packages/rules/src/console.ts"
+      ],
+      "name": "hasFlag",
+      "partLabels": [
+        "cli",
+        "rules"
+      ],
+      "parts": [
+        "cli",
+        "rules"
+      ]
+    },
+    {
+      "files": [
+        "packages/cli/src/console.ts",
+        "packages/rules/src/console.ts"
+      ],
+      "name": "info",
+      "partLabels": [
+        "cli",
+        "rules"
+      ],
+      "parts": [
+        "cli",
+        "rules"
+      ]
+    }
+  ],
+  "duplicatesLead": "These are candidates from names and call order, not a judgement.",
+  "duplicatesNote": [
+    "And 4 more pairs."
+  ],
+  "generated": [
+    {
+      "place": ".claude/",
+      "writers": [
+        "packages/cli/src/refresh.ts",
+        "packages/rules/src/signals.ts"
+      ]
+    }
+  ],
+  "generatedAt": "2026-09-23T17:44:16.191Z",
+  "limits": [
+    "7 writes and 59 reads use paths built at run time and are not named here.",
+    "Statistics confidence is low: fewer than 20 source files reach 10 revisions in the window."
+  ],
+  "mainDoor": ".github/workflows/ci.yml",
+  "parts": 9,
+  "readers": [
+    {
+      "readers": [
+        "packages/rules/src/analyze.ts",
+        "packages/rules/src/stats.ts"
+      ],
+      "target": ".claude/"
+    }
+  ],
+  "repo": "mcp-tool-shop-org/loadout-os",
+  "sequences": [],
+  "startHere": [
+    ".github/workflows/ci.yml",
+    "packages/kernel/src/",
+    ".claude/",
+    "packages/rules/src/analyze.ts"
+  ],
+  "summary": null,
+  "summaryFrom": null,
+  "testFiles": 45,
+  "testedBy": {
+    "cli": 12,
+    "hook": 0,
+    "site": 0
+  },
+  "unread": [],
+  "unreadNote": [],
+  "untested": [
+    {
+      "part": "hook",
+      "partLabel": "hook",
+      "testedBy": 0
+    },
+    {
+      "part": "site",
+      "partLabel": "site",
+      "testedBy": 0
+    }
+  ],
+  "untestedNote": [],
+  "written": 1
+}
