@@ -1,0 +1,2166 @@
+{
+  "boundaries": [
+    {
+      "breakage": {
+        "coChangesOnly": [],
+        "collapsed": false,
+        "confidence": "low",
+        "importsAndCoChanges": [],
+        "importsOnly": []
+      },
+      "cohesion": null,
+      "cohesionDropped": false,
+      "confidence": "low",
+      "highWater": null,
+      "name": ".claude",
+      "qualifyingSourceCommits": 0,
+      "rebaseline": null
+    },
+    {
+      "breakage": {
+        "coChangesOnly": [],
+        "collapsed": false,
+        "confidence": "low",
+        "importsAndCoChanges": [],
+        "importsOnly": []
+      },
+      "cohesion": null,
+      "cohesionDropped": false,
+      "confidence": "low",
+      "highWater": null,
+      "name": ".github",
+      "qualifyingSourceCommits": 0,
+      "rebaseline": null
+    },
+    {
+      "breakage": {
+        "coChangesOnly": [],
+        "collapsed": false,
+        "confidence": "low",
+        "importsAndCoChanges": [],
+        "importsOnly": []
+      },
+      "cohesion": null,
+      "cohesionDropped": false,
+      "confidence": "low",
+      "highWater": null,
+      "name": "cli",
+      "qualifyingSourceCommits": 6,
+      "rebaseline": null
+    },
+    {
+      "breakage": {
+        "coChangesOnly": [],
+        "collapsed": false,
+        "confidence": "low",
+        "importsAndCoChanges": [],
+        "importsOnly": []
+      },
+      "cohesion": null,
+      "cohesionDropped": false,
+      "confidence": "low",
+      "highWater": null,
+      "name": "hook",
+      "qualifyingSourceCommits": 3,
+      "rebaseline": null
+    },
+    {
+      "breakage": {
+        "coChangesOnly": [],
+        "collapsed": false,
+        "confidence": "low",
+        "importsAndCoChanges": [],
+        "importsOnly": [
+          "cli",
+          "hook",
+          "memories",
+          "rules"
+        ]
+      },
+      "cohesion": null,
+      "cohesionDropped": false,
+      "confidence": "low",
+      "highWater": null,
+      "name": "kernel",
+      "qualifyingSourceCommits": 4,
+      "rebaseline": null
+    },
+    {
+      "breakage": {
+        "coChangesOnly": [],
+        "collapsed": false,
+        "confidence": "low",
+        "importsAndCoChanges": [],
+        "importsOnly": [
+          "cli"
+        ]
+      },
+      "cohesion": null,
+      "cohesionDropped": false,
+      "confidence": "low",
+      "highWater": null,
+      "name": "memories",
+      "qualifyingSourceCommits": 5,
+      "rebaseline": null
+    },
+    {
+      "breakage": {
+        "coChangesOnly": [],
+        "collapsed": false,
+        "confidence": "low",
+        "importsAndCoChanges": [],
+        "importsOnly": []
+      },
+      "cohesion": null,
+      "cohesionDropped": false,
+      "confidence": "low",
+      "highWater": null,
+      "name": "root",
+      "qualifyingSourceCommits": 0,
+      "rebaseline": null
+    },
+    {
+      "breakage": {
+        "coChangesOnly": [],
+        "collapsed": false,
+        "confidence": "low",
+        "importsAndCoChanges": [],
+        "importsOnly": [
+          "cli"
+        ]
+      },
+      "cohesion": null,
+      "cohesionDropped": false,
+      "confidence": "low",
+      "highWater": null,
+      "name": "rules",
+      "qualifyingSourceCommits": 5,
+      "rebaseline": null
+    },
+    {
+      "breakage": {
+        "coChangesOnly": [],
+        "collapsed": false,
+        "confidence": "low",
+        "importsAndCoChanges": [],
+        "importsOnly": []
+      },
+      "cohesion": null,
+      "cohesionDropped": false,
+      "confidence": "low",
+      "highWater": null,
+      "name": "site",
+      "qualifyingSourceCommits": 2,
+      "rebaseline": null
+    }
+  ],
+  "churn": {
+    "definition": "commits is how many commits in the window touch the file, including merges and commits dropped from coupling. lines is added plus deleted in those commits.",
+    "files": [
+      {
+        "commits": 5,
+        "lines": 174,
+        "path": ".claude/CLAUDE.md"
+      },
+      {
+        "commits": 3,
+        "lines": 48,
+        "path": ".github/workflows/ci.yml"
+      },
+      {
+        "commits": 3,
+        "lines": 96,
+        "path": ".github/workflows/release.yml"
+      },
+      {
+        "commits": 1,
+        "lines": 20,
+        "path": ".github}/workflows/ci.yml"
+      },
+      {
+        "commits": 3,
+        "lines": 14,
+        "path": ".gitignore"
+      },
+      {
+        "commits": 3,
+        "lines": 130,
+        "path": "CHANGELOG.md"
+      },
+      {
+        "commits": 2,
+        "lines": 42,
+        "path": "LICENSE"
+      },
+      {
+        "commits": 2,
+        "lines": 96,
+        "path": "README.es.md"
+      },
+      {
+        "commits": 2,
+        "lines": 116,
+        "path": "README.fr.md"
+      },
+      {
+        "commits": 2,
+        "lines": 114,
+        "path": "README.hi.md"
+      },
+      {
+        "commits": 2,
+        "lines": 96,
+        "path": "README.it.md"
+      },
+      {
+        "commits": 2,
+        "lines": 96,
+        "path": "README.ja.md"
+      },
+      {
+        "commits": 10,
+        "lines": 150,
+        "path": "README.md"
+      },
+      {
+        "commits": 2,
+        "lines": 96,
+        "path": "README.pt-BR.md"
+      },
+      {
+        "commits": 2,
+        "lines": 120,
+        "path": "README.zh.md"
+      },
+      {
+        "commits": 4,
+        "lines": 261,
+        "path": "ROADMAP.md"
+      },
+      {
+        "commits": 1,
+        "lines": 41,
+        "path": "SCORECARD.md"
+      },
+      {
+        "commits": 1,
+        "lines": 51,
+        "path": "SECURITY.md"
+      },
+      {
+        "commits": 1,
+        "lines": 82,
+        "path": "SHIP_GATE.md"
+      },
+      {
+        "commits": 1,
+        "lines": 85,
+        "path": "apps/hook/esbuild.config.mjs"
+      },
+      {
+        "commits": 4,
+        "lines": 208,
+        "path": "apps/hook/loadout-hook.mjs"
+      },
+      {
+        "commits": 3,
+        "lines": 26,
+        "path": "apps/hook/package.json"
+      },
+      {
+        "commits": 3,
+        "lines": 160,
+        "path": "apps/hook/smoke-test.ps1"
+      },
+      {
+        "commits": 1,
+        "lines": 0,
+        "path": "logo.png"
+      },
+      {
+        "commits": 7,
+        "lines": 1467,
+        "path": "package-lock.json"
+      },
+      {
+        "commits": 4,
+        "lines": 32,
+        "path": "package.json"
+      },
+      {
+        "commits": 3,
+        "lines": 49,
+        "path": "packages/cli/CHANGELOG.md"
+      },
+      {
+        "commits": 1,
+        "lines": 21,
+        "path": "packages/cli/LICENSE"
+      },
+      {
+        "commits": 3,
+        "lines": 101,
+        "path": "packages/cli/README.md"
+      },
+      {
+        "commits": 1,
+        "lines": 78,
+        "path": "packages/cli/esbuild.config.mjs"
+      },
+      {
+        "commits": 8,
+        "lines": 82,
+        "path": "packages/cli/package.json"
+      },
+      {
+        "commits": 3,
+        "lines": 422,
+        "path": "packages/cli/src/cli.ts"
+      },
+      {
+        "commits": 3,
+        "lines": 900,
+        "path": "packages/cli/src/commands.ts"
+      },
+      {
+        "commits": 1,
+        "lines": 107,
+        "path": "packages/cli/src/console.ts"
+      },
+      {
+        "commits": 1,
+        "lines": 448,
+        "path": "packages/cli/src/doctor.ts"
+      },
+      {
+        "commits": 1,
+        "lines": 289,
+        "path": "packages/cli/src/help.ts"
+      },
+      {
+        "commits": 2,
+        "lines": 184,
+        "path": "packages/cli/src/hook.ts"
+      },
+      {
+        "commits": 2,
+        "lines": 63,
+        "path": "packages/cli/src/index.ts"
+      },
+      {
+        "commits": 3,
+        "lines": 454,
+        "path": "packages/cli/src/refresh.ts"
+      },
+      {
+        "commits": 1,
+        "lines": 226,
+        "path": "packages/cli/src/report.ts"
+      },
+      {
+        "commits": 1,
+        "lines": 55,
+        "path": "packages/cli/src/tests/console.test.ts"
+      },
+      {
+        "commits": 2,
+        "lines": 164,
+        "path": "packages/cli/src/tests/dispatch.test.ts"
+      },
+      {
+        "commits": 1,
+        "lines": 131,
+        "path": "packages/cli/src/tests/doctor.test.ts"
+      },
+      {
+        "commits": 2,
+        "lines": 279,
+        "path": "packages/cli/src/tests/fixtures.ts"
+      },
+      {
+        "commits": 1,
+        "lines": 118,
+        "path": "packages/cli/src/tests/help.test.ts"
+      },
+      {
+        "commits": 1,
+        "lines": 48,
+        "path": "packages/cli/src/tests/hook.test.ts"
+      },
+      {
+        "commits": 2,
+        "lines": 310,
+        "path": "packages/cli/src/tests/refresh.test.ts"
+      },
+      {
+        "commits": 1,
+        "lines": 109,
+        "path": "packages/cli/src/tests/report.test.ts"
+      },
+      {
+        "commits": 1,
+        "lines": 119,
+        "path": "packages/cli/src/tests/split.test.ts"
+      },
+      {
+        "commits": 1,
+        "lines": 240,
+        "path": "packages/cli/src/tests/wrapped.test.ts"
+      },
+      {
+        "commits": 1,
+        "lines": 12,
+        "path": "packages/cli/tsconfig.json"
+      },
+      {
+        "commits": 1,
+        "lines": 74,
+        "path": "packages/kernel/.claude/README.md"
+      },
+      {
+        "commits": 1,
+        "lines": 39,
+        "path": "packages/kernel/.claude/agents/core/critic-reviewer.md"
+      },
+      {
+        "commits": 1,
+        "lines": 40,
+        "path": "packages/kernel/.claude/agents/core/orchestrator.md"
+      },
+      {
+        "commits": 1,
+        "lines": 40,
+        "path": "packages/kernel/.claude/agents/core/product-strategist.md"
+      },
+      {
+        "commits": 1,
+        "lines": 41,
+        "path": "packages/kernel/.claude/agents/design/brand-guardian.md"
+      },
+      {
+        "commits": 1,
+        "lines": 42,
+        "path": "packages/kernel/.claude/agents/design/ui-designer.md"
+      },
+      {
+        "commits": 1,
+        "lines": 39,
+        "path": "packages/kernel/.claude/agents/engineering/backend-engineer.md"
+      },
+      {
+        "commits": 1,
+        "lines": 40,
+        "path": "packages/kernel/.claude/agents/engineering/dependency-auditor.md"
+      },
+      {
+        "commits": 1,
+        "lines": 40,
+        "path": "packages/kernel/.claude/agents/engineering/frontend-developer.md"
+      },
+      {
+        "commits": 1,
+        "lines": 42,
+        "path": "packages/kernel/.claude/agents/engineering/performance-engineer.md"
+      },
+      {
+        "commits": 1,
+        "lines": 41,
+        "path": "packages/kernel/.claude/agents/engineering/refactor-engineer.md"
+      },
+      {
+        "commits": 1,
+        "lines": 42,
+        "path": "packages/kernel/.claude/agents/engineering/security-reviewer.md"
+      },
+      {
+        "commits": 1,
+        "lines": 38,
+        "path": "packages/kernel/.claude/agents/engineering/test-engineer.md"
+      },
+      {
+        "commits": 1,
+        "lines": 41,
+        "path": "packages/kernel/.claude/agents/growth/community-manager.md"
+      },
+      {
+        "commits": 1,
+        "lines": 41,
+        "path": "packages/kernel/.claude/agents/growth/content-strategist.md"
+      },
+      {
+        "commits": 1,
+        "lines": 42,
+        "path": "packages/kernel/.claude/agents/growth/launch-strategist.md"
+      },
+      {
+        "commits": 1,
+        "lines": 41,
+        "path": "packages/kernel/.claude/agents/growth/support-triage-lead.md"
+      },
+      {
+        "commits": 1,
+        "lines": 39,
+        "path": "packages/kernel/.claude/agents/marketing/launch-copywriter.md"
+      },
+      {
+        "commits": 1,
+        "lines": 39,
+        "path": "packages/kernel/.claude/agents/product/feedback-synthesizer.md"
+      },
+      {
+        "commits": 1,
+        "lines": 40,
+        "path": "packages/kernel/.claude/agents/product/information-architect.md"
+      },
+      {
+        "commits": 1,
+        "lines": 41,
+        "path": "packages/kernel/.claude/agents/product/roadmap-prioritizer.md"
+      },
+      {
+        "commits": 1,
+        "lines": 42,
+        "path": "packages/kernel/.claude/agents/product/spec-writer.md"
+      },
+      {
+        "commits": 1,
+        "lines": 40,
+        "path": "packages/kernel/.claude/agents/research/competitive-analyst.md"
+      },
+      {
+        "commits": 1,
+        "lines": 40,
+        "path": "packages/kernel/.claude/agents/research/trend-researcher.md"
+      },
+      {
+        "commits": 1,
+        "lines": 41,
+        "path": "packages/kernel/.claude/agents/research/user-interview-synthesizer.md"
+      },
+      {
+        "commits": 1,
+        "lines": 40,
+        "path": "packages/kernel/.claude/agents/research/ux-researcher.md"
+      },
+      {
+        "commits": 1,
+        "lines": 40,
+        "path": "packages/kernel/.claude/agents/treatment/coverage-auditor.md"
+      },
+      {
+        "commits": 1,
+        "lines": 41,
+        "path": "packages/kernel/.claude/agents/treatment/deployment-verifier.md"
+      },
+      {
+        "commits": 1,
+        "lines": 40,
+        "path": "packages/kernel/.claude/agents/treatment/docs-architect.md"
+      },
+      {
+        "commits": 1,
+        "lines": 40,
+        "path": "packages/kernel/.claude/agents/treatment/metadata-curator.md"
+      },
+      {
+        "commits": 1,
+        "lines": 43,
+        "path": "packages/kernel/.claude/agents/treatment/release-engineer.md"
+      },
+      {
+        "commits": 1,
+        "lines": 40,
+        "path": "packages/kernel/.claude/agents/treatment/repo-researcher.md"
+      },
+      {
+        "commits": 1,
+        "lines": 38,
+        "path": "packages/kernel/.claude/agents/treatment/repo-translator.md"
+      },
+      {
+        "commits": 1,
+        "lines": 37,
+        "path": "packages/kernel/.claude/context/brand-rules.md"
+      },
+      {
+        "commits": 1,
+        "lines": 33,
+        "path": "packages/kernel/.claude/context/current-priorities.md"
+      },
+      {
+        "commits": 1,
+        "lines": 35,
+        "path": "packages/kernel/.claude/context/product-brief.md"
+      },
+      {
+        "commits": 1,
+        "lines": 81,
+        "path": "packages/kernel/.claude/context/repo-map.md"
+      },
+      {
+        "commits": 1,
+        "lines": 39,
+        "path": "packages/kernel/.claude/examples/feature-packet.md"
+      },
+      {
+        "commits": 1,
+        "lines": 39,
+        "path": "packages/kernel/.claude/examples/identity-packet.md"
+      },
+      {
+        "commits": 1,
+        "lines": 39,
+        "path": "packages/kernel/.claude/examples/integration-packet.md"
+      },
+      {
+        "commits": 1,
+        "lines": 67,
+        "path": "packages/kernel/.claude/handbook.md"
+      },
+      {
+        "commits": 1,
+        "lines": 15,
+        "path": "packages/kernel/.claude/policy/done-definition.md"
+      },
+      {
+        "commits": 1,
+        "lines": 20,
+        "path": "packages/kernel/.claude/policy/escalation-rules.md"
+      },
+      {
+        "commits": 1,
+        "lines": 199,
+        "path": "packages/kernel/.claude/policy/routing-rules.md"
+      },
+      {
+        "commits": 1,
+        "lines": 134,
+        "path": "packages/kernel/.claude/policy/tool-permissions.md"
+      },
+      {
+        "commits": 1,
+        "lines": 52,
+        "path": "packages/kernel/.claude/schemas/handoff.md"
+      },
+      {
+        "commits": 1,
+        "lines": 26,
+        "path": "packages/kernel/.claude/schemas/review-verdict.md"
+      },
+      {
+        "commits": 1,
+        "lines": 44,
+        "path": "packages/kernel/.claude/schemas/task-packet.md"
+      },
+      {
+        "commits": 1,
+        "lines": 18,
+        "path": "packages/kernel/.claude/workflows/fix-bug.md"
+      },
+      {
+        "commits": 1,
+        "lines": 176,
+        "path": "packages/kernel/.claude/workflows/full-treatment.md"
+      },
+      {
+        "commits": 1,
+        "lines": 15,
+        "path": "packages/kernel/.claude/workflows/launch-update.md"
+      },
+      {
+        "commits": 1,
+        "lines": 52,
+        "path": "packages/kernel/.claude/workflows/protect-dispatch-truth.md"
+      },
+      {
+        "commits": 1,
+        "lines": 22,
+        "path": "packages/kernel/.claude/workflows/ship-feature.md"
+      },
+      {
+        "commits": 2,
+        "lines": 38,
+        "path": "packages/kernel/.github/dependabot.yml"
+      },
+      {
+        "commits": 2,
+        "lines": 98,
+        "path": "packages/kernel/.github/workflows/ci.yml"
+      },
+      {
+        "commits": 2,
+        "lines": 350,
+        "path": "packages/kernel/.github/workflows/dogfood.yml"
+      },
+      {
+        "commits": 2,
+        "lines": 100,
+        "path": "packages/kernel/.github/workflows/pages.yml"
+      },
+      {
+        "commits": 2,
+        "lines": 154,
+        "path": "packages/kernel/.github/workflows/release.yml"
+      },
+      {
+        "commits": 1,
+        "lines": 7,
+        "path": "packages/kernel/.gitignore"
+      },
+      {
+        "commits": 1,
+        "lines": 195,
+        "path": "packages/kernel/AGENT_CONTRACT.md"
+      },
+      {
+        "commits": 2,
+        "lines": 96,
+        "path": "packages/kernel/CHANGELOG.md"
+      },
+      {
+        "commits": 1,
+        "lines": 21,
+        "path": "packages/kernel/LICENSE"
+      },
+      {
+        "commits": 1,
+        "lines": 274,
+        "path": "packages/kernel/README.es.md"
+      },
+      {
+        "commits": 1,
+        "lines": 274,
+        "path": "packages/kernel/README.fr.md"
+      },
+      {
+        "commits": 1,
+        "lines": 279,
+        "path": "packages/kernel/README.hi.md"
+      },
+      {
+        "commits": 1,
+        "lines": 274,
+        "path": "packages/kernel/README.it.md"
+      },
+      {
+        "commits": 1,
+        "lines": 274,
+        "path": "packages/kernel/README.ja.md"
+      },
+      {
+        "commits": 1,
+        "lines": 274,
+        "path": "packages/kernel/README.md"
+      },
+      {
+        "commits": 1,
+        "lines": 274,
+        "path": "packages/kernel/README.pt-BR.md"
+      },
+      {
+        "commits": 1,
+        "lines": 274,
+        "path": "packages/kernel/README.zh.md"
+      },
+      {
+        "commits": 1,
+        "lines": 49,
+        "path": "packages/kernel/SCORECARD.md"
+      },
+      {
+        "commits": 2,
+        "lines": 76,
+        "path": "packages/kernel/SECURITY.md"
+      },
+      {
+        "commits": 1,
+        "lines": 80,
+        "path": "packages/kernel/SHIP_GATE.md"
+      },
+      {
+        "commits": 1,
+        "lines": 328,
+        "path": "packages/kernel/SPEC.md"
+      },
+      {
+        "commits": 1,
+        "lines": 0,
+        "path": "packages/kernel/logo.png"
+      },
+      {
+        "commits": 1,
+        "lines": 63,
+        "path": "packages/kernel/package.json"
+      },
+      {
+        "commits": 2,
+        "lines": 34,
+        "path": "packages/kernel/site/astro.config.mjs"
+      },
+      {
+        "commits": 2,
+        "lines": 13572,
+        "path": "packages/kernel/site/package-lock.json"
+      },
+      {
+        "commits": 2,
+        "lines": 24,
+        "path": "packages/kernel/site/package.json"
+      },
+      {
+        "commits": 1,
+        "lines": 7,
+        "path": "packages/kernel/site/src/content.config.ts"
+      },
+      {
+        "commits": 1,
+        "lines": 196,
+        "path": "packages/kernel/site/src/content/docs/handbook/beginners.md"
+      },
+      {
+        "commits": 1,
+        "lines": 134,
+        "path": "packages/kernel/site/src/content/docs/handbook/concepts.md"
+      },
+      {
+        "commits": 1,
+        "lines": 88,
+        "path": "packages/kernel/site/src/content/docs/handbook/getting-started.md"
+      },
+      {
+        "commits": 1,
+        "lines": 35,
+        "path": "packages/kernel/site/src/content/docs/handbook/index.md"
+      },
+      {
+        "commits": 1,
+        "lines": 320,
+        "path": "packages/kernel/site/src/content/docs/handbook/reference.md"
+      },
+      {
+        "commits": 1,
+        "lines": 37,
+        "path": "packages/kernel/site/src/content/docs/handbook/security.md"
+      },
+      {
+        "commits": 1,
+        "lines": 33,
+        "path": "packages/kernel/site/src/pages/index.astro"
+      },
+      {
+        "commits": 1,
+        "lines": 123,
+        "path": "packages/kernel/site/src/site-config.ts"
+      },
+      {
+        "commits": 1,
+        "lines": 7,
+        "path": "packages/kernel/site/src/styles/global.css"
+      },
+      {
+        "commits": 1,
+        "lines": 18,
+        "path": "packages/kernel/site/src/styles/starlight-custom.css"
+      },
+      {
+        "commits": 1,
+        "lines": 5,
+        "path": "packages/kernel/site/tsconfig.json"
+      },
+      {
+        "commits": 1,
+        "lines": 140,
+        "path": "packages/kernel/src/analysis.ts"
+      },
+      {
+        "commits": 1,
+        "lines": 101,
+        "path": "packages/kernel/src/cli-helpers.ts"
+      },
+      {
+        "commits": 3,
+        "lines": 561,
+        "path": "packages/kernel/src/cli.ts"
+      },
+      {
+        "commits": 2,
+        "lines": 179,
+        "path": "packages/kernel/src/frontmatter.ts"
+      },
+      {
+        "commits": 4,
+        "lines": 66,
+        "path": "packages/kernel/src/index.ts"
+      },
+      {
+        "commits": 2,
+        "lines": 254,
+        "path": "packages/kernel/src/match.ts"
+      },
+      {
+        "commits": 1,
+        "lines": 83,
+        "path": "packages/kernel/src/merge.ts"
+      },
+      {
+        "commits": 2,
+        "lines": 212,
+        "path": "packages/kernel/src/resolve.ts"
+      },
+      {
+        "commits": 1,
+        "lines": 163,
+        "path": "packages/kernel/src/runtime.ts"
+      },
+      {
+        "commits": 1,
+        "lines": 199,
+        "path": "packages/kernel/src/tests/analysis.test.ts"
+      },
+      {
+        "commits": 1,
+        "lines": 92,
+        "path": "packages/kernel/src/tests/cli-helpers.test.ts"
+      },
+      {
+        "commits": 2,
+        "lines": 135,
+        "path": "packages/kernel/src/tests/frontmatter.test.ts"
+      },
+      {
+        "commits": 2,
+        "lines": 266,
+        "path": "packages/kernel/src/tests/match.test.ts"
+      },
+      {
+        "commits": 1,
+        "lines": 158,
+        "path": "packages/kernel/src/tests/merge.test.ts"
+      },
+      {
+        "commits": 2,
+        "lines": 411,
+        "path": "packages/kernel/src/tests/resolve.test.ts"
+      },
+      {
+        "commits": 1,
+        "lines": 276,
+        "path": "packages/kernel/src/tests/runtime.test.ts"
+      },
+      {
+        "commits": 1,
+        "lines": 16,
+        "path": "packages/kernel/src/tests/tokens.test.ts"
+      },
+      {
+        "commits": 3,
+        "lines": 219,
+        "path": "packages/kernel/src/tests/usage.test.ts"
+      },
+      {
+        "commits": 1,
+        "lines": 106,
+        "path": "packages/kernel/src/tests/validate.test.ts"
+      },
+      {
+        "commits": 1,
+        "lines": 10,
+        "path": "packages/kernel/src/tokens.ts"
+      },
+      {
+        "commits": 2,
+        "lines": 121,
+        "path": "packages/kernel/src/types.ts"
+      },
+      {
+        "commits": 3,
+        "lines": 166,
+        "path": "packages/kernel/src/usage.ts"
+      },
+      {
+        "commits": 1,
+        "lines": 168,
+        "path": "packages/kernel/src/validate.ts"
+      },
+      {
+        "commits": 2,
+        "lines": 26,
+        "path": "packages/kernel/tsconfig.json"
+      },
+      {
+        "commits": 1,
+        "lines": 74,
+        "path": "packages/memories/.claude/README.md"
+      },
+      {
+        "commits": 1,
+        "lines": 39,
+        "path": "packages/memories/.claude/agents/core/critic-reviewer.md"
+      },
+      {
+        "commits": 1,
+        "lines": 40,
+        "path": "packages/memories/.claude/agents/core/orchestrator.md"
+      },
+      {
+        "commits": 1,
+        "lines": 40,
+        "path": "packages/memories/.claude/agents/core/product-strategist.md"
+      },
+      {
+        "commits": 1,
+        "lines": 41,
+        "path": "packages/memories/.claude/agents/design/brand-guardian.md"
+      },
+      {
+        "commits": 1,
+        "lines": 42,
+        "path": "packages/memories/.claude/agents/design/ui-designer.md"
+      },
+      {
+        "commits": 1,
+        "lines": 39,
+        "path": "packages/memories/.claude/agents/engineering/backend-engineer.md"
+      },
+      {
+        "commits": 1,
+        "lines": 40,
+        "path": "packages/memories/.claude/agents/engineering/dependency-auditor.md"
+      },
+      {
+        "commits": 1,
+        "lines": 40,
+        "path": "packages/memories/.claude/agents/engineering/frontend-developer.md"
+      },
+      {
+        "commits": 1,
+        "lines": 42,
+        "path": "packages/memories/.claude/agents/engineering/performance-engineer.md"
+      },
+      {
+        "commits": 1,
+        "lines": 41,
+        "path": "packages/memories/.claude/agents/engineering/refactor-engineer.md"
+      },
+      {
+        "commits": 1,
+        "lines": 42,
+        "path": "packages/memories/.claude/agents/engineering/security-reviewer.md"
+      },
+      {
+        "commits": 1,
+        "lines": 38,
+        "path": "packages/memories/.claude/agents/engineering/test-engineer.md"
+      },
+      {
+        "commits": 1,
+        "lines": 41,
+        "path": "packages/memories/.claude/agents/growth/community-manager.md"
+      },
+      {
+        "commits": 1,
+        "lines": 41,
+        "path": "packages/memories/.claude/agents/growth/content-strategist.md"
+      },
+      {
+        "commits": 1,
+        "lines": 42,
+        "path": "packages/memories/.claude/agents/growth/launch-strategist.md"
+      },
+      {
+        "commits": 1,
+        "lines": 41,
+        "path": "packages/memories/.claude/agents/growth/support-triage-lead.md"
+      },
+      {
+        "commits": 1,
+        "lines": 39,
+        "path": "packages/memories/.claude/agents/marketing/launch-copywriter.md"
+      },
+      {
+        "commits": 1,
+        "lines": 39,
+        "path": "packages/memories/.claude/agents/product/feedback-synthesizer.md"
+      },
+      {
+        "commits": 1,
+        "lines": 40,
+        "path": "packages/memories/.claude/agents/product/information-architect.md"
+      },
+      {
+        "commits": 1,
+        "lines": 41,
+        "path": "packages/memories/.claude/agents/product/roadmap-prioritizer.md"
+      },
+      {
+        "commits": 1,
+        "lines": 42,
+        "path": "packages/memories/.claude/agents/product/spec-writer.md"
+      },
+      {
+        "commits": 1,
+        "lines": 40,
+        "path": "packages/memories/.claude/agents/research/competitive-analyst.md"
+      },
+      {
+        "commits": 1,
+        "lines": 40,
+        "path": "packages/memories/.claude/agents/research/trend-researcher.md"
+      },
+      {
+        "commits": 1,
+        "lines": 41,
+        "path": "packages/memories/.claude/agents/research/user-interview-synthesizer.md"
+      },
+      {
+        "commits": 1,
+        "lines": 40,
+        "path": "packages/memories/.claude/agents/research/ux-researcher.md"
+      },
+      {
+        "commits": 1,
+        "lines": 40,
+        "path": "packages/memories/.claude/agents/treatment/coverage-auditor.md"
+      },
+      {
+        "commits": 1,
+        "lines": 41,
+        "path": "packages/memories/.claude/agents/treatment/deployment-verifier.md"
+      },
+      {
+        "commits": 1,
+        "lines": 40,
+        "path": "packages/memories/.claude/agents/treatment/docs-architect.md"
+      },
+      {
+        "commits": 1,
+        "lines": 40,
+        "path": "packages/memories/.claude/agents/treatment/metadata-curator.md"
+      },
+      {
+        "commits": 1,
+        "lines": 43,
+        "path": "packages/memories/.claude/agents/treatment/release-engineer.md"
+      },
+      {
+        "commits": 1,
+        "lines": 40,
+        "path": "packages/memories/.claude/agents/treatment/repo-researcher.md"
+      },
+      {
+        "commits": 1,
+        "lines": 38,
+        "path": "packages/memories/.claude/agents/treatment/repo-translator.md"
+      },
+      {
+        "commits": 1,
+        "lines": 39,
+        "path": "packages/memories/.claude/examples/feature-packet.md"
+      },
+      {
+        "commits": 1,
+        "lines": 39,
+        "path": "packages/memories/.claude/examples/identity-packet.md"
+      },
+      {
+        "commits": 1,
+        "lines": 39,
+        "path": "packages/memories/.claude/examples/integration-packet.md"
+      },
+      {
+        "commits": 1,
+        "lines": 67,
+        "path": "packages/memories/.claude/handbook.md"
+      },
+      {
+        "commits": 1,
+        "lines": 12,
+        "path": "packages/memories/.claude/launch.json"
+      },
+      {
+        "commits": 1,
+        "lines": 15,
+        "path": "packages/memories/.claude/policy/done-definition.md"
+      },
+      {
+        "commits": 1,
+        "lines": 20,
+        "path": "packages/memories/.claude/policy/escalation-rules.md"
+      },
+      {
+        "commits": 1,
+        "lines": 199,
+        "path": "packages/memories/.claude/policy/routing-rules.md"
+      },
+      {
+        "commits": 1,
+        "lines": 134,
+        "path": "packages/memories/.claude/policy/tool-permissions.md"
+      },
+      {
+        "commits": 1,
+        "lines": 52,
+        "path": "packages/memories/.claude/schemas/handoff.md"
+      },
+      {
+        "commits": 1,
+        "lines": 26,
+        "path": "packages/memories/.claude/schemas/review-verdict.md"
+      },
+      {
+        "commits": 1,
+        "lines": 44,
+        "path": "packages/memories/.claude/schemas/task-packet.md"
+      },
+      {
+        "commits": 1,
+        "lines": 18,
+        "path": "packages/memories/.claude/workflows/fix-bug.md"
+      },
+      {
+        "commits": 1,
+        "lines": 176,
+        "path": "packages/memories/.claude/workflows/full-treatment.md"
+      },
+      {
+        "commits": 1,
+        "lines": 15,
+        "path": "packages/memories/.claude/workflows/launch-update.md"
+      },
+      {
+        "commits": 1,
+        "lines": 22,
+        "path": "packages/memories/.claude/workflows/ship-feature.md"
+      },
+      {
+        "commits": 2,
+        "lines": 86,
+        "path": "packages/memories/.github/workflows/ci.yml"
+      },
+      {
+        "commits": 2,
+        "lines": 100,
+        "path": "packages/memories/.github/workflows/pages.yml"
+      },
+      {
+        "commits": 1,
+        "lines": 8,
+        "path": "packages/memories/.gitignore"
+      },
+      {
+        "commits": 1,
+        "lines": 35,
+        "path": "packages/memories/CHANGELOG.md"
+      },
+      {
+        "commits": 1,
+        "lines": 21,
+        "path": "packages/memories/LICENSE"
+      },
+      {
+        "commits": 1,
+        "lines": 164,
+        "path": "packages/memories/README.es.md"
+      },
+      {
+        "commits": 1,
+        "lines": 164,
+        "path": "packages/memories/README.fr.md"
+      },
+      {
+        "commits": 1,
+        "lines": 166,
+        "path": "packages/memories/README.hi.md"
+      },
+      {
+        "commits": 1,
+        "lines": 164,
+        "path": "packages/memories/README.it.md"
+      },
+      {
+        "commits": 1,
+        "lines": 164,
+        "path": "packages/memories/README.ja.md"
+      },
+      {
+        "commits": 1,
+        "lines": 172,
+        "path": "packages/memories/README.md"
+      },
+      {
+        "commits": 1,
+        "lines": 164,
+        "path": "packages/memories/README.pt-BR.md"
+      },
+      {
+        "commits": 1,
+        "lines": 164,
+        "path": "packages/memories/README.zh.md"
+      },
+      {
+        "commits": 1,
+        "lines": 43,
+        "path": "packages/memories/SCORECARD.md"
+      },
+      {
+        "commits": 1,
+        "lines": 32,
+        "path": "packages/memories/SECURITY.md"
+      },
+      {
+        "commits": 1,
+        "lines": 80,
+        "path": "packages/memories/SHIP_GATE.md"
+      },
+      {
+        "commits": 1,
+        "lines": 0,
+        "path": "packages/memories/logo.png"
+      },
+      {
+        "commits": 1,
+        "lines": 58,
+        "path": "packages/memories/package.json"
+      },
+      {
+        "commits": 2,
+        "lines": 34,
+        "path": "packages/memories/site/astro.config.mjs"
+      },
+      {
+        "commits": 2,
+        "lines": 13568,
+        "path": "packages/memories/site/package-lock.json"
+      },
+      {
+        "commits": 2,
+        "lines": 24,
+        "path": "packages/memories/site/package.json"
+      },
+      {
+        "commits": 1,
+        "lines": 7,
+        "path": "packages/memories/site/src/content.config.ts"
+      },
+      {
+        "commits": 1,
+        "lines": 65,
+        "path": "packages/memories/site/src/content/docs/handbook/architecture.md"
+      },
+      {
+        "commits": 1,
+        "lines": 112,
+        "path": "packages/memories/site/src/content/docs/handbook/beginners.md"
+      },
+      {
+        "commits": 1,
+        "lines": 71,
+        "path": "packages/memories/site/src/content/docs/handbook/getting-started.md"
+      },
+      {
+        "commits": 1,
+        "lines": 19,
+        "path": "packages/memories/site/src/content/docs/handbook/index.md"
+      },
+      {
+        "commits": 1,
+        "lines": 102,
+        "path": "packages/memories/site/src/content/docs/handbook/usage.md"
+      },
+      {
+        "commits": 1,
+        "lines": 33,
+        "path": "packages/memories/site/src/pages/index.astro"
+      },
+      {
+        "commits": 1,
+        "lines": 61,
+        "path": "packages/memories/site/src/site-config.ts"
+      },
+      {
+        "commits": 1,
+        "lines": 3,
+        "path": "packages/memories/site/src/styles/global.css"
+      },
+      {
+        "commits": 1,
+        "lines": 17,
+        "path": "packages/memories/site/src/styles/starlight-custom.css"
+      },
+      {
+        "commits": 1,
+        "lines": 5,
+        "path": "packages/memories/site/tsconfig.json"
+      },
+      {
+        "commits": 2,
+        "lines": 244,
+        "path": "packages/memories/src/analyze.ts"
+      },
+      {
+        "commits": 3,
+        "lines": 478,
+        "path": "packages/memories/src/cli.ts"
+      },
+      {
+        "commits": 5,
+        "lines": 252,
+        "path": "packages/memories/src/index-gen.ts"
+      },
+      {
+        "commits": 2,
+        "lines": 46,
+        "path": "packages/memories/src/index.ts"
+      },
+      {
+        "commits": 2,
+        "lines": 215,
+        "path": "packages/memories/src/parser.ts"
+      },
+      {
+        "commits": 1,
+        "lines": 29,
+        "path": "packages/memories/src/paths.ts"
+      },
+      {
+        "commits": 1,
+        "lines": 104,
+        "path": "packages/memories/src/stats.ts"
+      },
+      {
+        "commits": 1,
+        "lines": 85,
+        "path": "packages/memories/src/tests/analyze.test.ts"
+      },
+      {
+        "commits": 2,
+        "lines": 206,
+        "path": "packages/memories/src/tests/cli.test.ts"
+      },
+      {
+        "commits": 1,
+        "lines": 164,
+        "path": "packages/memories/src/tests/diagnostics.test.ts"
+      },
+      {
+        "commits": 4,
+        "lines": 31,
+        "path": "packages/memories/src/tests/fixtures/MEMORY.md"
+      },
+      {
+        "commits": 1,
+        "lines": 15,
+        "path": "packages/memories/src/tests/fixtures/flat-store/memory/MEMORY.md"
+      },
+      {
+        "commits": 1,
+        "lines": 15,
+        "path": "packages/memories/src/tests/fixtures/flat-store/memory/flat-topic.md"
+      },
+      {
+        "commits": 1,
+        "lines": 5,
+        "path": "packages/memories/src/tests/fixtures/flat-store/memory/memory/nested-topic.md"
+      },
+      {
+        "commits": 1,
+        "lines": 14,
+        "path": "packages/memories/src/tests/fixtures/memory/ai-loadout.md"
+      },
+      {
+        "commits": 1,
+        "lines": 8,
+        "path": "packages/memories/src/tests/fixtures/memory/artifact.md"
+      },
+      {
+        "commits": 1,
+        "lines": 8,
+        "path": "packages/memories/src/tests/fixtures/memory/claude-rules.md"
+      },
+      {
+        "commits": 1,
+        "lines": 17,
+        "path": "packages/memories/src/tests/fixtures/memory/long-fm-id.md"
+      },
+      {
+        "commits": 1,
+        "lines": 5,
+        "path": "packages/memories/src/tests/fixtures/memory/long-name.md"
+      },
+      {
+        "commits": 1,
+        "lines": 15,
+        "path": "packages/memories/src/tests/fixtures/memory/long-summary.md"
+      },
+      {
+        "commits": 1,
+        "lines": 26,
+        "path": "packages/memories/src/tests/health.test.ts"
+      },
+      {
+        "commits": 4,
+        "lines": 185,
+        "path": "packages/memories/src/tests/index-gen.test.ts"
+      },
+      {
+        "commits": 3,
+        "lines": 179,
+        "path": "packages/memories/src/tests/parser.test.ts"
+      },
+      {
+        "commits": 1,
+        "lines": 58,
+        "path": "packages/memories/src/tests/stats.test.ts"
+      },
+      {
+        "commits": 3,
+        "lines": 100,
+        "path": "packages/memories/src/tests/validate.test.ts"
+      },
+      {
+        "commits": 2,
+        "lines": 87,
+        "path": "packages/memories/src/types.ts"
+      },
+      {
+        "commits": 4,
+        "lines": 178,
+        "path": "packages/memories/src/validate.ts"
+      },
+      {
+        "commits": 2,
+        "lines": 25,
+        "path": "packages/memories/tsconfig.json"
+      },
+      {
+        "commits": 1,
+        "lines": 74,
+        "path": "packages/rules/.claude/README.md"
+      },
+      {
+        "commits": 1,
+        "lines": 39,
+        "path": "packages/rules/.claude/agents/core/critic-reviewer.md"
+      },
+      {
+        "commits": 1,
+        "lines": 40,
+        "path": "packages/rules/.claude/agents/core/orchestrator.md"
+      },
+      {
+        "commits": 1,
+        "lines": 40,
+        "path": "packages/rules/.claude/agents/core/product-strategist.md"
+      },
+      {
+        "commits": 1,
+        "lines": 41,
+        "path": "packages/rules/.claude/agents/design/brand-guardian.md"
+      },
+      {
+        "commits": 1,
+        "lines": 42,
+        "path": "packages/rules/.claude/agents/design/ui-designer.md"
+      },
+      {
+        "commits": 1,
+        "lines": 39,
+        "path": "packages/rules/.claude/agents/engineering/backend-engineer.md"
+      },
+      {
+        "commits": 1,
+        "lines": 40,
+        "path": "packages/rules/.claude/agents/engineering/dependency-auditor.md"
+      },
+      {
+        "commits": 1,
+        "lines": 40,
+        "path": "packages/rules/.claude/agents/engineering/frontend-developer.md"
+      },
+      {
+        "commits": 1,
+        "lines": 42,
+        "path": "packages/rules/.claude/agents/engineering/performance-engineer.md"
+      },
+      {
+        "commits": 1,
+        "lines": 41,
+        "path": "packages/rules/.claude/agents/engineering/refactor-engineer.md"
+      },
+      {
+        "commits": 1,
+        "lines": 42,
+        "path": "packages/rules/.claude/agents/engineering/security-reviewer.md"
+      },
+      {
+        "commits": 1,
+        "lines": 38,
+        "path": "packages/rules/.claude/agents/engineering/test-engineer.md"
+      },
+      {
+        "commits": 1,
+        "lines": 41,
+        "path": "packages/rules/.claude/agents/growth/community-manager.md"
+      },
+      {
+        "commits": 1,
+        "lines": 41,
+        "path": "packages/rules/.claude/agents/growth/content-strategist.md"
+      },
+      {
+        "commits": 1,
+        "lines": 42,
+        "path": "packages/rules/.claude/agents/growth/launch-strategist.md"
+      },
+      {
+        "commits": 1,
+        "lines": 41,
+        "path": "packages/rules/.claude/agents/growth/support-triage-lead.md"
+      },
+      {
+        "commits": 1,
+        "lines": 39,
+        "path": "packages/rules/.claude/agents/marketing/launch-copywriter.md"
+      },
+      {
+        "commits": 1,
+        "lines": 39,
+        "path": "packages/rules/.claude/agents/product/feedback-synthesizer.md"
+      },
+      {
+        "commits": 1,
+        "lines": 40,
+        "path": "packages/rules/.claude/agents/product/information-architect.md"
+      },
+      {
+        "commits": 1,
+        "lines": 41,
+        "path": "packages/rules/.claude/agents/product/roadmap-prioritizer.md"
+      },
+      {
+        "commits": 1,
+        "lines": 42,
+        "path": "packages/rules/.claude/agents/product/spec-writer.md"
+      },
+      {
+        "commits": 1,
+        "lines": 40,
+        "path": "packages/rules/.claude/agents/research/competitive-analyst.md"
+      },
+      {
+        "commits": 1,
+        "lines": 40,
+        "path": "packages/rules/.claude/agents/research/trend-researcher.md"
+      },
+      {
+        "commits": 1,
+        "lines": 41,
+        "path": "packages/rules/.claude/agents/research/user-interview-synthesizer.md"
+      },
+      {
+        "commits": 1,
+        "lines": 40,
+        "path": "packages/rules/.claude/agents/research/ux-researcher.md"
+      },
+      {
+        "commits": 1,
+        "lines": 40,
+        "path": "packages/rules/.claude/agents/treatment/coverage-auditor.md"
+      },
+      {
+        "commits": 1,
+        "lines": 41,
+        "path": "packages/rules/.claude/agents/treatment/deployment-verifier.md"
+      },
+      {
+        "commits": 1,
+        "lines": 40,
+        "path": "packages/rules/.claude/agents/treatment/docs-architect.md"
+      },
+      {
+        "commits": 1,
+        "lines": 40,
+        "path": "packages/rules/.claude/agents/treatment/metadata-curator.md"
+      },
+      {
+        "commits": 1,
+        "lines": 43,
+        "path": "packages/rules/.claude/agents/treatment/release-engineer.md"
+      },
+      {
+        "commits": 1,
+        "lines": 40,
+        "path": "packages/rules/.claude/agents/treatment/repo-researcher.md"
+      },
+      {
+        "commits": 1,
+        "lines": 38,
+        "path": "packages/rules/.claude/agents/treatment/repo-translator.md"
+      },
+      {
+        "commits": 1,
+        "lines": 39,
+        "path": "packages/rules/.claude/examples/feature-packet.md"
+      },
+      {
+        "commits": 1,
+        "lines": 39,
+        "path": "packages/rules/.claude/examples/identity-packet.md"
+      },
+      {
+        "commits": 1,
+        "lines": 39,
+        "path": "packages/rules/.claude/examples/integration-packet.md"
+      },
+      {
+        "commits": 1,
+        "lines": 67,
+        "path": "packages/rules/.claude/handbook.md"
+      },
+      {
+        "commits": 1,
+        "lines": 15,
+        "path": "packages/rules/.claude/policy/done-definition.md"
+      },
+      {
+        "commits": 1,
+        "lines": 20,
+        "path": "packages/rules/.claude/policy/escalation-rules.md"
+      },
+      {
+        "commits": 1,
+        "lines": 199,
+        "path": "packages/rules/.claude/policy/routing-rules.md"
+      },
+      {
+        "commits": 1,
+        "lines": 134,
+        "path": "packages/rules/.claude/policy/tool-permissions.md"
+      },
+      {
+        "commits": 1,
+        "lines": 52,
+        "path": "packages/rules/.claude/schemas/handoff.md"
+      },
+      {
+        "commits": 1,
+        "lines": 26,
+        "path": "packages/rules/.claude/schemas/review-verdict.md"
+      },
+      {
+        "commits": 1,
+        "lines": 44,
+        "path": "packages/rules/.claude/schemas/task-packet.md"
+      },
+      {
+        "commits": 1,
+        "lines": 18,
+        "path": "packages/rules/.claude/workflows/fix-bug.md"
+      },
+      {
+        "commits": 1,
+        "lines": 176,
+        "path": "packages/rules/.claude/workflows/full-treatment.md"
+      },
+      {
+        "commits": 1,
+        "lines": 15,
+        "path": "packages/rules/.claude/workflows/launch-update.md"
+      },
+      {
+        "commits": 1,
+        "lines": 22,
+        "path": "packages/rules/.claude/workflows/ship-feature.md"
+      },
+      {
+        "commits": 2,
+        "lines": 38,
+        "path": "packages/rules/.github/dependabot.yml"
+      },
+      {
+        "commits": 1,
+        "lines": 49,
+        "path": "packages/rules/.github/workflows/ci.yml"
+      },
+      {
+        "commits": 2,
+        "lines": 100,
+        "path": "packages/rules/.github/workflows/pages.yml"
+      },
+      {
+        "commits": 1,
+        "lines": 8,
+        "path": "packages/rules/.gitignore"
+      },
+      {
+        "commits": 1,
+        "lines": 60,
+        "path": "packages/rules/CHANGELOG.md"
+      },
+      {
+        "commits": 1,
+        "lines": 21,
+        "path": "packages/rules/LICENSE"
+      },
+      {
+        "commits": 1,
+        "lines": 184,
+        "path": "packages/rules/README.es.md"
+      },
+      {
+        "commits": 1,
+        "lines": 184,
+        "path": "packages/rules/README.fr.md"
+      },
+      {
+        "commits": 1,
+        "lines": 184,
+        "path": "packages/rules/README.hi.md"
+      },
+      {
+        "commits": 1,
+        "lines": 184,
+        "path": "packages/rules/README.it.md"
+      },
+      {
+        "commits": 1,
+        "lines": 184,
+        "path": "packages/rules/README.ja.md"
+      },
+      {
+        "commits": 1,
+        "lines": 219,
+        "path": "packages/rules/README.md"
+      },
+      {
+        "commits": 1,
+        "lines": 184,
+        "path": "packages/rules/README.pt-BR.md"
+      },
+      {
+        "commits": 1,
+        "lines": 184,
+        "path": "packages/rules/README.zh.md"
+      },
+      {
+        "commits": 1,
+        "lines": 49,
+        "path": "packages/rules/SCORECARD.md"
+      },
+      {
+        "commits": 1,
+        "lines": 33,
+        "path": "packages/rules/SECURITY.md"
+      },
+      {
+        "commits": 1,
+        "lines": 80,
+        "path": "packages/rules/SHIP_GATE.md"
+      },
+      {
+        "commits": 1,
+        "lines": 0,
+        "path": "packages/rules/logo.png"
+      },
+      {
+        "commits": 2,
+        "lines": 56,
+        "path": "packages/rules/package.json"
+      },
+      {
+        "commits": 2,
+        "lines": 34,
+        "path": "packages/rules/site/astro.config.mjs"
+      },
+      {
+        "commits": 2,
+        "lines": 13572,
+        "path": "packages/rules/site/package-lock.json"
+      },
+      {
+        "commits": 2,
+        "lines": 24,
+        "path": "packages/rules/site/package.json"
+      },
+      {
+        "commits": 1,
+        "lines": 7,
+        "path": "packages/rules/site/src/content.config.ts"
+      },
+      {
+        "commits": 1,
+        "lines": 124,
+        "path": "packages/rules/site/src/content/docs/handbook/beginners.md"
+      },
+      {
+        "commits": 1,
+        "lines": 141,
+        "path": "packages/rules/site/src/content/docs/handbook/commands.md"
+      },
+      {
+        "commits": 1,
+        "lines": 82,
+        "path": "packages/rules/site/src/content/docs/handbook/getting-started.md"
+      },
+      {
+        "commits": 1,
+        "lines": 87,
+        "path": "packages/rules/site/src/content/docs/handbook/how-it-works.md"
+      },
+      {
+        "commits": 1,
+        "lines": 34,
+        "path": "packages/rules/site/src/content/docs/handbook/index.md"
+      },
+      {
+        "commits": 1,
+        "lines": 36,
+        "path": "packages/rules/site/src/content/docs/handbook/security.md"
+      },
+      {
+        "commits": 1,
+        "lines": 33,
+        "path": "packages/rules/site/src/pages/index.astro"
+      },
+      {
+        "commits": 1,
+        "lines": 105,
+        "path": "packages/rules/site/src/site-config.ts"
+      },
+      {
+        "commits": 1,
+        "lines": 7,
+        "path": "packages/rules/site/src/styles/global.css"
+      },
+      {
+        "commits": 1,
+        "lines": 18,
+        "path": "packages/rules/site/src/styles/starlight-custom.css"
+      },
+      {
+        "commits": 1,
+        "lines": 5,
+        "path": "packages/rules/site/tsconfig.json"
+      },
+      {
+        "commits": 3,
+        "lines": 369,
+        "path": "packages/rules/src/analyze.ts"
+      },
+      {
+        "commits": 4,
+        "lines": 318,
+        "path": "packages/rules/src/cli.ts"
+      },
+      {
+        "commits": 1,
+        "lines": 93,
+        "path": "packages/rules/src/console.ts"
+      },
+      {
+        "commits": 2,
+        "lines": 57,
+        "path": "packages/rules/src/index.ts"
+      },
+      {
+        "commits": 1,
+        "lines": 151,
+        "path": "packages/rules/src/parser.ts"
+      },
+      {
+        "commits": 3,
+        "lines": 110,
+        "path": "packages/rules/src/signals.ts"
+      },
+      {
+        "commits": 2,
+        "lines": 390,
+        "path": "packages/rules/src/split.ts"
+      },
+      {
+        "commits": 3,
+        "lines": 201,
+        "path": "packages/rules/src/stats.ts"
+      },
+      {
+        "commits": 1,
+        "lines": 162,
+        "path": "packages/rules/src/tests/analyze.test.ts"
+      },
+      {
+        "commits": 4,
+        "lines": 250,
+        "path": "packages/rules/src/tests/cli.test.ts"
+      },
+      {
+        "commits": 1,
+        "lines": 129,
+        "path": "packages/rules/src/tests/index.test.ts"
+      },
+      {
+        "commits": 1,
+        "lines": 287,
+        "path": "packages/rules/src/tests/parser.test.ts"
+      },
+      {
+        "commits": 1,
+        "lines": 85,
+        "path": "packages/rules/src/tests/signals.test.ts"
+      },
+      {
+        "commits": 1,
+        "lines": 247,
+        "path": "packages/rules/src/tests/split.test.ts"
+      },
+      {
+        "commits": 3,
+        "lines": 722,
+        "path": "packages/rules/src/tests/validate.test.ts"
+      },
+      {
+        "commits": 3,
+        "lines": 88,
+        "path": "packages/rules/src/types.ts"
+      },
+      {
+        "commits": 3,
+        "lines": 333,
+        "path": "packages/rules/src/validate.ts"
+      },
+      {
+        "commits": 2,
+        "lines": 27,
+        "path": "packages/rules/tsconfig.json"
+      },
+      {
+        "commits": 2,
+        "lines": 41,
+        "path": "site/astro.config.mjs"
+      },
+      {
+        "commits": 2,
+        "lines": 13862,
+        "path": "site/package-lock.json"
+      },
+      {
+        "commits": 2,
+        "lines": 24,
+        "path": "site/package.json"
+      },
+      {
+        "commits": 1,
+        "lines": 0,
+        "path": "site/src/assets/logo.png"
+      },
+      {
+        "commits": 1,
+        "lines": 7,
+        "path": "site/src/content.config.ts"
+      },
+      {
+        "commits": 1,
+        "lines": 61,
+        "path": "site/src/content/docs/handbook/architecture.md"
+      },
+      {
+        "commits": 1,
+        "lines": 92,
+        "path": "site/src/content/docs/handbook/getting-started.md"
+      },
+      {
+        "commits": 1,
+        "lines": 51,
+        "path": "site/src/content/docs/handbook/index.md"
+      },
+      {
+        "commits": 1,
+        "lines": 74,
+        "path": "site/src/content/docs/handbook/migration.md"
+      },
+      {
+        "commits": 1,
+        "lines": 103,
+        "path": "site/src/content/docs/handbook/reference.md"
+      },
+      {
+        "commits": 1,
+        "lines": 74,
+        "path": "site/src/content/docs/handbook/rituals.md"
+      },
+      {
+        "commits": 1,
+        "lines": 33,
+        "path": "site/src/pages/index.astro"
+      },
+      {
+        "commits": 1,
+        "lines": 78,
+        "path": "site/src/site-config.ts"
+      },
+      {
+        "commits": 1,
+        "lines": 3,
+        "path": "site/src/styles/global.css"
+      },
+      {
+        "commits": 1,
+        "lines": 5,
+        "path": "site/src/styles/starlight-custom.css"
+      },
+      {
+        "commits": 1,
+        "lines": 5,
+        "path": "site/tsconfig.json"
+      },
+      {
+        "commits": 1,
+        "lines": 12,
+        "path": "tsconfig.base.json"
+      }
+    ]
+  },
+  "confidence": {
+    "level": "low",
+    "reason": "fewer than 20 source files reach 10 revisions in the window"
+  },
+  "generatedAt": "2026-09-23T17:44:16.191Z",
+  "generatedFrom": {
+    "commit": "741a0923029b4c5c494f6a2f0089c08f18a6d8e7"
+  },
+  "pairs": [],
+  "parameters": {
+    "appliedChangesetLimit": 50,
+    "changeset": 50,
+    "changesetFraction": 0.25,
+    "cohesionDrop": 0.2,
+    "couplingPopulation": "source",
+    "fallenShared": 3,
+    "floor": "fallen",
+    "floorTrigger": "revision-depth",
+    "headDate": "2026-09-17T19:04:50-07:00",
+    "inScopeFiles": 381,
+    "pinnedStart": null,
+    "qualifyingCommits": 32,
+    "qualifyingMinimum": 30,
+    "revisions": 5,
+    "shared": 10,
+    "sharedFloorUsed": 3,
+    "since": "2026-03-22T02:04:50.000Z",
+    "sourceExtensions": [
+      ".js",
+      ".mjs",
+      ".cjs",
+      ".jsx",
+      ".ts",
+      ".tsx",
+      ".mts",
+      ".cts",
+      ".py"
+    ],
+    "sourceFileReach": 20,
+    "sourceFilesReachingStrongFloor": 0,
+    "strength": 0.5,
+    "windowDays": 180
+  },
+  "strengthDefinition": "strength is the shared qualifying commits divided by either. either is the number of qualifying commits that touch either file."
+}

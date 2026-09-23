@@ -1,0 +1,4289 @@
+{
+  "boundaries": [
+    {
+      "dynamicReads": 0,
+      "dynamicWrites": 0,
+      "entryPoints": [],
+      "externals": 0,
+      "files": [
+        {
+          "hash": "03f9c70e36d1f40eb10a91a623cc0a319c2154dede8be7fd48b05c3ded245f53",
+          "path": ".claude/CLAUDE.md"
+        }
+      ],
+      "globs": [
+        ".claude/**"
+      ],
+      "importConfidence": "full",
+      "name": ".claude",
+      "origin": "generated",
+      "role": "docs",
+      "testedBy": 0,
+      "unresolvedSites": 0
+    },
+    {
+      "dynamicReads": 0,
+      "dynamicWrites": 0,
+      "entryPoints": [],
+      "externals": 0,
+      "files": [
+        {
+          "hash": "364228853e252bd36106c1b128034ca5f46d811aab535875c81db34da5308a1a",
+          "path": ".github/workflows/ci.yml"
+        },
+        {
+          "hash": "e58c80648722bcacdf4cb882ee6766fd9def13e25a335e127665bb98809e4cf7",
+          "path": ".github/workflows/release.yml"
+        }
+      ],
+      "globs": [
+        ".github/**"
+      ],
+      "importConfidence": "full",
+      "name": ".github",
+      "origin": "authored",
+      "role": "config",
+      "testedBy": 0,
+      "unresolvedSites": 0
+    },
+    {
+      "dynamicReads": 21,
+      "dynamicWrites": 3,
+      "entryPoints": [],
+      "externals": 0,
+      "files": [
+        {
+          "hash": "8bb31d45018226d7d336d83ace95320b329323631a516c1218076349cc62e92f",
+          "path": "packages/cli/CHANGELOG.md"
+        },
+        {
+          "hash": "5ae6b3c8f446f0a7cb95176e4dadb91b68aaffb16b3be09f64f5de248b6a973a",
+          "path": "packages/cli/LICENSE"
+        },
+        {
+          "hash": "3d2cd25e48b9c9eaeb5ed15a1c31cb134e1eccae9235690792f7bfb5aace0a02",
+          "path": "packages/cli/README.md"
+        },
+        {
+          "hash": "b8454016835b65436cb18504f41fff38a9455797e2fd6f8a643e6c2dba0e91b8",
+          "path": "packages/cli/esbuild.config.mjs"
+        },
+        {
+          "hash": "83068af838c1dc96b43b414071d3c633f6511af32192fb46e444758d3aeacc35",
+          "path": "packages/cli/package.json"
+        },
+        {
+          "exports": [
+            "dispatch",
+            "getVersion",
+            "topLevelHelp"
+          ],
+          "hash": "6b9859ad50437a2b7c0e90768497fd28d80d8f2a6ee9262aef205ae96bc28688",
+          "importsFiles": [
+            "packages/cli/src/commands.ts",
+            "packages/cli/src/console.ts",
+            "packages/cli/src/doctor.ts",
+            "packages/cli/src/help.ts",
+            "packages/cli/src/hook.ts",
+            "packages/cli/src/refresh.ts",
+            "packages/cli/src/report.ts"
+          ],
+          "path": "packages/cli/src/cli.ts"
+        },
+        {
+          "exports": [
+            "buildSplitArgv",
+            "kernelBudget",
+            "kernelDead",
+            "kernelExplain",
+            "kernelOverlaps",
+            "kernelResolve",
+            "kernelUsage",
+            "kernelValidate",
+            "memoriesHealth",
+            "memoriesIndex",
+            "memoriesStats",
+            "memoriesValidate",
+            "resolveRulesBin",
+            "rulesAnalyze",
+            "rulesSplit",
+            "rulesStats",
+            "rulesValidate"
+          ],
+          "hash": "1ff4efcceeaeba721a59b5535685311ca29c14882bf8642282f8e3266b62c065",
+          "importsFiles": [
+            "packages/cli/src/console.ts",
+            "packages/kernel/src/index.ts",
+            "packages/memories/src/index.ts",
+            "packages/rules/src/index.ts"
+          ],
+          "path": "packages/cli/src/commands.ts"
+        },
+        {
+          "exports": [
+            "fail",
+            "flagValue",
+            "hasFlag",
+            "info",
+            "log",
+            "ok",
+            "positionalArgs",
+            "warn"
+          ],
+          "hash": "f4d34e322468de27162534347037053ec317a2de0fa0f19b3d29c28432c21cb8",
+          "path": "packages/cli/src/console.ts"
+        },
+        {
+          "exports": [
+            "defaultDoctorPaths",
+            "printDoctor",
+            "runDoctor"
+          ],
+          "hash": "f918921998b36ca0afc08a815ad9e2dfc392c29f15af7ea6fc4c1688cce5bcea",
+          "importsFiles": [
+            "packages/cli/src/console.ts",
+            "packages/kernel/src/index.ts",
+            "packages/memories/src/index.ts"
+          ],
+          "path": "packages/cli/src/doctor.ts"
+        },
+        {
+          "exports": [
+            "interceptHelp",
+            "renderCommandHelp",
+            "wantsHelp"
+          ],
+          "hash": "ee4fc7864d19955a28ef10e95a99d60aa64452d2065451021094e1dcc7ff2ec7",
+          "importsFiles": [
+            "packages/cli/src/console.ts"
+          ],
+          "path": "packages/cli/src/help.ts"
+        },
+        {
+          "exports": [
+            "defaultHookPath",
+            "printHookTest",
+            "runHookTest"
+          ],
+          "hash": "1e1075ef44e588ba59aedc739724400597d478233b9740e0df696dbf7129423d",
+          "importsFiles": [
+            "packages/cli/src/console.ts"
+          ],
+          "path": "packages/cli/src/hook.ts"
+        },
+        {
+          "hash": "1820c3f0b905f0fdae3bea7f6ed75dfe5e23a2c2f5de625097c5de7b3c9b0e32",
+          "importsFiles": [
+            "packages/cli/src/cli.ts",
+            "packages/cli/src/console.ts",
+            "packages/cli/src/doctor.ts",
+            "packages/cli/src/help.ts",
+            "packages/cli/src/hook.ts",
+            "packages/cli/src/refresh.ts",
+            "packages/cli/src/report.ts"
+          ],
+          "path": "packages/cli/src/index.ts"
+        },
+        {
+          "exports": [
+            "defaultDest",
+            "dispatchRefresh",
+            "printRefresh",
+            "printRefreshAndon",
+            "rewritePathsAbsolute",
+            "runRefresh",
+            "sameResolvedPath"
+          ],
+          "hash": "3d60a1e19f5eeb190fcda7e22a0a4541035d4906b2ef4a3d92f2adb327dbba7a",
+          "importsFiles": [
+            "packages/cli/src/console.ts",
+            "packages/kernel/src/index.ts",
+            "packages/memories/src/index.ts"
+          ],
+          "path": "packages/cli/src/refresh.ts"
+        },
+        {
+          "exports": [
+            "buildReport",
+            "printReport"
+          ],
+          "hash": "4bb9c2ff4d1a6ca0b0025c49eca174abb88ff0d0d998cef392f406c17d4aebbc",
+          "importsFiles": [
+            "packages/cli/src/console.ts",
+            "packages/kernel/src/index.ts"
+          ],
+          "path": "packages/cli/src/report.ts"
+        },
+        {
+          "hash": "b5505dcd82550b192f9a6c0c095e95dbec816c623cd89540dcf50bf03b4013e4",
+          "importsFiles": [
+            "packages/cli/src/console.ts"
+          ],
+          "path": "packages/cli/src/tests/console.test.ts"
+        },
+        {
+          "hash": "e2cbd682b702af6c2bc9c3b4fecedd49f7827886615693f866883213c339099f",
+          "importsFiles": [
+            "packages/cli/src/cli.ts",
+            "packages/cli/src/console.ts",
+            "packages/cli/src/tests/fixtures.ts"
+          ],
+          "path": "packages/cli/src/tests/dispatch.test.ts"
+        },
+        {
+          "hash": "c305c8b698fb642d0d27e8bc704604d963ba84de3292577459dc0f147f5cf675",
+          "importsFiles": [
+            "packages/cli/src/doctor.ts",
+            "packages/cli/src/tests/fixtures.ts"
+          ],
+          "path": "packages/cli/src/tests/doctor.test.ts"
+        },
+        {
+          "exports": [
+            "captureLog",
+            "makeRefreshSandbox",
+            "makeSandbox"
+          ],
+          "hash": "24f88c9c9ee963e72a455f524152fa681f3e1de906bfd4a3c5da4940bcf62270",
+          "importsFiles": [
+            "packages/kernel/src/index.ts"
+          ],
+          "path": "packages/cli/src/tests/fixtures.ts"
+        },
+        {
+          "hash": "fcea3b7d913a84a1b4cb3e3192af737d4b38769bf001e6ace676aad432019074",
+          "importsFiles": [
+            "packages/cli/src/cli.ts",
+            "packages/cli/src/help.ts",
+            "packages/cli/src/tests/fixtures.ts"
+          ],
+          "path": "packages/cli/src/tests/help.test.ts"
+        },
+        {
+          "hash": "9bf1c627e21c6b155cd7c47fe103959cd87b92d40babda5e68cf63e7c6b502ad",
+          "importsFiles": [
+            "packages/cli/src/hook.ts"
+          ],
+          "path": "packages/cli/src/tests/hook.test.ts"
+        },
+        {
+          "hash": "c5f5fc70542dc1334a92c63062d8a65006bda96e5fdad69552a02748cbf74fe2",
+          "importsFiles": [
+            "packages/cli/src/refresh.ts",
+            "packages/cli/src/tests/fixtures.ts"
+          ],
+          "path": "packages/cli/src/tests/refresh.test.ts"
+        },
+        {
+          "hash": "c371c0514fb36abc698bbd67c6e9b97e58fd6864ae6fd13d7bdb6acc65eb05dd",
+          "importsFiles": [
+            "packages/cli/src/report.ts",
+            "packages/cli/src/tests/fixtures.ts"
+          ],
+          "path": "packages/cli/src/tests/report.test.ts"
+        },
+        {
+          "hash": "cc8031e4ab90838485b6b90e7e4bfa8eafaf943bc637da8a9378e6bcf1e45017",
+          "importsFiles": [
+            "packages/cli/src/commands.ts",
+            "packages/cli/src/tests/fixtures.ts"
+          ],
+          "path": "packages/cli/src/tests/split.test.ts"
+        },
+        {
+          "hash": "b6b5966e81a560822b128ad0a500c560870775c260bb7df63dfd6c127f034b17",
+          "importsFiles": [
+            "packages/cli/src/cli.ts",
+            "packages/cli/src/console.ts",
+            "packages/cli/src/tests/fixtures.ts"
+          ],
+          "path": "packages/cli/src/tests/wrapped.test.ts"
+        },
+        {
+          "hash": "564b648693c51ba768dace1f01a62e955e8d84dbf65b86b41186b08dbed42bba",
+          "path": "packages/cli/tsconfig.json"
+        }
+      ],
+      "globs": [
+        "packages/cli/**"
+      ],
+      "importConfidence": "full",
+      "name": "cli",
+      "origin": "authored",
+      "role": "code",
+      "testedBy": 12,
+      "unresolvedSites": 0
+    },
+    {
+      "dynamicReads": 1,
+      "dynamicWrites": 0,
+      "entryPoints": [
+        "apps/hook/loadout-hook.mjs"
+      ],
+      "externals": 0,
+      "files": [
+        {
+          "hash": "5ae37070f06112e3c1c4e3fb690d77a64e9f37e072c136fe7c27c1035a7fe14c",
+          "path": "apps/hook/esbuild.config.mjs"
+        },
+        {
+          "hash": "c9d3fa3b98133de28a8b711c3ee3a8168c56e65819f7502931662a19a16c307b",
+          "importsFiles": [
+            "packages/kernel/src/index.ts"
+          ],
+          "path": "apps/hook/loadout-hook.mjs"
+        },
+        {
+          "hash": "df994d33c34d3a290f6cb4a105b2dd5dfd488c33b374e66ef86eb9097d40057b",
+          "path": "apps/hook/package.json"
+        },
+        {
+          "hash": "a4ab69f9ceee192e0dbdd42dfe4c050134dcfd9dab82265b0cb3e1b1146f8df5",
+          "path": "apps/hook/smoke-test.ps1"
+        }
+      ],
+      "globs": [
+        "apps/hook/**"
+      ],
+      "importConfidence": "full",
+      "name": "hook",
+      "origin": "authored",
+      "role": "code",
+      "testedBy": 0,
+      "unresolvedSites": 0
+    },
+    {
+      "dynamicReads": 6,
+      "dynamicWrites": 1,
+      "entryPoints": [
+        "packages/kernel/src/cli.ts",
+        "packages/kernel/src/index.ts"
+      ],
+      "externals": 0,
+      "files": [
+        {
+          "hash": "d373b6d41d6cde16ca4f0306636ee194e13ac5726b4face758b6bf08472fe842",
+          "path": "packages/kernel/.claude/README.md"
+        },
+        {
+          "hash": "2d964babba705c0b9f6a7296577979efc40775ad06c4112434d5ffa27c4312db",
+          "path": "packages/kernel/.claude/agents/core/critic-reviewer.md"
+        },
+        {
+          "hash": "687b2dc77ea8bda372bd00993eab1520abaf0ef656c6580d3a0138a4924eb4c9",
+          "path": "packages/kernel/.claude/agents/core/orchestrator.md"
+        },
+        {
+          "hash": "b4b72041103488d8562f24d4e0f41231c1634450df78c138b540336b2447207a",
+          "path": "packages/kernel/.claude/agents/core/product-strategist.md"
+        },
+        {
+          "hash": "fb7369b4435914f8878f120c7a08121d443a500f12259a948e0d98f0091ff421",
+          "path": "packages/kernel/.claude/agents/design/brand-guardian.md"
+        },
+        {
+          "hash": "48b8ba1cf8093e4559d15046e90abbf3b98c0383590dd4e506e6d21276bfdc09",
+          "path": "packages/kernel/.claude/agents/design/ui-designer.md"
+        },
+        {
+          "hash": "62c975ded0f9763ad0b1b6608f11adc9a5107137006dd76a7dae81a2cf21e689",
+          "path": "packages/kernel/.claude/agents/engineering/backend-engineer.md"
+        },
+        {
+          "hash": "1e464576cbfc8ba95c7865cc07a9eeba61e88ef5f4950baf665eea515b363be7",
+          "path": "packages/kernel/.claude/agents/engineering/dependency-auditor.md"
+        },
+        {
+          "hash": "ef3833837a334baf524bb4df15dbd586d3664376521e98b87d87c412cb0187d9",
+          "path": "packages/kernel/.claude/agents/engineering/frontend-developer.md"
+        },
+        {
+          "hash": "d8ea5372bd030768d59d4417d5889937003b59a872ef3c89b44bc31f9f333a03",
+          "path": "packages/kernel/.claude/agents/engineering/performance-engineer.md"
+        },
+        {
+          "hash": "a1a23a9789640d78b136a0c249ee3aacbafb6ef0c774ea50c14bd89a25b6943e",
+          "path": "packages/kernel/.claude/agents/engineering/refactor-engineer.md"
+        },
+        {
+          "hash": "d1cfc922932b9686ea3ba9263c9cf3a0e26f783f60eef12c86119d0f05b91999",
+          "path": "packages/kernel/.claude/agents/engineering/security-reviewer.md"
+        },
+        {
+          "hash": "911d2c78ed9be3c5a831927c8c2a5acbddd6945f206aeecdb435b10ff5f8bda6",
+          "path": "packages/kernel/.claude/agents/engineering/test-engineer.md"
+        },
+        {
+          "hash": "dc08071b0a3322f50ee5fa3049c465cd760289f67bcf497e11020e15a8415465",
+          "path": "packages/kernel/.claude/agents/growth/community-manager.md"
+        },
+        {
+          "hash": "ad1d9ba7f5d1e634e9225681077cd384585ef1856a1e9b9f59b0608132ef8d1f",
+          "path": "packages/kernel/.claude/agents/growth/content-strategist.md"
+        },
+        {
+          "hash": "05db0c02db9b053890f163dfa2a950f12b5be185ba61c24cd5a0168a5e41177b",
+          "path": "packages/kernel/.claude/agents/growth/launch-strategist.md"
+        },
+        {
+          "hash": "337f439266a055588e2a0af068b0461b0ec8259932341a19d1cf15044c028a67",
+          "path": "packages/kernel/.claude/agents/growth/support-triage-lead.md"
+        },
+        {
+          "hash": "22201daefd5b99ab0992dc432ba7e015771353ccde467e11e35ccf9fcb23ced1",
+          "path": "packages/kernel/.claude/agents/marketing/launch-copywriter.md"
+        },
+        {
+          "hash": "f66c80446da64b3ccf16d50f354bbc73ebff1022b273974f0a95472be643d6c7",
+          "path": "packages/kernel/.claude/agents/product/feedback-synthesizer.md"
+        },
+        {
+          "hash": "19b1d905b39ff4e2992fb755cda6f597fd615057052b0b38ad7c38d4858312c5",
+          "path": "packages/kernel/.claude/agents/product/information-architect.md"
+        },
+        {
+          "hash": "d3e7bc0b3b8c45b8c704cd9d4829fe50e1043c18b672854313ff807c2cbb4e42",
+          "path": "packages/kernel/.claude/agents/product/roadmap-prioritizer.md"
+        },
+        {
+          "hash": "b2c1626e9c18a1adf09d629234cf56bc18bbd5e13498246da35f86cc22463548",
+          "path": "packages/kernel/.claude/agents/product/spec-writer.md"
+        },
+        {
+          "hash": "ea0a9b1e28dff6fca5c558e3323954a2dd6505d1213145e98fe6322bf47ea580",
+          "path": "packages/kernel/.claude/agents/research/competitive-analyst.md"
+        },
+        {
+          "hash": "329fcca3c43be4f1d4458184a927029b8e136dc62b810653c0e132a2c1abdd23",
+          "path": "packages/kernel/.claude/agents/research/trend-researcher.md"
+        },
+        {
+          "hash": "429c7b361c36d610b30b1acc5793fa24cc1997bd9841297e6a753760f981351a",
+          "path": "packages/kernel/.claude/agents/research/user-interview-synthesizer.md"
+        },
+        {
+          "hash": "b7b2a5657a521807bb3c0b953066aea0ac6fd864305cb5bcff6f7dddc992d6d8",
+          "path": "packages/kernel/.claude/agents/research/ux-researcher.md"
+        },
+        {
+          "hash": "7a22beaad309c64e6ea14d3107025fa06a5b10bcd2e772c76fdeb6d3b252cdfe",
+          "path": "packages/kernel/.claude/agents/treatment/coverage-auditor.md"
+        },
+        {
+          "hash": "0d73f921bcc9a2fb49933af9551d9dbee85675d71a900627ed6eb2d636bccf2c",
+          "path": "packages/kernel/.claude/agents/treatment/deployment-verifier.md"
+        },
+        {
+          "hash": "1a9a9ff9ea1095aab4688b19cb9e0ec48db2ca59d9f5f5e51e1f858d8d1dff7b",
+          "path": "packages/kernel/.claude/agents/treatment/docs-architect.md"
+        },
+        {
+          "hash": "bb7a05aec44d58dcac5b36e28b8eb6b4640775eec6e9ebf069c6415e70a44b5a",
+          "path": "packages/kernel/.claude/agents/treatment/metadata-curator.md"
+        },
+        {
+          "hash": "4cc9d0a2b158a057c6c3fc39763f57c2192f9da62e2a811d68fd839f57eaf598",
+          "path": "packages/kernel/.claude/agents/treatment/release-engineer.md"
+        },
+        {
+          "hash": "d481658d5d6ff403aa4ddc87ab901adfbc3462d0a66935fa1009d15ae983583f",
+          "path": "packages/kernel/.claude/agents/treatment/repo-researcher.md"
+        },
+        {
+          "hash": "8cfe4f057b3c99e101689729054a6a2a8970cd0a64cace28eb5e1defbf602dde",
+          "path": "packages/kernel/.claude/agents/treatment/repo-translator.md"
+        },
+        {
+          "hash": "82a361c671001f89bd26184c246a072a18f6e6e78ee8ac86b7e53ae87019fdc4",
+          "path": "packages/kernel/.claude/context/brand-rules.md"
+        },
+        {
+          "hash": "79a18e03bb2595c5052408fc769ab981e14d81d04398b366995c278e0a3692fd",
+          "path": "packages/kernel/.claude/context/current-priorities.md"
+        },
+        {
+          "hash": "e82705e732e97399def5868e17f26c126fa746e78109339e5d29ab39ffd7cb6e",
+          "path": "packages/kernel/.claude/context/product-brief.md"
+        },
+        {
+          "hash": "928435e06c69b318b8d84a6e988ea474bbc416d7dff400ac51f0e202cf9395bc",
+          "path": "packages/kernel/.claude/context/repo-map.md"
+        },
+        {
+          "hash": "4ca89e52e89026648cddd1dcebae0ce9cd12290972323e751ca4785fdb78b7a6",
+          "path": "packages/kernel/.claude/examples/feature-packet.md"
+        },
+        {
+          "hash": "ed14e6a5dc1d77b0ccf88428f90e5ebcf604f9c14e0fa805a6dacf2adb396c2a",
+          "path": "packages/kernel/.claude/examples/identity-packet.md"
+        },
+        {
+          "hash": "5b1b7ead1a83ed6fb13e8342f64bae5eda5ebdf007516ff176d9fe582def19f7",
+          "path": "packages/kernel/.claude/examples/integration-packet.md"
+        },
+        {
+          "hash": "bc22ae44f568aacc8648cc306afa88bf49ef6883c7fa12cccf811ae66986dbe9",
+          "path": "packages/kernel/.claude/handbook.md"
+        },
+        {
+          "hash": "fa39ec3464d39e01b4f5f2dd15c69d47c8bf6d93b75daa1694eed3cd12be04dc",
+          "path": "packages/kernel/.claude/policy/done-definition.md"
+        },
+        {
+          "hash": "682c931d8ac0745b5b8d9300370775f5d7a43be83a9397b363d560f7329701de",
+          "path": "packages/kernel/.claude/policy/escalation-rules.md"
+        },
+        {
+          "hash": "8fe24f7551d6caa66713c98f32effcdc86a6cb4223707e25a7c5772988f83b55",
+          "path": "packages/kernel/.claude/policy/routing-rules.md"
+        },
+        {
+          "hash": "5d55e6a21f589f1e05117ce7a0c60891a1d2bd0c3ba9f4c5a80c50e5544e7d3e",
+          "path": "packages/kernel/.claude/policy/tool-permissions.md"
+        },
+        {
+          "hash": "16f96f8b2fe34b2167ad1a1bd65a90a8f715d170c724545a54e4e2a808f34fe9",
+          "path": "packages/kernel/.claude/schemas/handoff.md"
+        },
+        {
+          "hash": "34ee30f440135cb3c979f036f050faa6f12afe99528db9daafe01d1ac1f434ee",
+          "path": "packages/kernel/.claude/schemas/review-verdict.md"
+        },
+        {
+          "hash": "94fb28a919784c36612906f846800fd5def23da4807c93c45aca2c957baa9c41",
+          "path": "packages/kernel/.claude/schemas/task-packet.md"
+        },
+        {
+          "hash": "f85e5c9f734c54c2673e0053e4b2eef8be79ac10b1ec742462af9f18782d82c7",
+          "path": "packages/kernel/.claude/workflows/fix-bug.md"
+        },
+        {
+          "hash": "df359c5ab2c72dafcf89dc7667749c18b7a273c4bdfcfa842cfd402a4adde6e6",
+          "path": "packages/kernel/.claude/workflows/full-treatment.md"
+        },
+        {
+          "hash": "d0da445a5980afb0e596bb7fbdf2e38e94af4a2a3b69c541a4a75dccd8b1420d",
+          "path": "packages/kernel/.claude/workflows/launch-update.md"
+        },
+        {
+          "hash": "561b314441b6ee6cfc412c9ba8ef23f3610fa42aaebcec527ab80eb5fbc6a509",
+          "path": "packages/kernel/.claude/workflows/protect-dispatch-truth.md"
+        },
+        {
+          "hash": "77e6ad26462b2237ea062b63d9f242fae459b6c0ea51ee83888873235a048fa4",
+          "path": "packages/kernel/.claude/workflows/ship-feature.md"
+        },
+        {
+          "hash": "d485565c8e7455bb205ad30ea12f10eb5c41e1ee153cbbb3ef5a720f4d2e9a52",
+          "path": "packages/kernel/.gitignore"
+        },
+        {
+          "hash": "8844ad8596c6e76b5e09c58d8e9e39e68689a5937c3530db19c4b4b757e6a12b",
+          "path": "packages/kernel/AGENT_CONTRACT.md"
+        },
+        {
+          "hash": "ab2f64020410874fd19c7363f28079694b041a7dfc17309fc7b589915cdccd27",
+          "path": "packages/kernel/CHANGELOG.md"
+        },
+        {
+          "hash": "5ae6b3c8f446f0a7cb95176e4dadb91b68aaffb16b3be09f64f5de248b6a973a",
+          "path": "packages/kernel/LICENSE"
+        },
+        {
+          "hash": "fe01850294ab4801d988104346a48ce04f91109f60edc9300e8f64ebc7b75245",
+          "path": "packages/kernel/README.es.md"
+        },
+        {
+          "hash": "d8887230805a746efa11675b5c5c2f7afbb5ef3bc8e8793adad55b79dd55d2d7",
+          "path": "packages/kernel/README.fr.md"
+        },
+        {
+          "hash": "3beca04aa98b4a2fff6eb15a82e1d40d34c2d572ddff54575e94aec8867d7d75",
+          "path": "packages/kernel/README.hi.md"
+        },
+        {
+          "hash": "8560498f2b51386e04f59c2875c347841ff5c567ce33d9ff2c472c77e6bbed6d",
+          "path": "packages/kernel/README.it.md"
+        },
+        {
+          "hash": "e0615f22e0e1eb63513c58d396b85ed611b20691d6fd4b904144ed0040bcd0f2",
+          "path": "packages/kernel/README.ja.md"
+        },
+        {
+          "hash": "a121ae74272b6ebcf8c9e5eda10ad58382cdf2bd000d3435efd30226c83fe9f2",
+          "path": "packages/kernel/README.md"
+        },
+        {
+          "hash": "35c349dd26ccf0fb69ca6092f94422ed533523e97ce1213013ff7e20bb14cf9e",
+          "path": "packages/kernel/README.pt-BR.md"
+        },
+        {
+          "hash": "533fcc61a2c4879d99b528384bca446f72070852350968a03d935f15fc37b938",
+          "path": "packages/kernel/README.zh.md"
+        },
+        {
+          "hash": "3c97799787538a61aed96675d7e9a21bf189a77e9bd7afa414113c5aa7840dfc",
+          "path": "packages/kernel/SCORECARD.md"
+        },
+        {
+          "hash": "3c0914a8a5fc47dd86d9bb6f8d8ac2ee01ca2c7c3aa7ab22d022d86d4f8288b4",
+          "path": "packages/kernel/SECURITY.md"
+        },
+        {
+          "hash": "deca28c32a67f46639ecb724abcff5b3b1f53c959056d28c870064c4abfedfb5",
+          "path": "packages/kernel/SHIP_GATE.md"
+        },
+        {
+          "hash": "a9c2b83cce7413aa64a1d91ba62a7b592a027478b45091485dfcc5055a0c99d9",
+          "path": "packages/kernel/SPEC.md"
+        },
+        {
+          "hash": "3b0683ec08127c9713c419ba7770f2f68ac611bd9180100584a25fbd3b66f7f5",
+          "path": "packages/kernel/logo.png"
+        },
+        {
+          "hash": "794739829663da709db45cdd0763a94623c2a4d92c093e0baba38ba2ac2bce95",
+          "path": "packages/kernel/package.json"
+        },
+        {
+          "hash": "588fab2ab5bdaf75f345a5311854e299aa03be7fa4b01c2311d3b58a5b878424",
+          "path": "packages/kernel/site/astro.config.mjs"
+        },
+        {
+          "hash": "b5578baf42cab82e5e7b451b6992cb929aeb6ff8d02d8e11ab690e6f67fea144",
+          "path": "packages/kernel/site/package-lock.json"
+        },
+        {
+          "hash": "cff923d88f356795747a843362ca300b43d09c5715e6356f904b4d5fa06a7fae",
+          "path": "packages/kernel/site/package.json"
+        },
+        {
+          "hash": "ec030f2e4bf6dc57eaca075d390c228b3212cf29db267e32ef92e110de1acdcc",
+          "path": "packages/kernel/site/src/content.config.ts"
+        },
+        {
+          "hash": "d3432332c713de0e2e5b1482d69fbaf32a9a80ec53d8557de789e471158cc1fc",
+          "path": "packages/kernel/site/src/content/docs/handbook/beginners.md"
+        },
+        {
+          "hash": "617ddd167e42ef3c9dc61052f3093aae6e1295da78d0a6fe4a9010fab8f889b0",
+          "path": "packages/kernel/site/src/content/docs/handbook/concepts.md"
+        },
+        {
+          "hash": "bcb6cf74ef3aa247621a16d34016e4ab7dfd549758a4b9c16887be5bc9bd9d1c",
+          "path": "packages/kernel/site/src/content/docs/handbook/getting-started.md"
+        },
+        {
+          "hash": "ca993c1ef2789c209bd44608057fefae6ecd1768ccb3bbcd0c893efb54b1f334",
+          "path": "packages/kernel/site/src/content/docs/handbook/index.md"
+        },
+        {
+          "hash": "66bc9c1db477c2ca94d91af2b79dc0b3feb5a6e6fa6933cd0fc8cab43aa197c5",
+          "path": "packages/kernel/site/src/content/docs/handbook/reference.md"
+        },
+        {
+          "hash": "2950915fdac5c5b2fdc2795b82fc4633197e37690d669c13c0f2996249a21886",
+          "path": "packages/kernel/site/src/content/docs/handbook/security.md"
+        },
+        {
+          "hash": "a699ad78a6d27d6864ccfe4c3a4a01993aca28ecb4a3d20893f37db9f9b1a522",
+          "path": "packages/kernel/site/src/pages/index.astro"
+        },
+        {
+          "hash": "1bc5a6382ed3f2d19a245d8d5d2088371fbd9d3b30f9c39d26b1af20bd5b95e7",
+          "path": "packages/kernel/site/src/site-config.ts"
+        },
+        {
+          "hash": "1bef974f1399bbaed3884c6d5ad72afde3f7977da8fa4e0a1ab45e12a6e21cfe",
+          "path": "packages/kernel/site/src/styles/global.css"
+        },
+        {
+          "hash": "7dbfcd21926d75508ede59dc6ca4715a6678d209088c508304c7c441d01ef7ad",
+          "path": "packages/kernel/site/src/styles/starlight-custom.css"
+        },
+        {
+          "hash": "61fc24492db9aef7ec38eb91cfeebaef96155014bb5f22648fd8ed2327c6cae2",
+          "path": "packages/kernel/site/tsconfig.json"
+        },
+        {
+          "exports": [
+            "analyzeBudget",
+            "findDeadEntries",
+            "findKeywordOverlaps"
+          ],
+          "hash": "495aef3b4c5e457a8c71d8336ae6f6654d3cb6475eee578596d4885e4a839ce0",
+          "importsFiles": [
+            "packages/kernel/src/types.ts",
+            "packages/kernel/src/usage.ts"
+          ],
+          "path": "packages/kernel/src/analysis.ts"
+        },
+        {
+          "exports": [
+            "describeIndexShapeProblem",
+            "diagnoseFlagValue",
+            "getFlagValue",
+            "isLoadoutIndex"
+          ],
+          "hash": "504d2bf638efa207aabe14ff2334a1ac29b3bab98d4a08eae7cb4fae6c76e407",
+          "importsFiles": [
+            "packages/kernel/src/types.ts"
+          ],
+          "path": "packages/kernel/src/cli-helpers.ts"
+        },
+        {
+          "hash": "cae31bc8dd521cb1f110af58b1acd77b6586d42c4bf28a72ce16333284961314",
+          "importsFiles": [
+            "packages/kernel/src/analysis.ts",
+            "packages/kernel/src/cli-helpers.ts",
+            "packages/kernel/src/resolve.ts",
+            "packages/kernel/src/types.ts",
+            "packages/kernel/src/usage.ts",
+            "packages/kernel/src/validate.ts"
+          ],
+          "path": "packages/kernel/src/cli.ts"
+        },
+        {
+          "exports": [
+            "parseFrontmatter",
+            "serializeFrontmatter"
+          ],
+          "hash": "bc07b88b23609ee07beb66aed51780c073cc7b214d9a0a103889d6250c2bce6a",
+          "importsFiles": [
+            "packages/kernel/src/types.ts"
+          ],
+          "path": "packages/kernel/src/frontmatter.ts"
+        },
+        {
+          "hash": "04757bccf07863714765e89a500b1ef0517652cc76ff89950bd32560eb6bd061",
+          "importsFiles": [
+            "packages/kernel/src/analysis.ts",
+            "packages/kernel/src/frontmatter.ts",
+            "packages/kernel/src/match.ts",
+            "packages/kernel/src/merge.ts",
+            "packages/kernel/src/resolve.ts",
+            "packages/kernel/src/runtime.ts",
+            "packages/kernel/src/tokens.ts",
+            "packages/kernel/src/types.ts",
+            "packages/kernel/src/usage.ts",
+            "packages/kernel/src/validate.ts"
+          ],
+          "path": "packages/kernel/src/index.ts"
+        },
+        {
+          "exports": [
+            "lookupEntry",
+            "matchLoadout"
+          ],
+          "hash": "cbe33670a9249719c182888c94806b17d56249df90019f2d6991ca5a0d938506",
+          "importsFiles": [
+            "packages/kernel/src/types.ts"
+          ],
+          "path": "packages/kernel/src/match.ts"
+        },
+        {
+          "exports": [
+            "mergeIndexes"
+          ],
+          "hash": "85fa58c86cabcdfb013861f22358d5317126f2852a20c8aa953e1904f4c02b0c",
+          "importsFiles": [
+            "packages/kernel/src/tokens.ts",
+            "packages/kernel/src/types.ts"
+          ],
+          "path": "packages/kernel/src/merge.ts"
+        },
+        {
+          "exports": [
+            "discoverLayers",
+            "explainEntry",
+            "resolveLoadout"
+          ],
+          "hash": "07b5258d266b551fc2506bbfb397082629e1915f8322a0ed09d4605f5fbcf091",
+          "importsFiles": [
+            "packages/kernel/src/merge.ts",
+            "packages/kernel/src/types.ts"
+          ],
+          "path": "packages/kernel/src/resolve.ts"
+        },
+        {
+          "exports": [
+            "manualLookup",
+            "planLoad",
+            "recordLoad"
+          ],
+          "hash": "f5a87a3cf7ac61d16bb4b6bf73d1a824af492cc403c032dbdffb0a4e98d41633",
+          "importsFiles": [
+            "packages/kernel/src/match.ts",
+            "packages/kernel/src/resolve.ts",
+            "packages/kernel/src/types.ts",
+            "packages/kernel/src/usage.ts"
+          ],
+          "path": "packages/kernel/src/runtime.ts"
+        },
+        {
+          "hash": "ebb054ec5b7c7e49b4483a6e2aa662d9c74da5a64e5249161840306fb6288bd8",
+          "importsFiles": [
+            "packages/kernel/src/analysis.ts",
+            "packages/kernel/src/types.ts"
+          ],
+          "path": "packages/kernel/src/tests/analysis.test.ts"
+        },
+        {
+          "hash": "93cf0ba9eb9c92dd870c7032ecb1050a30628277526955ced91b66e317440ae0",
+          "importsFiles": [
+            "packages/kernel/src/cli-helpers.ts"
+          ],
+          "path": "packages/kernel/src/tests/cli-helpers.test.ts"
+        },
+        {
+          "hash": "c041edebb5ab5e7027e4bf58c3f5494da09e243596c0805875af1748fe66972a",
+          "importsFiles": [
+            "packages/kernel/src/frontmatter.ts",
+            "packages/kernel/src/types.ts"
+          ],
+          "path": "packages/kernel/src/tests/frontmatter.test.ts"
+        },
+        {
+          "hash": "8cb196cfda8b00990af7b756e5bb36b808f5fe2986cfb703cad0f94c9bd97f8a",
+          "importsFiles": [
+            "packages/kernel/src/match.ts",
+            "packages/kernel/src/types.ts"
+          ],
+          "path": "packages/kernel/src/tests/match.test.ts"
+        },
+        {
+          "hash": "b51f234e7843a732fb30580728005016ff4ac14657828f88b7796a8ae4e2ca15",
+          "importsFiles": [
+            "packages/kernel/src/merge.ts",
+            "packages/kernel/src/types.ts"
+          ],
+          "path": "packages/kernel/src/tests/merge.test.ts"
+        },
+        {
+          "hash": "c8f21a4860e2500286deac916ab953c7a3b289f0a96677b5d22a27cbc6c006ec",
+          "importsFiles": [
+            "packages/kernel/src/index.ts",
+            "packages/kernel/src/resolve.ts",
+            "packages/kernel/src/types.ts"
+          ],
+          "path": "packages/kernel/src/tests/resolve.test.ts"
+        },
+        {
+          "hash": "d6d0744000d9b08b05c046a9615eeaf1aa6399c35b24e8f6585ce54514c77c75",
+          "importsFiles": [
+            "packages/kernel/src/runtime.ts",
+            "packages/kernel/src/types.ts"
+          ],
+          "path": "packages/kernel/src/tests/runtime.test.ts"
+        },
+        {
+          "hash": "fda2944ef881f0015a052ac02007d858d10e4769ffca833bb488a84ccd84aa61",
+          "importsFiles": [
+            "packages/kernel/src/tokens.ts"
+          ],
+          "path": "packages/kernel/src/tests/tokens.test.ts"
+        },
+        {
+          "hash": "acf590b6495187f5f86b9b6449201a802a20c71c78c5534d01aabb34353a9096",
+          "importsFiles": [
+            "packages/kernel/src/types.ts",
+            "packages/kernel/src/usage.ts"
+          ],
+          "path": "packages/kernel/src/tests/usage.test.ts"
+        },
+        {
+          "hash": "d8e225617555b6dbef6b043385564f9daa84c014af12ebb7817433621584a045",
+          "importsFiles": [
+            "packages/kernel/src/types.ts",
+            "packages/kernel/src/validate.ts"
+          ],
+          "path": "packages/kernel/src/tests/validate.test.ts"
+        },
+        {
+          "exports": [
+            "estimateTokens"
+          ],
+          "hash": "a4fabe6dcd83c5f3218e99d5d7c996827483c4df27837cb4ab0a70e32036bf87",
+          "path": "packages/kernel/src/tokens.ts"
+        },
+        {
+          "hash": "97893c290072a12595e35496995acbfe225cc020a6bb2b9c8ac7d87d76830814",
+          "path": "packages/kernel/src/types.ts"
+        },
+        {
+          "exports": [
+            "readUsage",
+            "readUsageWithStats",
+            "recordUsage",
+            "summarizeUsage",
+            "summaryToJSON"
+          ],
+          "hash": "853048d408c350ebb4da56fd10f04c1ba47ac35197f8de4f8e3d4f56f9ab6de8",
+          "importsFiles": [
+            "packages/kernel/src/types.ts"
+          ],
+          "path": "packages/kernel/src/usage.ts"
+        },
+        {
+          "exports": [
+            "validateIndex"
+          ],
+          "hash": "8ad30809d90b757c7d60e71c7bbf9c62ebba4c0e322b5ae551331cd8b477b075",
+          "importsFiles": [
+            "packages/kernel/src/types.ts"
+          ],
+          "path": "packages/kernel/src/validate.ts"
+        },
+        {
+          "hash": "564b648693c51ba768dace1f01a62e955e8d84dbf65b86b41186b08dbed42bba",
+          "path": "packages/kernel/tsconfig.json"
+        }
+      ],
+      "globs": [
+        "packages/kernel/**"
+      ],
+      "importConfidence": "full",
+      "name": "kernel",
+      "origin": "authored",
+      "role": "docs",
+      "testedBy": 31,
+      "unresolvedSites": 0
+    },
+    {
+      "dynamicReads": 13,
+      "dynamicWrites": 0,
+      "entryPoints": [
+        "packages/memories/src/cli.ts",
+        "packages/memories/src/index.ts"
+      ],
+      "externals": 0,
+      "files": [
+        {
+          "hash": "d373b6d41d6cde16ca4f0306636ee194e13ac5726b4face758b6bf08472fe842",
+          "path": "packages/memories/.claude/README.md"
+        },
+        {
+          "hash": "2d964babba705c0b9f6a7296577979efc40775ad06c4112434d5ffa27c4312db",
+          "path": "packages/memories/.claude/agents/core/critic-reviewer.md"
+        },
+        {
+          "hash": "687b2dc77ea8bda372bd00993eab1520abaf0ef656c6580d3a0138a4924eb4c9",
+          "path": "packages/memories/.claude/agents/core/orchestrator.md"
+        },
+        {
+          "hash": "b4b72041103488d8562f24d4e0f41231c1634450df78c138b540336b2447207a",
+          "path": "packages/memories/.claude/agents/core/product-strategist.md"
+        },
+        {
+          "hash": "fb7369b4435914f8878f120c7a08121d443a500f12259a948e0d98f0091ff421",
+          "path": "packages/memories/.claude/agents/design/brand-guardian.md"
+        },
+        {
+          "hash": "48b8ba1cf8093e4559d15046e90abbf3b98c0383590dd4e506e6d21276bfdc09",
+          "path": "packages/memories/.claude/agents/design/ui-designer.md"
+        },
+        {
+          "hash": "62c975ded0f9763ad0b1b6608f11adc9a5107137006dd76a7dae81a2cf21e689",
+          "path": "packages/memories/.claude/agents/engineering/backend-engineer.md"
+        },
+        {
+          "hash": "1e464576cbfc8ba95c7865cc07a9eeba61e88ef5f4950baf665eea515b363be7",
+          "path": "packages/memories/.claude/agents/engineering/dependency-auditor.md"
+        },
+        {
+          "hash": "ef3833837a334baf524bb4df15dbd586d3664376521e98b87d87c412cb0187d9",
+          "path": "packages/memories/.claude/agents/engineering/frontend-developer.md"
+        },
+        {
+          "hash": "d8ea5372bd030768d59d4417d5889937003b59a872ef3c89b44bc31f9f333a03",
+          "path": "packages/memories/.claude/agents/engineering/performance-engineer.md"
+        },
+        {
+          "hash": "a1a23a9789640d78b136a0c249ee3aacbafb6ef0c774ea50c14bd89a25b6943e",
+          "path": "packages/memories/.claude/agents/engineering/refactor-engineer.md"
+        },
+        {
+          "hash": "d1cfc922932b9686ea3ba9263c9cf3a0e26f783f60eef12c86119d0f05b91999",
+          "path": "packages/memories/.claude/agents/engineering/security-reviewer.md"
+        },
+        {
+          "hash": "911d2c78ed9be3c5a831927c8c2a5acbddd6945f206aeecdb435b10ff5f8bda6",
+          "path": "packages/memories/.claude/agents/engineering/test-engineer.md"
+        },
+        {
+          "hash": "dc08071b0a3322f50ee5fa3049c465cd760289f67bcf497e11020e15a8415465",
+          "path": "packages/memories/.claude/agents/growth/community-manager.md"
+        },
+        {
+          "hash": "ad1d9ba7f5d1e634e9225681077cd384585ef1856a1e9b9f59b0608132ef8d1f",
+          "path": "packages/memories/.claude/agents/growth/content-strategist.md"
+        },
+        {
+          "hash": "05db0c02db9b053890f163dfa2a950f12b5be185ba61c24cd5a0168a5e41177b",
+          "path": "packages/memories/.claude/agents/growth/launch-strategist.md"
+        },
+        {
+          "hash": "337f439266a055588e2a0af068b0461b0ec8259932341a19d1cf15044c028a67",
+          "path": "packages/memories/.claude/agents/growth/support-triage-lead.md"
+        },
+        {
+          "hash": "22201daefd5b99ab0992dc432ba7e015771353ccde467e11e35ccf9fcb23ced1",
+          "path": "packages/memories/.claude/agents/marketing/launch-copywriter.md"
+        },
+        {
+          "hash": "f66c80446da64b3ccf16d50f354bbc73ebff1022b273974f0a95472be643d6c7",
+          "path": "packages/memories/.claude/agents/product/feedback-synthesizer.md"
+        },
+        {
+          "hash": "19b1d905b39ff4e2992fb755cda6f597fd615057052b0b38ad7c38d4858312c5",
+          "path": "packages/memories/.claude/agents/product/information-architect.md"
+        },
+        {
+          "hash": "d3e7bc0b3b8c45b8c704cd9d4829fe50e1043c18b672854313ff807c2cbb4e42",
+          "path": "packages/memories/.claude/agents/product/roadmap-prioritizer.md"
+        },
+        {
+          "hash": "b2c1626e9c18a1adf09d629234cf56bc18bbd5e13498246da35f86cc22463548",
+          "path": "packages/memories/.claude/agents/product/spec-writer.md"
+        },
+        {
+          "hash": "ea0a9b1e28dff6fca5c558e3323954a2dd6505d1213145e98fe6322bf47ea580",
+          "path": "packages/memories/.claude/agents/research/competitive-analyst.md"
+        },
+        {
+          "hash": "329fcca3c43be4f1d4458184a927029b8e136dc62b810653c0e132a2c1abdd23",
+          "path": "packages/memories/.claude/agents/research/trend-researcher.md"
+        },
+        {
+          "hash": "429c7b361c36d610b30b1acc5793fa24cc1997bd9841297e6a753760f981351a",
+          "path": "packages/memories/.claude/agents/research/user-interview-synthesizer.md"
+        },
+        {
+          "hash": "b7b2a5657a521807bb3c0b953066aea0ac6fd864305cb5bcff6f7dddc992d6d8",
+          "path": "packages/memories/.claude/agents/research/ux-researcher.md"
+        },
+        {
+          "hash": "7a22beaad309c64e6ea14d3107025fa06a5b10bcd2e772c76fdeb6d3b252cdfe",
+          "path": "packages/memories/.claude/agents/treatment/coverage-auditor.md"
+        },
+        {
+          "hash": "0d73f921bcc9a2fb49933af9551d9dbee85675d71a900627ed6eb2d636bccf2c",
+          "path": "packages/memories/.claude/agents/treatment/deployment-verifier.md"
+        },
+        {
+          "hash": "1a9a9ff9ea1095aab4688b19cb9e0ec48db2ca59d9f5f5e51e1f858d8d1dff7b",
+          "path": "packages/memories/.claude/agents/treatment/docs-architect.md"
+        },
+        {
+          "hash": "bb7a05aec44d58dcac5b36e28b8eb6b4640775eec6e9ebf069c6415e70a44b5a",
+          "path": "packages/memories/.claude/agents/treatment/metadata-curator.md"
+        },
+        {
+          "hash": "4cc9d0a2b158a057c6c3fc39763f57c2192f9da62e2a811d68fd839f57eaf598",
+          "path": "packages/memories/.claude/agents/treatment/release-engineer.md"
+        },
+        {
+          "hash": "d481658d5d6ff403aa4ddc87ab901adfbc3462d0a66935fa1009d15ae983583f",
+          "path": "packages/memories/.claude/agents/treatment/repo-researcher.md"
+        },
+        {
+          "hash": "8cfe4f057b3c99e101689729054a6a2a8970cd0a64cace28eb5e1defbf602dde",
+          "path": "packages/memories/.claude/agents/treatment/repo-translator.md"
+        },
+        {
+          "hash": "4ca89e52e89026648cddd1dcebae0ce9cd12290972323e751ca4785fdb78b7a6",
+          "path": "packages/memories/.claude/examples/feature-packet.md"
+        },
+        {
+          "hash": "ed14e6a5dc1d77b0ccf88428f90e5ebcf604f9c14e0fa805a6dacf2adb396c2a",
+          "path": "packages/memories/.claude/examples/identity-packet.md"
+        },
+        {
+          "hash": "5b1b7ead1a83ed6fb13e8342f64bae5eda5ebdf007516ff176d9fe582def19f7",
+          "path": "packages/memories/.claude/examples/integration-packet.md"
+        },
+        {
+          "hash": "bc22ae44f568aacc8648cc306afa88bf49ef6883c7fa12cccf811ae66986dbe9",
+          "path": "packages/memories/.claude/handbook.md"
+        },
+        {
+          "hash": "caff1be6a004d9f1b9bb736aa408dcc5fb6d748a55acd35b50640db4d8c47a15",
+          "path": "packages/memories/.claude/launch.json"
+        },
+        {
+          "hash": "fa39ec3464d39e01b4f5f2dd15c69d47c8bf6d93b75daa1694eed3cd12be04dc",
+          "path": "packages/memories/.claude/policy/done-definition.md"
+        },
+        {
+          "hash": "682c931d8ac0745b5b8d9300370775f5d7a43be83a9397b363d560f7329701de",
+          "path": "packages/memories/.claude/policy/escalation-rules.md"
+        },
+        {
+          "hash": "8fe24f7551d6caa66713c98f32effcdc86a6cb4223707e25a7c5772988f83b55",
+          "path": "packages/memories/.claude/policy/routing-rules.md"
+        },
+        {
+          "hash": "5d55e6a21f589f1e05117ce7a0c60891a1d2bd0c3ba9f4c5a80c50e5544e7d3e",
+          "path": "packages/memories/.claude/policy/tool-permissions.md"
+        },
+        {
+          "hash": "16f96f8b2fe34b2167ad1a1bd65a90a8f715d170c724545a54e4e2a808f34fe9",
+          "path": "packages/memories/.claude/schemas/handoff.md"
+        },
+        {
+          "hash": "34ee30f440135cb3c979f036f050faa6f12afe99528db9daafe01d1ac1f434ee",
+          "path": "packages/memories/.claude/schemas/review-verdict.md"
+        },
+        {
+          "hash": "94fb28a919784c36612906f846800fd5def23da4807c93c45aca2c957baa9c41",
+          "path": "packages/memories/.claude/schemas/task-packet.md"
+        },
+        {
+          "hash": "f85e5c9f734c54c2673e0053e4b2eef8be79ac10b1ec742462af9f18782d82c7",
+          "path": "packages/memories/.claude/workflows/fix-bug.md"
+        },
+        {
+          "hash": "df359c5ab2c72dafcf89dc7667749c18b7a273c4bdfcfa842cfd402a4adde6e6",
+          "path": "packages/memories/.claude/workflows/full-treatment.md"
+        },
+        {
+          "hash": "d0da445a5980afb0e596bb7fbdf2e38e94af4a2a3b69c541a4a75dccd8b1420d",
+          "path": "packages/memories/.claude/workflows/launch-update.md"
+        },
+        {
+          "hash": "77e6ad26462b2237ea062b63d9f242fae459b6c0ea51ee83888873235a048fa4",
+          "path": "packages/memories/.claude/workflows/ship-feature.md"
+        },
+        {
+          "hash": "ae482d9c8e1d25675669edfbc00c9a9b866af806a7e94f7a11c60208c2b06678",
+          "path": "packages/memories/.gitignore"
+        },
+        {
+          "hash": "36ce0f8ba86e9bd3d0cb9c32c5842bec2fa47d59f966b7430abe1ecd9abad5e7",
+          "path": "packages/memories/CHANGELOG.md"
+        },
+        {
+          "hash": "5ae6b3c8f446f0a7cb95176e4dadb91b68aaffb16b3be09f64f5de248b6a973a",
+          "path": "packages/memories/LICENSE"
+        },
+        {
+          "hash": "e649394cddca73b75611c605d1ffc13e57e4640f68c0af3a1075fc31be430185",
+          "path": "packages/memories/README.es.md"
+        },
+        {
+          "hash": "0e462fe87743c69a81e05ead1c15370f8990001a80de59f5af453ff2af672aff",
+          "path": "packages/memories/README.fr.md"
+        },
+        {
+          "hash": "781f132a9f5b617bcf252846240bedf09f4f67a660a1565b7dbb15f311ae6d20",
+          "path": "packages/memories/README.hi.md"
+        },
+        {
+          "hash": "24db0e5728c23a4e77d024b7adce57f3231f15b70fc3ade983bba9d80019e595",
+          "path": "packages/memories/README.it.md"
+        },
+        {
+          "hash": "c899ccc08130c1f1cfeaf0427d538e846a51c72c0819a6dc3e8b5ff70767846d",
+          "path": "packages/memories/README.ja.md"
+        },
+        {
+          "hash": "2a6c563dd404c12624be296840c93a8f0db0854f3a8cad65c3b74a7b4fa84390",
+          "path": "packages/memories/README.md"
+        },
+        {
+          "hash": "7d477f733452989ae7f2ec0d66fef7ba32c05e277c231c18cb9d846b69dbbdc2",
+          "path": "packages/memories/README.pt-BR.md"
+        },
+        {
+          "hash": "09a863b6a15b0fad310197870be76fa1fcf75eda6e3bf81f082ab9d500ef3c58",
+          "path": "packages/memories/README.zh.md"
+        },
+        {
+          "hash": "1697e6a56ab875fe75817621c9f649d99ae5b1a6f21c9677de1fdbf60e180b97",
+          "path": "packages/memories/SCORECARD.md"
+        },
+        {
+          "hash": "c454763dcd8bec5fd55680bc78c29426ad0fddd8d851d239a870ab19412b66d6",
+          "path": "packages/memories/SECURITY.md"
+        },
+        {
+          "hash": "f9d997c43b688ca9277e37a0a24dcc6a04b40eca43e799f02acc389c26a8faf0",
+          "path": "packages/memories/SHIP_GATE.md"
+        },
+        {
+          "hash": "12ecec9428431544fca6ebff729e12703e6ec78d422f2f9dab55f1f0c3999131",
+          "path": "packages/memories/logo.png"
+        },
+        {
+          "hash": "1a6fbab90d8d32a92db3760da353cb4604c0b3d10405f0ba61b38a693693f035",
+          "path": "packages/memories/package.json"
+        },
+        {
+          "hash": "3b5b73002eba20c81def7245031716574087af0b7f538142373cabc7c05f9eda",
+          "path": "packages/memories/site/astro.config.mjs"
+        },
+        {
+          "hash": "b5578baf42cab82e5e7b451b6992cb929aeb6ff8d02d8e11ab690e6f67fea144",
+          "path": "packages/memories/site/package-lock.json"
+        },
+        {
+          "hash": "cff923d88f356795747a843362ca300b43d09c5715e6356f904b4d5fa06a7fae",
+          "path": "packages/memories/site/package.json"
+        },
+        {
+          "hash": "ec030f2e4bf6dc57eaca075d390c228b3212cf29db267e32ef92e110de1acdcc",
+          "path": "packages/memories/site/src/content.config.ts"
+        },
+        {
+          "hash": "5af0c3be0593e51bd00e08c82b74ddd1b2646ab79a94f7fa3f096e4d12133cff",
+          "path": "packages/memories/site/src/content/docs/handbook/architecture.md"
+        },
+        {
+          "hash": "6f85bca96c7917d4ae7f6cd8593b0d332e930de618f54794b2d127765ea9f43e",
+          "path": "packages/memories/site/src/content/docs/handbook/beginners.md"
+        },
+        {
+          "hash": "17ca796d489f38afbbf22fe763fec2d3b7a4ae7c996e32167cefc12d13508910",
+          "path": "packages/memories/site/src/content/docs/handbook/getting-started.md"
+        },
+        {
+          "hash": "73800c43fef023d9de174285650807f795269d91e8a92038a18de4d929acf382",
+          "path": "packages/memories/site/src/content/docs/handbook/index.md"
+        },
+        {
+          "hash": "2ac09862faa7bd27318d67bbe64010a276f9da3ced9ee9663894971cc2f5e166",
+          "path": "packages/memories/site/src/content/docs/handbook/usage.md"
+        },
+        {
+          "hash": "a699ad78a6d27d6864ccfe4c3a4a01993aca28ecb4a3d20893f37db9f9b1a522",
+          "path": "packages/memories/site/src/pages/index.astro"
+        },
+        {
+          "hash": "f527f5c7fd1a4c31ad9b03a3cb7cf7d27a38ee8c290e86a30075d73117b86843",
+          "path": "packages/memories/site/src/site-config.ts"
+        },
+        {
+          "hash": "5995279a40a9a63426a93feec129006b261cc7200426a398914d0317722ef19b",
+          "path": "packages/memories/site/src/styles/global.css"
+        },
+        {
+          "hash": "9d8dddc46c99a1863e6980810ca6375e764db806f99696446751cbdc5be1a1d9",
+          "path": "packages/memories/site/src/styles/starlight-custom.css"
+        },
+        {
+          "hash": "61fc24492db9aef7ec38eb91cfeebaef96155014bb5f22648fd8ed2327c6cae2",
+          "path": "packages/memories/site/tsconfig.json"
+        },
+        {
+          "exports": [
+            "analyzeMemoryMd",
+            "extractKeywords"
+          ],
+          "hash": "cdb09dfab868e43e0cf5e5e8bc0521d2464844132a46c0a84886a318d434e596",
+          "importsFiles": [
+            "packages/kernel/src/index.ts",
+            "packages/memories/src/parser.ts",
+            "packages/memories/src/paths.ts",
+            "packages/memories/src/types.ts"
+          ],
+          "path": "packages/memories/src/analyze.ts"
+        },
+        {
+          "hash": "6571baa7316d3a35271b58f2360f30662be7a7f04752b31d4e78d0707ea2c8fe",
+          "importsFiles": [
+            "packages/memories/src/analyze.ts",
+            "packages/memories/src/index-gen.ts",
+            "packages/memories/src/stats.ts",
+            "packages/memories/src/types.ts",
+            "packages/memories/src/validate.ts"
+          ],
+          "path": "packages/memories/src/cli.ts"
+        },
+        {
+          "exports": [
+            "generateIndex",
+            "nameToId"
+          ],
+          "hash": "607cdd2b62e90423948471ce40ddf6b91c7d9ac2782cfe4f10296d80eff76df6",
+          "importsFiles": [
+            "packages/kernel/src/index.ts",
+            "packages/memories/src/analyze.ts",
+            "packages/memories/src/paths.ts",
+            "packages/memories/src/types.ts"
+          ],
+          "path": "packages/memories/src/index-gen.ts"
+        },
+        {
+          "hash": "aa39f2074c1e780e54ca064de9978c6f2c4083865a00cd7c9850f089d6166b6c",
+          "importsFiles": [
+            "packages/memories/src/analyze.ts",
+            "packages/memories/src/index-gen.ts",
+            "packages/memories/src/parser.ts",
+            "packages/memories/src/paths.ts",
+            "packages/memories/src/stats.ts",
+            "packages/memories/src/types.ts",
+            "packages/memories/src/validate.ts"
+          ],
+          "path": "packages/memories/src/index.ts"
+        },
+        {
+          "exports": [
+            "parseMemoryMd"
+          ],
+          "hash": "8f6e7471acf2d3548d671f083e41ccdc1b4cddde2219da9734c52401b9a678c6",
+          "importsFiles": [
+            "packages/memories/src/index-gen.ts",
+            "packages/memories/src/types.ts"
+          ],
+          "path": "packages/memories/src/parser.ts"
+        },
+        {
+          "exports": [
+            "resolveRefPath"
+          ],
+          "hash": "162260df6ca72017e5fa2f776728f82a94f4283112a97212fc1502839dbd8e06",
+          "path": "packages/memories/src/paths.ts"
+        },
+        {
+          "exports": [
+            "formatStats",
+            "generateStats"
+          ],
+          "hash": "9ebaba107cf2b876e241b2077e4608c7f565186d77a033545c8c7b73f8f9a1ca",
+          "importsFiles": [
+            "packages/memories/src/types.ts"
+          ],
+          "path": "packages/memories/src/stats.ts"
+        },
+        {
+          "hash": "76d6325cbf4dc2349904a0b5d023eac8b42322dc7f77f4d56afd0ce3fb3a2eef",
+          "importsFiles": [
+            "packages/memories/src/analyze.ts"
+          ],
+          "path": "packages/memories/src/tests/analyze.test.ts"
+        },
+        {
+          "hash": "6e82f8d3857abc9e5b718c627553551a5cdfd49ff6be233bb5b831a31572288a",
+          "path": "packages/memories/src/tests/cli.test.ts"
+        },
+        {
+          "hash": "dc0ef3a712b20d30fcb739aa0ea58634a10341d6a48fd3835d3c23d7b7e85551",
+          "importsFiles": [
+            "packages/memories/src/analyze.ts",
+            "packages/memories/src/index-gen.ts",
+            "packages/memories/src/index.ts",
+            "packages/memories/src/paths.ts"
+          ],
+          "path": "packages/memories/src/tests/diagnostics.test.ts"
+        },
+        {
+          "hash": "7214d1d020fedb6a01fe570178760dc6ac49cef30754e2f890671c8c2acd9670",
+          "path": "packages/memories/src/tests/fixtures/MEMORY.md"
+        },
+        {
+          "hash": "d4ea2acc136cc51512e4d6255f9c6b1378fb498b4381e1c99a4cc92281296983",
+          "path": "packages/memories/src/tests/fixtures/flat-store/memory/MEMORY.md"
+        },
+        {
+          "hash": "456315289a90326c9b9dd687f5b28017b4fd800270cf29e0409f14cd8d12df84",
+          "path": "packages/memories/src/tests/fixtures/flat-store/memory/flat-topic.md"
+        },
+        {
+          "hash": "fc2c9c64c285904e38152e0922c83deee1ac6077fd03ac531715c5548a72f732",
+          "path": "packages/memories/src/tests/fixtures/flat-store/memory/memory/nested-topic.md"
+        },
+        {
+          "hash": "fa82298821ea9cf950a1d3e3076ea243fd05f3ca87afeab55bfd780389f4f8ac",
+          "path": "packages/memories/src/tests/fixtures/memory/ai-loadout.md"
+        },
+        {
+          "hash": "96040a64579fdc67ba2fd7ded22439059e7bee4ebcd8e28280a02332fba5ee72",
+          "path": "packages/memories/src/tests/fixtures/memory/artifact.md"
+        },
+        {
+          "hash": "8a18897ed7b2edc456d25ae7585f38d70fc7fae343067f26e87babc88fb11256",
+          "path": "packages/memories/src/tests/fixtures/memory/claude-rules.md"
+        },
+        {
+          "hash": "d1936e586caeaaaf0931b64e9fbfae81bf39d40b41e4bd2f416bca90ead49272",
+          "path": "packages/memories/src/tests/fixtures/memory/long-fm-id.md"
+        },
+        {
+          "hash": "32f3029d3aed6cbd91c6112b04541d216705065a0a00b236de719c9d3fda4d93",
+          "path": "packages/memories/src/tests/fixtures/memory/long-name.md"
+        },
+        {
+          "hash": "f4e55f24212f0586cf48dcb9d02a1df521892efcb923f0fff9f55d6e5c309003",
+          "path": "packages/memories/src/tests/fixtures/memory/long-summary.md"
+        },
+        {
+          "hash": "417280931e7ec01f9a56dcb36d4203c96191a78f6cb2583379756f2b3d936450",
+          "path": "packages/memories/src/tests/health.test.ts"
+        },
+        {
+          "hash": "bbf4214f92a6378a50d6fb66949d0cf111ffbd8de602b16a66b7e80697bb0427",
+          "importsFiles": [
+            "packages/memories/src/analyze.ts",
+            "packages/memories/src/index-gen.ts"
+          ],
+          "path": "packages/memories/src/tests/index-gen.test.ts"
+        },
+        {
+          "hash": "9ef54137b1770c4a57d079e7b9b0f2eb7177cd62e7b05257bbdc4ebfc10b60a2",
+          "importsFiles": [
+            "packages/memories/src/parser.ts"
+          ],
+          "path": "packages/memories/src/tests/parser.test.ts"
+        },
+        {
+          "hash": "353fc606d61f303445552fe0978721355bda27cc32eb2ee0fe25b36d7193f7b9",
+          "importsFiles": [
+            "packages/memories/src/analyze.ts",
+            "packages/memories/src/index-gen.ts",
+            "packages/memories/src/stats.ts"
+          ],
+          "path": "packages/memories/src/tests/stats.test.ts"
+        },
+        {
+          "hash": "d605577fe4efa5d8b1e268f4e87a56a9d2f79e20c63face968d0ec1108be8cfd",
+          "importsFiles": [
+            "packages/memories/src/analyze.ts",
+            "packages/memories/src/index-gen.ts",
+            "packages/memories/src/validate.ts"
+          ],
+          "path": "packages/memories/src/tests/validate.test.ts"
+        },
+        {
+          "hash": "ce5fb872e44d5f08b85b0a34d2d6e7e10bcb9764af222b8edfb91ef69ff74c5e",
+          "parseError": true,
+          "path": "packages/memories/src/types.ts"
+        },
+        {
+          "exports": [
+            "validateMemory",
+            "validateMemoryIndex"
+          ],
+          "hash": "a53c44e3b0fdc4a3710a0879528333820c78056946533241499275d4bf6f04fd",
+          "importsFiles": [
+            "packages/kernel/src/index.ts",
+            "packages/memories/src/index-gen.ts",
+            "packages/memories/src/paths.ts",
+            "packages/memories/src/types.ts"
+          ],
+          "path": "packages/memories/src/validate.ts"
+        },
+        {
+          "hash": "e9c61df4a1ed66d0d1193290c528dbada61b43aab4b1445a2b0a8e4dcd142697",
+          "path": "packages/memories/tsconfig.json"
+        }
+      ],
+      "globs": [
+        "packages/memories/**"
+      ],
+      "importConfidence": "full",
+      "name": "memories",
+      "origin": "authored",
+      "role": "docs",
+      "testedBy": 16,
+      "unresolvedSites": 0
+    },
+    {
+      "dynamicReads": 0,
+      "dynamicWrites": 0,
+      "entryPoints": [],
+      "externals": 0,
+      "files": [
+        {
+          "hash": "c89d6c97066c9846eeb1839572d0a04666f50c6d52a7f969ea3fb59554d850ae",
+          "path": ".gitignore"
+        },
+        {
+          "hash": "51dc01d5af8ff93b35927706e53e198f99646a54d0fef7d5934c2f5fa8f810b8",
+          "path": "CHANGELOG.md"
+        },
+        {
+          "hash": "5ae6b3c8f446f0a7cb95176e4dadb91b68aaffb16b3be09f64f5de248b6a973a",
+          "path": "LICENSE"
+        },
+        {
+          "hash": "505c6ddc8487c76bd403b3a350d8d4535bc1b7fa9a73e1d4805187e4e1d2a654",
+          "path": "README.es.md"
+        },
+        {
+          "hash": "e554d8ecdd90a4df3a94dc45fb1d22856fd3a414a6c50871fb92945bf8398035",
+          "path": "README.fr.md"
+        },
+        {
+          "hash": "253a71ccb79f808a8413495704ad09f530c7375d2dae0fec19172034f0383f09",
+          "path": "README.hi.md"
+        },
+        {
+          "hash": "63493ba9a5833d1c81a1d062045b02f2ffd8c323e1ea61e897fd0f237be74c77",
+          "path": "README.it.md"
+        },
+        {
+          "hash": "fbdc20781dccaf961016548f2795eed1df13f463d849bb90f4eee5b7e9850c86",
+          "path": "README.ja.md"
+        },
+        {
+          "hash": "d5971b8141b4b65de846ec71c06c91e407a44b54115ff216d73a7c6d5ca303f2",
+          "path": "README.md"
+        },
+        {
+          "hash": "1f644141f9bef96bb10dc5d199cb8e6832726776503ebd055376815111ad23c2",
+          "path": "README.pt-BR.md"
+        },
+        {
+          "hash": "27bdc7bde82e4b786926b2fefaaef20d9f3f75ad43c33754898542c0b47eaae1",
+          "path": "README.zh.md"
+        },
+        {
+          "hash": "d9db3e021ee8e745009c67eb8e9fa717c4be88f7eccaea79e419492d78bc6cb2",
+          "path": "ROADMAP.md"
+        },
+        {
+          "hash": "f32a95ef94d48377399bd4d48ba22f03cde53710741ef78843d972e0dd3f3fe9",
+          "path": "SCORECARD.md"
+        },
+        {
+          "hash": "ed2542f7052b1cbe2b85ba8c86ecc9317082d919fe4fa102b8269f0ab2a679fd",
+          "path": "SECURITY.md"
+        },
+        {
+          "hash": "879c5cc15c68f39cefb106703ddff320641dd2f7f4c603e1727732dd8f2a78b0",
+          "path": "SHIP_GATE.md"
+        },
+        {
+          "hash": "b386ec309af2773368ddc7038ff82a6432918d8ca24b2b7913c19eb0f7443480",
+          "path": "logo.png"
+        },
+        {
+          "hash": "2998714d712cb45934d5fb52eba5c500e7f410768297ed59a6259e14eccad8f0",
+          "path": "package-lock.json"
+        },
+        {
+          "hash": "4d71ff9d9e53e855b529db75b955ef74867bdd323694014e638c7916f82f20f1",
+          "path": "package.json"
+        },
+        {
+          "hash": "708bee2720777bd780b2aec4b946576f0ae185ba22a84918acf7db40c985c579",
+          "path": "tsconfig.base.json"
+        }
+      ],
+      "globs": [
+        "*"
+      ],
+      "importConfidence": "full",
+      "name": "root",
+      "origin": "authored",
+      "role": "docs",
+      "testedBy": 0,
+      "unresolvedSites": 0
+    },
+    {
+      "dynamicReads": 18,
+      "dynamicWrites": 3,
+      "entryPoints": [
+        "packages/rules/src/cli.ts",
+        "packages/rules/src/index.ts"
+      ],
+      "externals": 0,
+      "files": [
+        {
+          "hash": "d373b6d41d6cde16ca4f0306636ee194e13ac5726b4face758b6bf08472fe842",
+          "path": "packages/rules/.claude/README.md"
+        },
+        {
+          "hash": "2d964babba705c0b9f6a7296577979efc40775ad06c4112434d5ffa27c4312db",
+          "path": "packages/rules/.claude/agents/core/critic-reviewer.md"
+        },
+        {
+          "hash": "687b2dc77ea8bda372bd00993eab1520abaf0ef656c6580d3a0138a4924eb4c9",
+          "path": "packages/rules/.claude/agents/core/orchestrator.md"
+        },
+        {
+          "hash": "b4b72041103488d8562f24d4e0f41231c1634450df78c138b540336b2447207a",
+          "path": "packages/rules/.claude/agents/core/product-strategist.md"
+        },
+        {
+          "hash": "fb7369b4435914f8878f120c7a08121d443a500f12259a948e0d98f0091ff421",
+          "path": "packages/rules/.claude/agents/design/brand-guardian.md"
+        },
+        {
+          "hash": "48b8ba1cf8093e4559d15046e90abbf3b98c0383590dd4e506e6d21276bfdc09",
+          "path": "packages/rules/.claude/agents/design/ui-designer.md"
+        },
+        {
+          "hash": "62c975ded0f9763ad0b1b6608f11adc9a5107137006dd76a7dae81a2cf21e689",
+          "path": "packages/rules/.claude/agents/engineering/backend-engineer.md"
+        },
+        {
+          "hash": "1e464576cbfc8ba95c7865cc07a9eeba61e88ef5f4950baf665eea515b363be7",
+          "path": "packages/rules/.claude/agents/engineering/dependency-auditor.md"
+        },
+        {
+          "hash": "ef3833837a334baf524bb4df15dbd586d3664376521e98b87d87c412cb0187d9",
+          "path": "packages/rules/.claude/agents/engineering/frontend-developer.md"
+        },
+        {
+          "hash": "d8ea5372bd030768d59d4417d5889937003b59a872ef3c89b44bc31f9f333a03",
+          "path": "packages/rules/.claude/agents/engineering/performance-engineer.md"
+        },
+        {
+          "hash": "a1a23a9789640d78b136a0c249ee3aacbafb6ef0c774ea50c14bd89a25b6943e",
+          "path": "packages/rules/.claude/agents/engineering/refactor-engineer.md"
+        },
+        {
+          "hash": "d1cfc922932b9686ea3ba9263c9cf3a0e26f783f60eef12c86119d0f05b91999",
+          "path": "packages/rules/.claude/agents/engineering/security-reviewer.md"
+        },
+        {
+          "hash": "911d2c78ed9be3c5a831927c8c2a5acbddd6945f206aeecdb435b10ff5f8bda6",
+          "path": "packages/rules/.claude/agents/engineering/test-engineer.md"
+        },
+        {
+          "hash": "dc08071b0a3322f50ee5fa3049c465cd760289f67bcf497e11020e15a8415465",
+          "path": "packages/rules/.claude/agents/growth/community-manager.md"
+        },
+        {
+          "hash": "ad1d9ba7f5d1e634e9225681077cd384585ef1856a1e9b9f59b0608132ef8d1f",
+          "path": "packages/rules/.claude/agents/growth/content-strategist.md"
+        },
+        {
+          "hash": "05db0c02db9b053890f163dfa2a950f12b5be185ba61c24cd5a0168a5e41177b",
+          "path": "packages/rules/.claude/agents/growth/launch-strategist.md"
+        },
+        {
+          "hash": "337f439266a055588e2a0af068b0461b0ec8259932341a19d1cf15044c028a67",
+          "path": "packages/rules/.claude/agents/growth/support-triage-lead.md"
+        },
+        {
+          "hash": "22201daefd5b99ab0992dc432ba7e015771353ccde467e11e35ccf9fcb23ced1",
+          "path": "packages/rules/.claude/agents/marketing/launch-copywriter.md"
+        },
+        {
+          "hash": "f66c80446da64b3ccf16d50f354bbc73ebff1022b273974f0a95472be643d6c7",
+          "path": "packages/rules/.claude/agents/product/feedback-synthesizer.md"
+        },
+        {
+          "hash": "19b1d905b39ff4e2992fb755cda6f597fd615057052b0b38ad7c38d4858312c5",
+          "path": "packages/rules/.claude/agents/product/information-architect.md"
+        },
+        {
+          "hash": "d3e7bc0b3b8c45b8c704cd9d4829fe50e1043c18b672854313ff807c2cbb4e42",
+          "path": "packages/rules/.claude/agents/product/roadmap-prioritizer.md"
+        },
+        {
+          "hash": "b2c1626e9c18a1adf09d629234cf56bc18bbd5e13498246da35f86cc22463548",
+          "path": "packages/rules/.claude/agents/product/spec-writer.md"
+        },
+        {
+          "hash": "ea0a9b1e28dff6fca5c558e3323954a2dd6505d1213145e98fe6322bf47ea580",
+          "path": "packages/rules/.claude/agents/research/competitive-analyst.md"
+        },
+        {
+          "hash": "329fcca3c43be4f1d4458184a927029b8e136dc62b810653c0e132a2c1abdd23",
+          "path": "packages/rules/.claude/agents/research/trend-researcher.md"
+        },
+        {
+          "hash": "429c7b361c36d610b30b1acc5793fa24cc1997bd9841297e6a753760f981351a",
+          "path": "packages/rules/.claude/agents/research/user-interview-synthesizer.md"
+        },
+        {
+          "hash": "b7b2a5657a521807bb3c0b953066aea0ac6fd864305cb5bcff6f7dddc992d6d8",
+          "path": "packages/rules/.claude/agents/research/ux-researcher.md"
+        },
+        {
+          "hash": "7a22beaad309c64e6ea14d3107025fa06a5b10bcd2e772c76fdeb6d3b252cdfe",
+          "path": "packages/rules/.claude/agents/treatment/coverage-auditor.md"
+        },
+        {
+          "hash": "0d73f921bcc9a2fb49933af9551d9dbee85675d71a900627ed6eb2d636bccf2c",
+          "path": "packages/rules/.claude/agents/treatment/deployment-verifier.md"
+        },
+        {
+          "hash": "1a9a9ff9ea1095aab4688b19cb9e0ec48db2ca59d9f5f5e51e1f858d8d1dff7b",
+          "path": "packages/rules/.claude/agents/treatment/docs-architect.md"
+        },
+        {
+          "hash": "bb7a05aec44d58dcac5b36e28b8eb6b4640775eec6e9ebf069c6415e70a44b5a",
+          "path": "packages/rules/.claude/agents/treatment/metadata-curator.md"
+        },
+        {
+          "hash": "4cc9d0a2b158a057c6c3fc39763f57c2192f9da62e2a811d68fd839f57eaf598",
+          "path": "packages/rules/.claude/agents/treatment/release-engineer.md"
+        },
+        {
+          "hash": "d481658d5d6ff403aa4ddc87ab901adfbc3462d0a66935fa1009d15ae983583f",
+          "path": "packages/rules/.claude/agents/treatment/repo-researcher.md"
+        },
+        {
+          "hash": "8cfe4f057b3c99e101689729054a6a2a8970cd0a64cace28eb5e1defbf602dde",
+          "path": "packages/rules/.claude/agents/treatment/repo-translator.md"
+        },
+        {
+          "hash": "4ca89e52e89026648cddd1dcebae0ce9cd12290972323e751ca4785fdb78b7a6",
+          "path": "packages/rules/.claude/examples/feature-packet.md"
+        },
+        {
+          "hash": "ed14e6a5dc1d77b0ccf88428f90e5ebcf604f9c14e0fa805a6dacf2adb396c2a",
+          "path": "packages/rules/.claude/examples/identity-packet.md"
+        },
+        {
+          "hash": "5b1b7ead1a83ed6fb13e8342f64bae5eda5ebdf007516ff176d9fe582def19f7",
+          "path": "packages/rules/.claude/examples/integration-packet.md"
+        },
+        {
+          "hash": "bc22ae44f568aacc8648cc306afa88bf49ef6883c7fa12cccf811ae66986dbe9",
+          "path": "packages/rules/.claude/handbook.md"
+        },
+        {
+          "hash": "fa39ec3464d39e01b4f5f2dd15c69d47c8bf6d93b75daa1694eed3cd12be04dc",
+          "path": "packages/rules/.claude/policy/done-definition.md"
+        },
+        {
+          "hash": "682c931d8ac0745b5b8d9300370775f5d7a43be83a9397b363d560f7329701de",
+          "path": "packages/rules/.claude/policy/escalation-rules.md"
+        },
+        {
+          "hash": "8fe24f7551d6caa66713c98f32effcdc86a6cb4223707e25a7c5772988f83b55",
+          "path": "packages/rules/.claude/policy/routing-rules.md"
+        },
+        {
+          "hash": "5d55e6a21f589f1e05117ce7a0c60891a1d2bd0c3ba9f4c5a80c50e5544e7d3e",
+          "path": "packages/rules/.claude/policy/tool-permissions.md"
+        },
+        {
+          "hash": "16f96f8b2fe34b2167ad1a1bd65a90a8f715d170c724545a54e4e2a808f34fe9",
+          "path": "packages/rules/.claude/schemas/handoff.md"
+        },
+        {
+          "hash": "34ee30f440135cb3c979f036f050faa6f12afe99528db9daafe01d1ac1f434ee",
+          "path": "packages/rules/.claude/schemas/review-verdict.md"
+        },
+        {
+          "hash": "94fb28a919784c36612906f846800fd5def23da4807c93c45aca2c957baa9c41",
+          "path": "packages/rules/.claude/schemas/task-packet.md"
+        },
+        {
+          "hash": "f85e5c9f734c54c2673e0053e4b2eef8be79ac10b1ec742462af9f18782d82c7",
+          "path": "packages/rules/.claude/workflows/fix-bug.md"
+        },
+        {
+          "hash": "df359c5ab2c72dafcf89dc7667749c18b7a273c4bdfcfa842cfd402a4adde6e6",
+          "path": "packages/rules/.claude/workflows/full-treatment.md"
+        },
+        {
+          "hash": "d0da445a5980afb0e596bb7fbdf2e38e94af4a2a3b69c541a4a75dccd8b1420d",
+          "path": "packages/rules/.claude/workflows/launch-update.md"
+        },
+        {
+          "hash": "77e6ad26462b2237ea062b63d9f242fae459b6c0ea51ee83888873235a048fa4",
+          "path": "packages/rules/.claude/workflows/ship-feature.md"
+        },
+        {
+          "hash": "ee5c6051f7f16cf5a557f9a10da7dceded71de95e80e0c3be7885e279e07882a",
+          "path": "packages/rules/.gitignore"
+        },
+        {
+          "hash": "9ad3bf96fd21cb9dca505719b8f961fb92ebfa191f0ae09dad4ee3ae3706db1e",
+          "path": "packages/rules/CHANGELOG.md"
+        },
+        {
+          "hash": "5ae6b3c8f446f0a7cb95176e4dadb91b68aaffb16b3be09f64f5de248b6a973a",
+          "path": "packages/rules/LICENSE"
+        },
+        {
+          "hash": "dd5c90d6a411a305f047dd251de5c34e435bf252cdcda0da01dc974667c2bb9d",
+          "path": "packages/rules/README.es.md"
+        },
+        {
+          "hash": "40172ab259ac46bcc587a019d93f4fa1b7348eecac678bc62e617359dfe9d81b",
+          "path": "packages/rules/README.fr.md"
+        },
+        {
+          "hash": "709e191dd3ebdb0aae0e58001e162ec30d68415163535ef26e42660c34e16da6",
+          "path": "packages/rules/README.hi.md"
+        },
+        {
+          "hash": "c44c0d8be6e0dc4c8133220401f86d8adcfa382b3ef8f4635435207b9b112960",
+          "path": "packages/rules/README.it.md"
+        },
+        {
+          "hash": "47dd40780568e0b99ed6a1d843956d1246b6eba205d2b8d089608e4f1dff2cec",
+          "path": "packages/rules/README.ja.md"
+        },
+        {
+          "hash": "ba8927bab72a2596fd864990120c6e4f5694c37fa4710818d9f2b6e50524e52e",
+          "path": "packages/rules/README.md"
+        },
+        {
+          "hash": "25f701306586ebf121e54bea702ae45de7a4617330032fb4c0bc735d1ec76f38",
+          "path": "packages/rules/README.pt-BR.md"
+        },
+        {
+          "hash": "6516ef1485e7ca08ed0dc4f27e1fc57931a20b5410f92d1ab40467400dda1086",
+          "path": "packages/rules/README.zh.md"
+        },
+        {
+          "hash": "3c97799787538a61aed96675d7e9a21bf189a77e9bd7afa414113c5aa7840dfc",
+          "path": "packages/rules/SCORECARD.md"
+        },
+        {
+          "hash": "a6c889c878f0b2dd3106e34bc6a8c914e6e0882be710c7171c270d02052330cc",
+          "path": "packages/rules/SECURITY.md"
+        },
+        {
+          "hash": "e8a589caeee46f53022e207816b96ff7b40824516f28fedfa447d6a52d49999d",
+          "path": "packages/rules/SHIP_GATE.md"
+        },
+        {
+          "hash": "cdcdd802fb51414cf21afeff36416fa1400d6b3d4197167dcad1cbc2510b275d",
+          "path": "packages/rules/logo.png"
+        },
+        {
+          "hash": "df0c2c5f4532c1e05d24deb4693cf6538f890a06651374b501203e9205d2d03b",
+          "path": "packages/rules/package.json"
+        },
+        {
+          "hash": "27fff99aa1e35f6292d47e25ffae20a63d3fd4ae90284f94a735456abe062230",
+          "path": "packages/rules/site/astro.config.mjs"
+        },
+        {
+          "hash": "b5578baf42cab82e5e7b451b6992cb929aeb6ff8d02d8e11ab690e6f67fea144",
+          "path": "packages/rules/site/package-lock.json"
+        },
+        {
+          "hash": "cff923d88f356795747a843362ca300b43d09c5715e6356f904b4d5fa06a7fae",
+          "path": "packages/rules/site/package.json"
+        },
+        {
+          "hash": "ec030f2e4bf6dc57eaca075d390c228b3212cf29db267e32ef92e110de1acdcc",
+          "path": "packages/rules/site/src/content.config.ts"
+        },
+        {
+          "hash": "efe3e1d9d09ee84520de1bc7097a8c8b99e9da59ff5c0f4cc902938d00cad97b",
+          "path": "packages/rules/site/src/content/docs/handbook/beginners.md"
+        },
+        {
+          "hash": "963334d2eda9bed3571bf0675ae956e1acae68d5a2f5cb33bad07ad1aa1e35ad",
+          "path": "packages/rules/site/src/content/docs/handbook/commands.md"
+        },
+        {
+          "hash": "17bc187f6309b5c2f4c61251c4200850c3a5d3b2f77988ef7868bfeb129a4480",
+          "path": "packages/rules/site/src/content/docs/handbook/getting-started.md"
+        },
+        {
+          "hash": "cd1f1547cf28ccf7ab0a70798925512afe0ba4dc582b8ed087f54163f0c1891d",
+          "path": "packages/rules/site/src/content/docs/handbook/how-it-works.md"
+        },
+        {
+          "hash": "33c0fccd677d19cf511171abb19ed44b5d08f182f1235c934956341cda53309b",
+          "path": "packages/rules/site/src/content/docs/handbook/index.md"
+        },
+        {
+          "hash": "04484816303968c2713dad2d632f0f8af4a01e1a776801fc962c9d75ba789e32",
+          "path": "packages/rules/site/src/content/docs/handbook/security.md"
+        },
+        {
+          "hash": "a699ad78a6d27d6864ccfe4c3a4a01993aca28ecb4a3d20893f37db9f9b1a522",
+          "path": "packages/rules/site/src/pages/index.astro"
+        },
+        {
+          "hash": "e42a39089275c1a85a242141f2abe6efc26f4914aa1e9c1fa1721311b72fe635",
+          "path": "packages/rules/site/src/site-config.ts"
+        },
+        {
+          "hash": "8d7a9e46bb152083fc90ad66ed91b697ac1aef5a9de3e801e94ff4171753c2b3",
+          "path": "packages/rules/site/src/styles/global.css"
+        },
+        {
+          "hash": "06dc2fef306540facfcded563b52bcddb691308972fe986eea62d8551961c6ec",
+          "path": "packages/rules/site/src/styles/starlight-custom.css"
+        },
+        {
+          "hash": "61fc24492db9aef7ec38eb91cfeebaef96155014bb5f22648fd8ed2327c6cae2",
+          "path": "packages/rules/site/tsconfig.json"
+        },
+        {
+          "exports": [
+            "analyzeFile",
+            "classifyPriority",
+            "cmdAnalyze",
+            "extractKeywords",
+            "generateSummary",
+            "resolveClaudeMd",
+            "resolveMemoryMd",
+            "suggestPatterns"
+          ],
+          "hash": "6aabb2205429d9fa01bd8a4543e1c203cd023a12d3adb89d70d228788225f124",
+          "importsFiles": [
+            "packages/rules/src/console.ts",
+            "packages/rules/src/parser.ts",
+            "packages/rules/src/signals.ts",
+            "packages/rules/src/types.ts"
+          ],
+          "path": "packages/rules/src/analyze.ts"
+        },
+        {
+          "hash": "c2d81ad0520552aa3b824128b0eb65b4f4e44cd319cbe42723cc90b9818ea2f5",
+          "importsFiles": [
+            "packages/rules/src/analyze.ts",
+            "packages/rules/src/console.ts",
+            "packages/rules/src/signals.ts",
+            "packages/rules/src/split.ts",
+            "packages/rules/src/stats.ts",
+            "packages/rules/src/validate.ts"
+          ],
+          "path": "packages/rules/src/cli.ts"
+        },
+        {
+          "exports": [
+            "fail",
+            "flagValue",
+            "hasFlag",
+            "info",
+            "log",
+            "ok",
+            "positionalArgs",
+            "skip",
+            "warn"
+          ],
+          "hash": "7ea2946bf5de60046d76f56ff4721b06ba72a51afa4226fe5e0ba1a078b2ce8f",
+          "path": "packages/rules/src/console.ts"
+        },
+        {
+          "hash": "dce0d40f4c42c6903fb8b2bfabac706986b0438bfc33a625325786f43bd9c507",
+          "importsFiles": [
+            "packages/rules/src/analyze.ts",
+            "packages/rules/src/parser.ts",
+            "packages/rules/src/signals.ts",
+            "packages/rules/src/split.ts",
+            "packages/rules/src/types.ts",
+            "packages/rules/src/validate.ts"
+          ],
+          "path": "packages/rules/src/index.ts"
+        },
+        {
+          "exports": [
+            "headingToId",
+            "parseSections"
+          ],
+          "hash": "4e14b2afacd3a4325e45ce806e25ab5a83ddb263aead9fe7145f163982140c99",
+          "importsFiles": [
+            "packages/kernel/src/index.ts",
+            "packages/rules/src/types.ts"
+          ],
+          "path": "packages/rules/src/parser.ts"
+        },
+        {
+          "exports": [
+            "cmdInitSignals",
+            "generateDefaultSignalsJson",
+            "loadSignals"
+          ],
+          "hash": "be349a2d0e9bedf88aac276ff27f3efcfef2af1a415d3c4e963585831c9e628e",
+          "importsFiles": [
+            "packages/rules/src/console.ts",
+            "packages/rules/src/types.ts"
+          ],
+          "path": "packages/rules/src/signals.ts"
+        },
+        {
+          "exports": [
+            "cmdSplit",
+            "generateClaudeMd",
+            "generateIndex",
+            "generateRuleFile"
+          ],
+          "hash": "7e0c04b359be59adc70a460f5079be46e1f941499ec378d48c3da622d7c694a7",
+          "importsFiles": [
+            "packages/rules/src/analyze.ts",
+            "packages/rules/src/console.ts",
+            "packages/rules/src/parser.ts",
+            "packages/rules/src/signals.ts",
+            "packages/rules/src/types.ts"
+          ],
+          "path": "packages/rules/src/split.ts"
+        },
+        {
+          "exports": [
+            "cmdStats"
+          ],
+          "hash": "86ba8e9223006ec8e16ceb5dc9750866ceae353c776ba96bd28921a3255ad40a",
+          "importsFiles": [
+            "packages/rules/src/analyze.ts",
+            "packages/rules/src/console.ts",
+            "packages/rules/src/parser.ts",
+            "packages/rules/src/types.ts"
+          ],
+          "path": "packages/rules/src/stats.ts"
+        },
+        {
+          "hash": "34a93d1008934068a419de40ab069b55c8fc9b11715391ba5e7ca85b21ab297b",
+          "importsFiles": [
+            "packages/rules/src/analyze.ts",
+            "packages/rules/src/types.ts"
+          ],
+          "path": "packages/rules/src/tests/analyze.test.ts"
+        },
+        {
+          "hash": "89b7dbfc5ea10b0da6faeb3e580edb0b7416850289141c77c54f8dfd319fc4be",
+          "importsFiles": [
+            "packages/rules/src/console.ts"
+          ],
+          "path": "packages/rules/src/tests/cli.test.ts"
+        },
+        {
+          "hash": "898d7cd73615c9fe42f83385d976d35fd6df031f4536d39e86c71fc6476a47f9",
+          "importsFiles": [
+            "packages/rules/src/index.ts"
+          ],
+          "path": "packages/rules/src/tests/index.test.ts"
+        },
+        {
+          "hash": "c8ec17cbe3f681d15dd5261063b8f32e0583c1536ce235d9ea2e307e05948b6e",
+          "importsFiles": [
+            "packages/rules/src/parser.ts",
+            "packages/rules/src/types.ts"
+          ],
+          "path": "packages/rules/src/tests/parser.test.ts"
+        },
+        {
+          "hash": "512aed215c2a12a98e3eec1d7549bd198754c90025c388a3eac6158545bed88d",
+          "importsFiles": [
+            "packages/rules/src/analyze.ts",
+            "packages/rules/src/signals.ts",
+            "packages/rules/src/types.ts"
+          ],
+          "path": "packages/rules/src/tests/signals.test.ts"
+        },
+        {
+          "hash": "bbc5a326cf4ac4b79450f55bc21ab63a5ce6e95c5e5280a42f0b6d3e75a3bb5f",
+          "importsFiles": [
+            "packages/rules/src/parser.ts",
+            "packages/rules/src/split.ts",
+            "packages/rules/src/types.ts"
+          ],
+          "path": "packages/rules/src/tests/split.test.ts"
+        },
+        {
+          "hash": "b4b6367e6390e403a2a33ae55df990a568142b5c56470bdde9d640a187853c63",
+          "importsFiles": [
+            "packages/rules/src/validate.ts"
+          ],
+          "path": "packages/rules/src/tests/validate.test.ts"
+        },
+        {
+          "hash": "044b71507ca96a617e6df0490b2db5e701f065166afa7c3a337305c221680012",
+          "importsFiles": [
+            "packages/kernel/src/index.ts"
+          ],
+          "path": "packages/rules/src/types.ts"
+        },
+        {
+          "exports": [
+            "cmdValidate",
+            "validateRules"
+          ],
+          "hash": "bdf5904a2edd21be54027525787504958bc7a281b6fc2c2ecfda8b047fe60d70",
+          "importsFiles": [
+            "packages/rules/src/console.ts",
+            "packages/rules/src/parser.ts",
+            "packages/rules/src/types.ts"
+          ],
+          "path": "packages/rules/src/validate.ts"
+        },
+        {
+          "hash": "7fb68469a8a8518861b0ecd253332a9e894bae032798c2aa45f24ba9f8a1d737",
+          "path": "packages/rules/tsconfig.json"
+        }
+      ],
+      "globs": [
+        "packages/rules/**"
+      ],
+      "importConfidence": "full",
+      "name": "rules",
+      "origin": "authored",
+      "role": "docs",
+      "testedBy": 15,
+      "unresolvedSites": 0
+    },
+    {
+      "dynamicReads": 0,
+      "dynamicWrites": 0,
+      "entryPoints": [],
+      "externals": 0,
+      "files": [
+        {
+          "hash": "f04c9eaba1504256d45b4e63abcad0efd37711e6eefd5b6040862089159a6dab",
+          "path": "site/astro.config.mjs"
+        },
+        {
+          "hash": "b5578baf42cab82e5e7b451b6992cb929aeb6ff8d02d8e11ab690e6f67fea144",
+          "path": "site/package-lock.json"
+        },
+        {
+          "hash": "0fe0343f8ddb0628d954129b02a72b3b2c8f8f884b1380c5567403c4f55942f8",
+          "path": "site/package.json"
+        },
+        {
+          "hash": "b386ec309af2773368ddc7038ff82a6432918d8ca24b2b7913c19eb0f7443480",
+          "path": "site/src/assets/logo.png"
+        },
+        {
+          "hash": "ec030f2e4bf6dc57eaca075d390c228b3212cf29db267e32ef92e110de1acdcc",
+          "path": "site/src/content.config.ts"
+        },
+        {
+          "hash": "98214c219fd420345e9e8c7bd8d5cadd21c2246a66cd72f5afea10ea7c46eb64",
+          "path": "site/src/content/docs/handbook/architecture.md"
+        },
+        {
+          "hash": "ed634054407ab3d58398af6753391255334e565777c2ef87ceb38b51b17fb4d7",
+          "path": "site/src/content/docs/handbook/getting-started.md"
+        },
+        {
+          "hash": "fa02b2d379b0d214eb88cfdd98bec637d9ba0eb4ef200a9cec8abc49c2b7c7ef",
+          "path": "site/src/content/docs/handbook/index.md"
+        },
+        {
+          "hash": "a669ab8e9859cc09436adb7dfdd03b75caff1668a911bb67eccc7272a5b03ac6",
+          "path": "site/src/content/docs/handbook/migration.md"
+        },
+        {
+          "hash": "49bebe50138606858b3cc4ce545665c3528b5fdce3b68d74c35cf8ffb6a3d0c8",
+          "path": "site/src/content/docs/handbook/reference.md"
+        },
+        {
+          "hash": "aec353c0f75d9120c83b871f7246f07bd7accef31b84635e69bf3d382e8479e8",
+          "path": "site/src/content/docs/handbook/rituals.md"
+        },
+        {
+          "hash": "a699ad78a6d27d6864ccfe4c3a4a01993aca28ecb4a3d20893f37db9f9b1a522",
+          "path": "site/src/pages/index.astro"
+        },
+        {
+          "hash": "7f8ce934f686862b50abbcefd7e3e59c008780bdf6710d48a234f498171a3806",
+          "path": "site/src/site-config.ts"
+        },
+        {
+          "hash": "5995279a40a9a63426a93feec129006b261cc7200426a398914d0317722ef19b",
+          "path": "site/src/styles/global.css"
+        },
+        {
+          "hash": "9699457f0a7a31093d48944cabb11812852f0ce480732986b04896d53d29c4ca",
+          "path": "site/src/styles/starlight-custom.css"
+        },
+        {
+          "hash": "61fc24492db9aef7ec38eb91cfeebaef96155014bb5f22648fd8ed2327c6cae2",
+          "path": "site/tsconfig.json"
+        }
+      ],
+      "globs": [
+        "site/**"
+      ],
+      "importConfidence": "full",
+      "name": "site",
+      "origin": "authored",
+      "role": "code",
+      "testedBy": 0,
+      "unresolvedSites": 0
+    }
+  ],
+  "doors": [
+    {
+      "commands": [
+        {
+          "job": "build-and-test",
+          "step": "Atlas check",
+          "text": "npx --yes @dogfood-lab/atlas@1.14.0 check"
+        },
+        {
+          "job": "build-and-test",
+          "step": "3",
+          "text": "npm ci"
+        },
+        {
+          "job": "build-and-test",
+          "step": "4",
+          "text": "npm run build"
+        },
+        {
+          "job": "build-and-test",
+          "step": "5",
+          "text": "npm test"
+        },
+        {
+          "job": "build-and-test",
+          "step": "6",
+          "text": "npm audit --audit-level=moderate"
+        },
+        {
+          "job": "deploy-pages",
+          "step": "Install site dependencies",
+          "text": "npm ci"
+        },
+        {
+          "job": "deploy-pages",
+          "step": "Build site",
+          "text": "npm run build"
+        }
+      ],
+      "file": ".github/workflows/ci.yml",
+      "landings": [
+        ".claude"
+      ],
+      "mentions": [],
+      "name": "CI",
+      "permissions": [
+        "contents:read",
+        "id-token:write",
+        "pages:write"
+      ],
+      "pushes": false,
+      "reach": [
+        {
+          "boundary": "cli",
+          "depth": 0,
+          "files": 19
+        },
+        {
+          "boundary": "kernel",
+          "depth": 0,
+          "files": 23
+        },
+        {
+          "boundary": "memories",
+          "depth": 0,
+          "files": 17
+        },
+        {
+          "boundary": "rules",
+          "depth": 0,
+          "files": 17
+        }
+      ],
+      "readers": [
+        {
+          "by": "packages/cli/src/refresh.ts",
+          "call": "existsSync",
+          "confidence": "ast",
+          "target": ".claude"
+        },
+        {
+          "by": "packages/cli/src/refresh.ts",
+          "call": "statSync",
+          "confidence": "ast",
+          "target": ".claude"
+        },
+        {
+          "by": "packages/rules/src/analyze.ts",
+          "call": "literal",
+          "confidence": "ast",
+          "target": ".claude"
+        },
+        {
+          "by": "packages/rules/src/signals.ts",
+          "call": "existsSync",
+          "confidence": "ast",
+          "target": ".claude"
+        },
+        {
+          "by": "packages/rules/src/signals.ts",
+          "call": "readFileSync",
+          "confidence": "ast",
+          "target": ".claude"
+        },
+        {
+          "by": "packages/rules/src/stats.ts",
+          "call": "existsSync",
+          "confidence": "ast",
+          "target": ".claude"
+        },
+        {
+          "by": "packages/rules/src/stats.ts",
+          "call": "readFileSync",
+          "confidence": "ast",
+          "target": ".claude"
+        }
+      ],
+      "runs": [
+        {
+          "directory": true,
+          "job": "build-and-test",
+          "matched": true,
+          "path": "packages/cli/src/",
+          "via": "tsc packages/cli/tsconfig.json"
+        },
+        {
+          "directory": true,
+          "job": "build-and-test",
+          "matched": true,
+          "path": "packages/kernel/src/",
+          "via": "tsc packages/kernel/tsconfig.json"
+        },
+        {
+          "directory": true,
+          "job": "build-and-test",
+          "matched": true,
+          "path": "packages/memories/src/",
+          "via": "tsc packages/memories/tsconfig.json"
+        },
+        {
+          "directory": true,
+          "job": "build-and-test",
+          "matched": true,
+          "path": "packages/rules/src/",
+          "via": "tsc packages/rules/tsconfig.json"
+        }
+      ],
+      "runsCount": 4,
+      "secrets": [],
+      "sends": {
+        "deploysPages": true,
+        "dispatchesTo": [],
+        "opensIssues": false,
+        "opensIssuesOnFailure": false,
+        "opensPullRequests": false,
+        "publishes": false,
+        "publishesTo": [],
+        "releases": false
+      },
+      "stages": [],
+      "triggers": [
+        {
+          "event": "pull_request",
+          "paths": [
+            ".github/workflows/**",
+            "apps/**",
+            "atlas/**",
+            "package-lock.json",
+            "package.json",
+            "packages/**",
+            "site/**",
+            "tsconfig.base.json"
+          ]
+        },
+        {
+          "branches": [
+            "main"
+          ],
+          "event": "push",
+          "paths": [
+            ".github/workflows/**",
+            "apps/**",
+            "atlas/**",
+            "package-lock.json",
+            "package.json",
+            "packages/**",
+            "site/**",
+            "tsconfig.base.json"
+          ]
+        },
+        {
+          "event": "workflow_dispatch"
+        }
+      ],
+      "uses": [
+        "actions/checkout",
+        "actions/deploy-pages",
+        "actions/setup-node",
+        "actions/upload-pages-artifact"
+      ],
+      "usesWorkflowToken": false
+    },
+    {
+      "commands": [
+        {
+          "job": "release",
+          "step": "Install npm >=11.5 in sandbox for OIDC trusted-publishing auth",
+          "text": "# Node 22's bundled npm 10.9 races on an in-place 'npm i -g npm@latest'\n# (MODULE_NOT_FOUND: promise-retry). Install npm@latest into a sandbox\n# dir and shadow the system npm via PATH instead.\nSANDBOX=\"$HOME/.npm-cli-sandbox\"\nmkdir -p \"$SANDBOX\"\npushd \"$SANDBOX\" >/dev/null\necho '{\"name\":\"npm-cli-sandbox\",\"version\":\"0.0.0\",\"private\":true}' > package.json\nnpm install --no-save --no-audit --no-fund --silent npm@latest\npopd >/dev/null\necho \"$SANDBOX/node_modules/.bin\" >> \"$GITHUB_PATH\"\n\"$SANDBOX/node_modules/.bin/npm\" --version\n"
+        },
+        {
+          "job": "release",
+          "step": "Verify tag matches packages/cli/package.json version",
+          "text": "PKG_VERSION=$(node -p \"require('./packages/cli/package.json').version\")\nTAG_VERSION=\"${GITHUB_REF_NAME#v}\"\necho \"Tag: ${GITHUB_REF_NAME} -> ${TAG_VERSION}\"\necho \"Package (packages/cli): ${PKG_VERSION}\"\nif [ \"${PKG_VERSION}\" != \"${TAG_VERSION}\" ]; then\n  echo \"::error::Tag ${TAG_VERSION} does not match packages/cli/package.json version ${PKG_VERSION}\"\n  exit 1\nfi\n"
+        },
+        {
+          "job": "release",
+          "step": "Install dependencies",
+          "text": "npm ci"
+        },
+        {
+          "job": "release",
+          "step": "Build (kernel -> memories -> rules -> cli)",
+          "text": "npm run build"
+        },
+        {
+          "job": "release",
+          "step": "Bundle the CLI (self-contained publish artifact)",
+          "text": "npm run bundle -w packages/cli"
+        },
+        {
+          "job": "release",
+          "step": "Test",
+          "text": "npm test"
+        },
+        {
+          "job": "release",
+          "step": "npm pack dry-run (verify shape)",
+          "text": "npm pack --dry-run -w packages/cli"
+        },
+        {
+          "job": "release",
+          "step": "Publish to npm with provenance (OIDC trusted publisher)",
+          "text": "npm publish -w packages/cli --provenance --access public"
+        },
+        {
+          "job": "release",
+          "step": "Create GitHub Release",
+          "text": "gh release create \"${GITHUB_REF_NAME}\" \\\n  --title \"loadout-os ${GITHUB_REF_NAME}\" \\\n  --generate-notes \\\n  --verify-tag\n"
+        }
+      ],
+      "file": ".github/workflows/release.yml",
+      "landings": [
+        ".claude"
+      ],
+      "mentions": [
+        {
+          "job": "release",
+          "path": "package.json"
+        },
+        {
+          "job": "release",
+          "path": "packages/cli/package.json"
+        }
+      ],
+      "name": "Release",
+      "permissions": [
+        "contents:write",
+        "id-token:write"
+      ],
+      "pushes": false,
+      "reach": [
+        {
+          "boundary": "cli",
+          "depth": 0,
+          "files": 20
+        },
+        {
+          "boundary": "kernel",
+          "depth": 0,
+          "files": 23
+        },
+        {
+          "boundary": "memories",
+          "depth": 0,
+          "files": 17
+        },
+        {
+          "boundary": "rules",
+          "depth": 0,
+          "files": 17
+        }
+      ],
+      "readers": [
+        {
+          "by": "packages/cli/src/refresh.ts",
+          "call": "existsSync",
+          "confidence": "ast",
+          "target": ".claude"
+        },
+        {
+          "by": "packages/cli/src/refresh.ts",
+          "call": "statSync",
+          "confidence": "ast",
+          "target": ".claude"
+        },
+        {
+          "by": "packages/rules/src/analyze.ts",
+          "call": "literal",
+          "confidence": "ast",
+          "target": ".claude"
+        },
+        {
+          "by": "packages/rules/src/signals.ts",
+          "call": "existsSync",
+          "confidence": "ast",
+          "target": ".claude"
+        },
+        {
+          "by": "packages/rules/src/signals.ts",
+          "call": "readFileSync",
+          "confidence": "ast",
+          "target": ".claude"
+        },
+        {
+          "by": "packages/rules/src/stats.ts",
+          "call": "existsSync",
+          "confidence": "ast",
+          "target": ".claude"
+        },
+        {
+          "by": "packages/rules/src/stats.ts",
+          "call": "readFileSync",
+          "confidence": "ast",
+          "target": ".claude"
+        }
+      ],
+      "runs": [
+        {
+          "job": "release",
+          "path": "packages/cli/esbuild.config.mjs"
+        },
+        {
+          "directory": true,
+          "job": "release",
+          "matched": true,
+          "path": "packages/cli/src/",
+          "via": "tsc packages/cli/tsconfig.json"
+        },
+        {
+          "directory": true,
+          "job": "release",
+          "matched": true,
+          "path": "packages/kernel/src/",
+          "via": "tsc packages/kernel/tsconfig.json"
+        },
+        {
+          "directory": true,
+          "job": "release",
+          "matched": true,
+          "path": "packages/memories/src/",
+          "via": "tsc packages/memories/tsconfig.json"
+        },
+        {
+          "directory": true,
+          "job": "release",
+          "matched": true,
+          "path": "packages/rules/src/",
+          "via": "tsc packages/rules/tsconfig.json"
+        }
+      ],
+      "runsCount": 5,
+      "secrets": [
+        "GITHUB_TOKEN"
+      ],
+      "sends": {
+        "deploysPages": false,
+        "dispatchesTo": [],
+        "opensIssues": false,
+        "opensIssuesOnFailure": false,
+        "opensPullRequests": false,
+        "publishes": true,
+        "publishesTo": [
+          "npm"
+        ],
+        "releases": true
+      },
+      "stages": [],
+      "triggers": [
+        {
+          "event": "push",
+          "tags": [
+            "v*"
+          ]
+        }
+      ],
+      "uses": [
+        "actions/checkout",
+        "actions/setup-node"
+      ],
+      "usesWorkflowToken": true
+    }
+  ],
+  "edges": [
+    {
+      "from": "cli",
+      "kind": "file",
+      "to": "kernel"
+    },
+    {
+      "from": "cli",
+      "kind": "file",
+      "to": "memories"
+    },
+    {
+      "from": "cli",
+      "kind": "file",
+      "to": "rules"
+    },
+    {
+      "from": "hook",
+      "kind": "file",
+      "to": "kernel"
+    },
+    {
+      "from": "memories",
+      "kind": "file",
+      "to": "kernel"
+    },
+    {
+      "from": "rules",
+      "kind": "file",
+      "to": "kernel"
+    }
+  ],
+  "generatedFrom": {
+    "commit": "741a0923029b4c5c494f6a2f0089c08f18a6d8e7",
+    "tracked": 381
+  },
+  "landings": [
+    {
+      "readers": [
+        {
+          "by": "packages/cli/src/refresh.ts",
+          "call": "existsSync",
+          "confidence": "ast"
+        },
+        {
+          "by": "packages/cli/src/refresh.ts",
+          "call": "statSync",
+          "confidence": "ast"
+        },
+        {
+          "by": "packages/rules/src/signals.ts",
+          "call": "existsSync",
+          "confidence": "ast"
+        },
+        {
+          "by": "packages/rules/src/signals.ts",
+          "call": "readFileSync",
+          "confidence": "ast"
+        },
+        {
+          "by": "packages/rules/src/stats.ts",
+          "call": "existsSync",
+          "confidence": "ast"
+        },
+        {
+          "by": "packages/rules/src/stats.ts",
+          "call": "readFileSync",
+          "confidence": "ast"
+        }
+      ],
+      "target": ".claude",
+      "writers": [
+        {
+          "by": "packages/cli/src/refresh.ts",
+          "confidence": "ast"
+        },
+        {
+          "by": "packages/rules/src/signals.ts",
+          "confidence": "ast"
+        }
+      ]
+    },
+    {
+      "readers": [
+        {
+          "by": "packages/rules/src/analyze.ts",
+          "call": "literal",
+          "confidence": "ast"
+        }
+      ],
+      "target": ".claude/CLAUDE.md",
+      "writers": []
+    },
+    {
+      "readers": [
+        {
+          "by": "packages/cli/package.json",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/kernel/package.json",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/memories/package.json",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/rules/package.json",
+          "call": "literal",
+          "confidence": "text"
+        }
+      ],
+      "target": "CHANGELOG.md",
+      "writers": []
+    },
+    {
+      "readers": [
+        {
+          "by": "packages/cli/package.json",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/kernel/README.es.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/kernel/README.fr.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/kernel/README.hi.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/kernel/README.it.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/kernel/README.ja.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/kernel/README.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/kernel/README.pt-BR.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/kernel/README.zh.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/kernel/package.json",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/memories/package.json",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/rules/README.es.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/rules/README.fr.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/rules/README.hi.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/rules/README.it.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/rules/README.ja.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/rules/README.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/rules/README.pt-BR.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/rules/README.zh.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/rules/package.json",
+          "call": "literal",
+          "confidence": "text"
+        }
+      ],
+      "target": "LICENSE",
+      "writers": []
+    },
+    {
+      "readers": [
+        {
+          "by": "README.fr.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "README.hi.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "README.it.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "README.ja.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "README.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "README.pt-BR.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "README.zh.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/kernel/README.fr.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/kernel/README.hi.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/kernel/README.it.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/kernel/README.ja.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/kernel/README.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/kernel/README.pt-BR.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/kernel/README.zh.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/memories/README.fr.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/memories/README.hi.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/memories/README.it.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/memories/README.ja.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/memories/README.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/memories/README.pt-BR.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/memories/README.zh.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/rules/README.fr.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/rules/README.hi.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/rules/README.it.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/rules/README.ja.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/rules/README.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/rules/README.pt-BR.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/rules/README.zh.md",
+          "call": "literal",
+          "confidence": "text"
+        }
+      ],
+      "target": "README.es.md",
+      "writers": []
+    },
+    {
+      "readers": [
+        {
+          "by": "README.es.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "README.hi.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "README.it.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "README.ja.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "README.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "README.pt-BR.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "README.zh.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/kernel/README.es.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/kernel/README.hi.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/kernel/README.it.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/kernel/README.ja.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/kernel/README.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/kernel/README.pt-BR.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/kernel/README.zh.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/memories/README.es.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/memories/README.hi.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/memories/README.it.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/memories/README.ja.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/memories/README.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/memories/README.pt-BR.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/memories/README.zh.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/rules/README.es.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/rules/README.hi.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/rules/README.it.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/rules/README.ja.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/rules/README.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/rules/README.pt-BR.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/rules/README.zh.md",
+          "call": "literal",
+          "confidence": "text"
+        }
+      ],
+      "target": "README.fr.md",
+      "writers": []
+    },
+    {
+      "readers": [
+        {
+          "by": "README.es.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "README.fr.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "README.it.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "README.ja.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "README.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "README.pt-BR.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "README.zh.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/kernel/README.es.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/kernel/README.fr.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/kernel/README.it.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/kernel/README.ja.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/kernel/README.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/kernel/README.pt-BR.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/kernel/README.zh.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/memories/README.es.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/memories/README.fr.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/memories/README.it.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/memories/README.ja.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/memories/README.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/memories/README.pt-BR.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/memories/README.zh.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/rules/README.es.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/rules/README.fr.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/rules/README.it.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/rules/README.ja.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/rules/README.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/rules/README.pt-BR.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/rules/README.zh.md",
+          "call": "literal",
+          "confidence": "text"
+        }
+      ],
+      "target": "README.hi.md",
+      "writers": []
+    },
+    {
+      "readers": [
+        {
+          "by": "README.es.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "README.fr.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "README.hi.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "README.ja.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "README.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "README.pt-BR.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "README.zh.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/kernel/README.es.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/kernel/README.fr.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/kernel/README.hi.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/kernel/README.ja.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/kernel/README.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/kernel/README.pt-BR.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/kernel/README.zh.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/memories/README.es.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/memories/README.fr.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/memories/README.hi.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/memories/README.ja.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/memories/README.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/memories/README.pt-BR.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/memories/README.zh.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/rules/README.es.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/rules/README.fr.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/rules/README.hi.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/rules/README.ja.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/rules/README.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/rules/README.pt-BR.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/rules/README.zh.md",
+          "call": "literal",
+          "confidence": "text"
+        }
+      ],
+      "target": "README.it.md",
+      "writers": []
+    },
+    {
+      "readers": [
+        {
+          "by": "README.es.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "README.fr.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "README.hi.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "README.it.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "README.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "README.pt-BR.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "README.zh.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/kernel/README.es.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/kernel/README.fr.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/kernel/README.hi.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/kernel/README.it.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/kernel/README.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/kernel/README.pt-BR.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/kernel/README.zh.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/memories/README.es.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/memories/README.fr.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/memories/README.hi.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/memories/README.it.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/memories/README.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/memories/README.pt-BR.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/memories/README.zh.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/rules/README.es.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/rules/README.fr.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/rules/README.hi.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/rules/README.it.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/rules/README.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/rules/README.pt-BR.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/rules/README.zh.md",
+          "call": "literal",
+          "confidence": "text"
+        }
+      ],
+      "target": "README.ja.md",
+      "writers": []
+    },
+    {
+      "readers": [
+        {
+          "by": "README.es.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "README.fr.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "README.hi.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "README.it.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "README.ja.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "README.pt-BR.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "README.zh.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/cli/package.json",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/kernel/README.es.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/kernel/README.fr.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/kernel/README.hi.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/kernel/README.it.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/kernel/README.ja.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/kernel/README.pt-BR.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/kernel/README.zh.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/kernel/package.json",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/memories/README.es.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/memories/README.fr.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/memories/README.hi.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/memories/README.it.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/memories/README.ja.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/memories/README.pt-BR.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/memories/README.zh.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/memories/package.json",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/rules/README.es.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/rules/README.fr.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/rules/README.hi.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/rules/README.it.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/rules/README.ja.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/rules/README.pt-BR.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/rules/README.zh.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/rules/package.json",
+          "call": "literal",
+          "confidence": "text"
+        }
+      ],
+      "target": "README.md",
+      "writers": []
+    },
+    {
+      "readers": [
+        {
+          "by": "README.es.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "README.fr.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "README.hi.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "README.it.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "README.ja.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "README.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "README.zh.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/kernel/README.es.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/kernel/README.fr.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/kernel/README.hi.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/kernel/README.it.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/kernel/README.ja.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/kernel/README.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/kernel/README.zh.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/memories/README.es.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/memories/README.fr.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/memories/README.hi.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/memories/README.it.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/memories/README.ja.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/memories/README.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/memories/README.zh.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/rules/README.es.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/rules/README.fr.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/rules/README.hi.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/rules/README.it.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/rules/README.ja.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/rules/README.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/rules/README.zh.md",
+          "call": "literal",
+          "confidence": "text"
+        }
+      ],
+      "target": "README.pt-BR.md",
+      "writers": []
+    },
+    {
+      "readers": [
+        {
+          "by": "README.es.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "README.fr.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "README.hi.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "README.it.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "README.ja.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "README.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "README.pt-BR.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/kernel/README.es.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/kernel/README.fr.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/kernel/README.hi.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/kernel/README.it.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/kernel/README.ja.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/kernel/README.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/kernel/README.pt-BR.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/memories/README.es.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/memories/README.fr.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/memories/README.hi.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/memories/README.it.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/memories/README.ja.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/memories/README.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/memories/README.pt-BR.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/rules/README.es.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/rules/README.fr.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/rules/README.hi.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/rules/README.it.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/rules/README.ja.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/rules/README.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/rules/README.pt-BR.md",
+          "call": "literal",
+          "confidence": "text"
+        }
+      ],
+      "target": "README.zh.md",
+      "writers": []
+    },
+    {
+      "readers": [
+        {
+          "by": "packages/memories/package.json",
+          "call": "literal",
+          "confidence": "text"
+        }
+      ],
+      "target": "SCORECARD.md",
+      "writers": []
+    },
+    {
+      "readers": [
+        {
+          "by": "packages/kernel/package.json",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/memories/package.json",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/rules/package.json",
+          "call": "literal",
+          "confidence": "text"
+        }
+      ],
+      "target": "SECURITY.md",
+      "writers": []
+    },
+    {
+      "readers": [
+        {
+          "by": "packages/memories/package.json",
+          "call": "literal",
+          "confidence": "text"
+        }
+      ],
+      "target": "SHIP_GATE.md",
+      "writers": []
+    },
+    {
+      "readers": [
+        {
+          "by": "apps/hook/esbuild.config.mjs",
+          "call": "readFileSync",
+          "confidence": "ast"
+        },
+        {
+          "by": "package-lock.json",
+          "call": "literal",
+          "confidence": "text"
+        }
+      ],
+      "target": "apps/hook",
+      "writers": []
+    },
+    {
+      "readers": [
+        {
+          "by": "apps/hook/esbuild.config.mjs",
+          "call": "literal",
+          "confidence": "ast"
+        },
+        {
+          "by": "packages/cli/src/doctor.ts",
+          "call": "literal",
+          "confidence": "ast"
+        },
+        {
+          "by": "packages/cli/src/hook.ts",
+          "call": "literal",
+          "confidence": "ast"
+        }
+      ],
+      "target": "apps/hook/loadout-hook.mjs",
+      "writers": []
+    },
+    {
+      "readers": [
+        {
+          "by": "README.es.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "README.fr.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "README.hi.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "README.it.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "README.ja.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "README.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "README.pt-BR.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "README.zh.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "SHIP_GATE.md",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/cli/README.md",
+          "call": "raw-url",
+          "confidence": "text",
+          "ref": "main",
+          "repo": "mcp-tool-shop-org/loadout-os"
+        },
+        {
+          "by": "packages/kernel/package.json",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/memories/package.json",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/rules/package.json",
+          "call": "literal",
+          "confidence": "text"
+        }
+      ],
+      "target": "logo.png",
+      "writers": []
+    },
+    {
+      "readers": [
+        {
+          "by": ".github/workflows/release.yml"
+        },
+        {
+          "by": "packages/rules/package.json",
+          "call": "literal",
+          "confidence": "text"
+        }
+      ],
+      "target": "package.json",
+      "writers": []
+    },
+    {
+      "readers": [
+        {
+          "by": "package-lock.json",
+          "call": "literal",
+          "confidence": "text"
+        },
+        {
+          "by": "packages/cli/esbuild.config.mjs",
+          "call": "readFileSync",
+          "confidence": "ast"
+        }
+      ],
+      "target": "packages/cli",
+      "writers": []
+    },
+    {
+      "readers": [
+        {
+          "by": ".github/workflows/release.yml"
+        },
+        {
+          "by": "packages/cli/src/cli.ts",
+          "call": "readFileSync",
+          "confidence": "ast"
+        }
+      ],
+      "target": "packages/cli/package.json",
+      "writers": []
+    },
+    {
+      "readers": [
+        {
+          "by": "packages/cli/esbuild.config.mjs",
+          "call": "literal",
+          "confidence": "ast"
+        }
+      ],
+      "target": "packages/cli/src/cli.ts",
+      "writers": []
+    },
+    {
+      "readers": [
+        {
+          "by": "package-lock.json",
+          "call": "literal",
+          "confidence": "text"
+        }
+      ],
+      "target": "packages/kernel",
+      "writers": []
+    },
+    {
+      "readers": [
+        {
+          "by": "packages/kernel/src/cli.ts",
+          "call": "readFileSync",
+          "confidence": "ast"
+        }
+      ],
+      "target": "packages/kernel/package.json",
+      "writers": []
+    },
+    {
+      "readers": [
+        {
+          "by": "package-lock.json",
+          "call": "literal",
+          "confidence": "text"
+        }
+      ],
+      "target": "packages/memories",
+      "writers": []
+    },
+    {
+      "readers": [
+        {
+          "by": "packages/memories/src/cli.ts",
+          "call": "readFileSync",
+          "confidence": "ast"
+        }
+      ],
+      "target": "packages/memories/package.json",
+      "writers": []
+    },
+    {
+      "readers": [
+        {
+          "by": "package-lock.json",
+          "call": "literal",
+          "confidence": "text"
+        }
+      ],
+      "target": "packages/rules",
+      "writers": []
+    },
+    {
+      "readers": [
+        {
+          "by": "packages/rules/src/cli.ts",
+          "call": "readFileSync",
+          "confidence": "ast"
+        }
+      ],
+      "target": "packages/rules/package.json",
+      "writers": []
+    }
+  ],
+  "overlaps": [],
+  "submodules": [],
+  "symlinks": [],
+  "testFiles": 45,
+  "unassigned": []
+}
