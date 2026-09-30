@@ -1,4 +1,8 @@
 {
+  "authorship": {
+    "parts": [],
+    "places": []
+  },
   "boundaries": [
     {
       "breakage": {
@@ -163,8 +167,8 @@
         "path": ".claude/CLAUDE.md"
       },
       {
-        "commits": 3,
-        "lines": 48,
+        "commits": 7,
+        "lines": 280,
         "path": ".github/workflows/ci.yml"
       },
       {
@@ -273,13 +277,43 @@
         "path": "apps/hook/smoke-test.ps1"
       },
       {
+        "commits": 2,
+        "lines": 172,
+        "path": "atlas/README.md"
+      },
+      {
+        "commits": 2,
+        "lines": 76,
+        "path": "atlas/boundaries.yaml"
+      },
+      {
+        "commits": 2,
+        "lines": 602,
+        "path": "atlas/page.json"
+      },
+      {
+        "commits": 2,
+        "lines": 4332,
+        "path": "atlas/statistics.json"
+      },
+      {
+        "commits": 2,
+        "lines": 8578,
+        "path": "atlas/structure.json"
+      },
+      {
+        "commits": 2,
+        "lines": 36,
+        "path": "codecov.yml"
+      },
+      {
         "commits": 1,
         "lines": 0,
         "path": "logo.png"
       },
       {
-        "commits": 7,
-        "lines": 1467,
+        "commits": 9,
+        "lines": 1483,
         "path": "package-lock.json"
       },
       {
@@ -788,8 +822,8 @@
         "path": "packages/kernel/logo.png"
       },
       {
-        "commits": 1,
-        "lines": 63,
+        "commits": 3,
+        "lines": 65,
         "path": "packages/kernel/package.json"
       },
       {
@@ -1318,8 +1352,8 @@
         "path": "packages/memories/logo.png"
       },
       {
-        "commits": 1,
-        "lines": 58,
+        "commits": 3,
+        "lines": 60,
         "path": "packages/memories/package.json"
       },
       {
@@ -1863,8 +1897,8 @@
         "path": "packages/rules/logo.png"
       },
       {
-        "commits": 2,
-        "lines": 56,
+        "commits": 4,
+        "lines": 58,
         "path": "packages/rules/package.json"
       },
       {
@@ -2113,19 +2147,19 @@
         "path": "site/tsconfig.json"
       },
       {
-        "commits": 1,
-        "lines": 12,
+        "commits": 3,
+        "lines": 16,
         "path": "tsconfig.base.json"
       }
     ]
   },
   "confidence": {
     "level": "low",
-    "reason": "fewer than 20 source files reach 10 revisions in the window"
+    "reason": "fewer than 25 source files reach 10 revisions in the window"
   },
-  "generatedAt": "2026-09-23T17:44:16.191Z",
+  "generatedAt": "2026-09-30T21:29:07.823Z",
   "generatedFrom": {
-    "commit": "741a0923029b4c5c494f6a2f0089c08f18a6d8e7"
+    "commit": "532deeed98d8a72bc4c8ada226db1f9024dc5dfb"
   },
   "pairs": [],
   "parameters": {
@@ -2136,16 +2170,18 @@
     "couplingPopulation": "source",
     "fallenShared": 3,
     "floor": "fallen",
+    "floorHeld": false,
     "floorTrigger": "revision-depth",
-    "headDate": "2026-09-17T19:04:50-07:00",
-    "inScopeFiles": 381,
+    "headDate": "2026-09-30T14:25:41-07:00",
+    "inScopeFiles": 387,
     "pinnedStart": null,
-    "qualifyingCommits": 32,
+    "priorFloor": "fallen",
+    "qualifyingCommits": 36,
     "qualifyingMinimum": 30,
     "revisions": 5,
     "shared": 10,
     "sharedFloorUsed": 3,
-    "since": "2026-03-22T02:04:50.000Z",
+    "since": "2026-04-03T21:25:41.000Z",
     "sourceExtensions": [
       ".js",
       ".mjs",
@@ -2155,9 +2191,12 @@
       ".tsx",
       ".mts",
       ".cts",
-      ".py"
+      ".py",
+      ".rs",
+      ".gd"
     ],
     "sourceFileReach": 20,
+    "sourceFileRise": 25,
     "sourceFilesReachingStrongFloor": 0,
     "strength": 0.5,
     "windowDays": 180
