@@ -58,9 +58,9 @@
 ## E. Identity (soft gate — does not block ship)
 
 - [x] `[all]` Logo in README header (2026-06-16) — `README.md:1` `<img src="logo.png" alt="loadout-os" width="500">` (`logo.png` present in repo root).
-- [ ] `[all]` Translations (polyglot-mcp, 8 languages) — COORDINATOR / publish-time: run before npm publish + GitHub release (per global release-ordering rule). Not done here.
+- [x] `[all]` Translations (polyglot-mcp, 8 languages) (2026-10-07, v1.0.4) — TranslateGemma 27B on the local GPU, run before the tag; all 7 files ok, structure matches the English README.
 - [x] `[org]` Landing page (@mcptoolshop/site-theme) (2026-06-16) — Starlight site under `site/` with the handbook wired to the landing page (README "Documentation" links to `https://mcp-tool-shop-org.github.io/loadout-os/handbook/`); `pages.yml` workflow present.
-- [ ] `[all]` GitHub repo metadata: description, homepage, topics — COORDINATOR: set via `gh repo edit` at publish time. Not done here.
+- [x] `[all]` GitHub repo metadata: description, homepage, topics (verified 2026-10-07) — description is the front-door one-liner, homepage is the landing page, nine topics set.
 
 ---
 

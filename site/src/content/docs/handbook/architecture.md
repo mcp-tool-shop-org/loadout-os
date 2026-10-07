@@ -46,7 +46,20 @@ The matching, merging, and validation modules are pure functions with no side ef
 
 ### Memories adapter
 
-Parses a `MEMORY.md` store for topic references in arrow format (`Topic Name — description → path`), reads each topic file, extracts keywords from headings and content, and generates a kernel-compatible dispatch table. Topic files may carry optional frontmatter (`id`, `keywords`, `patterns`, `priority`, `triggers`) for fine-grained routing control; without it, keywords are auto-extracted. `validate` catches missing topic files, orphans, duplicate references, and over-long ids/summaries.
+Parses a `MEMORY.md` store for topic references, reads each topic file, extracts keywords from headings and content, and generates a kernel-compatible dispatch table. Topic files may carry optional frontmatter (`id`, `keywords`, `patterns`, `priority`, `triggers`) for fine-grained routing control; without it, keywords are auto-extracted. `validate` catches missing topic files, orphans, duplicate references, and over-long ids/summaries.
+
+Two reference styles are recognised, and a store can mix them:
+
+```markdown
+- [Docs as you go](Feedback/feedback_docs_as_you_go.md) — update docs after each merge
+- **⭐ [Release notes](memory/release-notes.md)** — what shipped and when
+- AI Loadout — routing core → `memory/ai-loadout.md`
+```
+
+- **Markdown links** (the format Claude Code's memory instructions write): the link must be the bullet's first token, optionally bolded and led by a short status marker. The link text becomes the entry's name, and the text after the link becomes its summary. An em-dash inside the link text separates a name from a subtitle.
+- **Arrow references**: `Name — description → path`, with or without backticks around the path.
+
+A link inside a sentence is treated as a citation, not an entry. So are URLs, absolute paths, globs and non-`.md` targets. Those lines never become dispatch entries.
 
 ### Rules adapter
 

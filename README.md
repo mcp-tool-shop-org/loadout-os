@@ -1,10 +1,16 @@
 <p align="center">
-  <a href="README.ja.md">日本語</a> | <a href="README.zh.md">中文</a> | <a href="README.es.md">Español</a> | <a href="README.fr.md">Français</a> | <a href="README.hi.md">हिन्दी</a> | <a href="README.it.md">Italiano</a> | <a href="README.pt-BR.md">Português (BR)</a>
+  <a href="README.md">English</a> | <a href="README.ja.md">日本語</a> | <a href="README.zh.md">中文</a> | <a href="README.es.md">Español</a> | <a href="README.fr.md">Français</a> | <a href="README.hi.md">हिन्दी</a> | <a href="README.it.md">Italiano</a> | <a href="README.pt-BR.md">Português (BR)</a>
 </p>
 
-<p align="center"><img src="logo.png" alt="loadout-os" width="500"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/mcp-tool-shop-org/brand/main/logos/loadout-os/readme.png" alt="loadout-os" width="400"></p>
 
-
+<p align="center">
+  <a href="https://github.com/mcp-tool-shop-org/loadout-os/actions/workflows/ci.yml"><img src="https://github.com/mcp-tool-shop-org/loadout-os/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://codecov.io/gh/mcp-tool-shop-org/loadout-os"><img src="https://codecov.io/gh/mcp-tool-shop-org/loadout-os/graph/badge.svg" alt="Coverage"></a>
+  <a href="https://www.npmjs.com/package/@mcptoolshop/loadout-os"><img src="https://img.shields.io/npm/v/@mcptoolshop/loadout-os" alt="npm version"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT License"></a>
+  <a href="https://mcp-tool-shop-org.github.io/loadout-os/"><img src="https://img.shields.io/badge/landing-page-blue" alt="Landing Page"></a>
+</p>
 
 **A Knowledge OS for AI coding agents.** One CLI that routes the right context to the model on demand — instead of dumping every memory file and rule into the context window at the start of each session.
 
@@ -17,7 +23,7 @@ loadout-os unifies four surfaces under one `loadout-os` binary:
 | Surface | What it does |
 |---|---|
 | **Kernel** (knowledge router) | Deterministic keyword/pattern matcher, hierarchical layered resolver (global → org → project → session), and the agent runtime contract. Core entries always load; domain entries load on match; manual entries load on explicit lookup. |
-| **Memories adapter** | Turns a `MEMORY.md` store into a machine-readable dispatch table and lints it (missing files, orphans, duplicates, over-long entries). |
+| **Memories adapter** | Turns a `MEMORY.md` store into a machine-readable dispatch table and lints it (missing files, orphans, duplicates, over-long entries). Reads both index styles: Claude Code's own `- [Title](file.md) — hook` links and `Name — description → path` arrow references. |
 | **Rules adapter** | Splits a bloated `CLAUDE.md` into a lean always-loaded index plus on-demand rule files, and validates frontmatter against the index. |
 | **Runtime hook** | A `UserPromptSubmit` hook that injects ≤5 pointer lines (≤200 tokens) to the entries relevant to your prompt. Fail-silent: every error path exits 0, so a broken hook can never block a prompt. |
 
@@ -73,7 +79,7 @@ The kernel is also importable as a library — `@mcptoolshop/ai-loadout` exposes
 
 ## Why consolidate
 
-Decompose-by-secrets (Parnas 1972) was the clean answer for a team of N humans. For a solo operator plus an LLM crew it is operationally broken: multi-repo work fragments the agent's context across sessions, unpublished adapters rot (only the kernel ever shipped), and advancement serializes across repos. One named umbrella repo with one CLI serves the operator. Full reasoning lives in the canonical memory store (`feedback_consolidate_when_cant_juggle_repos.md`).
+Decompose-by-secrets (Parnas 1972) was the clean answer for a team of N humans. For a solo operator plus an LLM crew it is operationally broken: multi-repo work fragments the agent's context across sessions, unpublished adapters rot (only the kernel ever shipped), and advancement serializes across repos. One named umbrella repo with one CLI serves the operator.
 
 ## Status
 
@@ -92,3 +98,7 @@ Full threat model and reporting process: [SECURITY.md](./SECURITY.md).
 ## License
 
 MIT — matches all upstream sources.
+
+---
+
+<p align="center">Built by <a href="https://mcp-tool-shop.github.io/">MCP Tool Shop</a></p>
