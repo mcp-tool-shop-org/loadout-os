@@ -172,4 +172,66 @@ See also: the post-proof balance tuning notes live at \`memory/post-proof-balanc
     assert.equal(refs[0].name, "MyTopic");
     assert.equal(refs[0].path, "memory/my-topic.md");
   });
+
+  it("parses Markdown-link entries in Claude Code's index format (MEM-B12)", () => {
+    const content = `## Feedback corrections (index)
+
+- [Docs as you go](Feedback/feedback_docs_as_you_go.md) — Director 2026-09-25: update docs after each merge
+- [python-gpu — GPU Python on the rig](python-gpu.md) — run CUDA scripts with \`python-gpu\`
+- **[Bold entry](bold.md)** — emphasised in the index
+- [No hook](no-hook.md)
+* [Anchored](anchored.md#section): colon separator
+`;
+    const { refs, sections } = parseMemoryMd(content);
+    assert.equal(refs.length, 5);
+    assert.deepEqual(refs.map((r) => r.path), [
+      "Feedback/feedback_docs_as_you_go.md", "python-gpu.md", "bold.md", "no-hook.md", "anchored.md",
+    ]);
+    assert.equal(refs[0].name, "Docs as you go");
+    assert.equal(refs[0].description, "Director 2026-09-25: update docs after each merge");
+    // An em-dash inside the link text splits name from subtitle; the text after
+    // the link still wins as the description.
+    assert.equal(refs[1].name, "python-gpu");
+    assert.equal(refs[1].description, "run CUDA scripts with `python-gpu`");
+    assert.equal(refs[3].description, "");
+    assert.equal(refs[4].description, "colon separator");
+    assert.equal(sections[0].entries.length, 5);
+  });
+
+  it("accepts a short status marker before the link (MEM-B12)", () => {
+    const content = `- **⭐ [ai-rpg-engine v3.9.0 SHIPPED](memory/ai-rpg-engine-v39.md)** — 2026-08-31: authoring loop
+- ✅ [Done thing](done.md) — shipped
+- some words [Not first](not-first.md) — prose, not an entry
+`;
+    const { refs } = parseMemoryMd(content);
+    assert.deepEqual(refs.map((r) => r.path), ["memory/ai-rpg-engine-v39.md", "done.md"]);
+    assert.equal(refs[0].name, "ai-rpg-engine v3.9.0 SHIPPED");
+    assert.equal(refs[0].description, "2026-08-31: authoring loop");
+  });
+
+  it("falls back to the link text's subtitle when nothing follows the link (MEM-B12)", () => {
+    const { refs } = parseMemoryMd("- [Topic — what it covers](topic.md)\n");
+    assert.equal(refs.length, 1);
+    assert.equal(refs[0].name, "Topic");
+    assert.equal(refs[0].description, "what it covers");
+  });
+
+  it("rejects Markdown links that are citations, URLs or absolute paths (MEM-B12)", () => {
+    const content = `- See [the protocol](protocol.md) for details
+Full frame in [user profile](user_profile.md).
+- [Site](https://example.com/readme.md) — external
+- [Abs](C:/Users/x/memory/abs.md) — absolute
+- [Root](/memory/root.md) — posix absolute
+- [Glob](memory/*.md) — glob
+- [Not markdown](notes.txt) — wrong extension
+`;
+    const { refs } = parseMemoryMd(content);
+    assert.equal(refs.length, 0, `expected no refs, got ${JSON.stringify(refs.map((r) => r.path))}`);
+  });
+
+  it("keeps arrow lines on the arrow branch even when they contain a link (MEM-B12 regression guard)", () => {
+    const { refs } = parseMemoryMd("- [Old](old.md) Topic — desc → `memory/topic.md`\n");
+    assert.equal(refs.length, 1);
+    assert.equal(refs[0].path, "memory/topic.md");
+  });
 });

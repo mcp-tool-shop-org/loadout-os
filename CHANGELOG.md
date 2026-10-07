@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+
+- **Markdown-link index entries were never parsed** (MEM-B12): the MEMORY.md parser's
+  header promised Markdown links, but no branch handled them, so every entry written
+  as `- [Title](file.md) — hook` was dropped. That is the format Claude Code's own
+  memory instructions prescribe. Each such entry was left out of the dispatch index and
+  reported `ORPHAN_TOPIC_FILE` even though MEMORY.md links it, so the UserPromptSubmit
+  hook never surfaced any memory written that way. The parser now accepts a bullet whose
+  first token is a link to a relative `.md` file, optionally bolded and led by a short
+  status marker (`- **⭐ [Title](memory/x.md)** — hook`). The text after the link
+  becomes the description. An em-dash inside the link text splits name from subtitle.
+  Gated like MEM-001: links inside prose, URLs, absolute paths, globs and non-`.md`
+  targets are rejected, and arrow-format lines keep their existing branch. On the
+  canonical store the index went 542 → 559 entries and orphan warnings 39 → 24. The
+  change also surfaced one link that pointed at the wrong directory.
+
 ## [1.0.3] - 2026-09-07
 
 ### Fixed
