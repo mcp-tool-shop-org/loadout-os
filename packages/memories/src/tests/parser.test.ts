@@ -220,7 +220,7 @@ See also: the post-proof balance tuning notes live at \`memory/post-proof-balanc
     const content = `- See [the protocol](protocol.md) for details
 Full frame in [user profile](user_profile.md).
 - [Site](https://example.com/readme.md) — external
-- [Abs](C:/Users/x/memory/abs.md) — absolute
+- [Abs](D:/notes/abs.md) — absolute
 - [Root](/memory/root.md) — posix absolute
 - [Glob](memory/*.md) — glob
 - [Not markdown](notes.txt) — wrong extension
