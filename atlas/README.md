@@ -1,14 +1,14 @@
 # loadout-os: how it works
 
-Mapped at 2026-11-08 from commit 97f2e9e by Atlas 1.24.0.
+Mapped at 2026-11-08 from commit c838284 by Atlas 1.24.0.
 
 ## What this is
 
 9 parts, mostly Markdown (236 files); code in TypeScript (85), CSS (8), JavaScript (7), Astro (4) and PowerShell (1). Work enters through 6 doors; the busiest is CI, which reaches 6 parts. It publishes @mcptoolshop/loadout-os to npm. It deploys a site to GitHub Pages. People run ai-loadout, claude-memories, claude-rules and loadout-os.
 
-## What changed since 2026-11-08 (0c72069)
+## What changed since 2026-11-08 (97f2e9e)
 
-Nothing structural changed since 2026-11-08; 15 files changed content.
+Nothing structural changed since 2026-11-08; 2 files changed content.
 
 ## What comes in
 
@@ -53,12 +53,13 @@ CI writes only to .claude/loadout/, which is not tracked.
 
 ## What tends to change together
 
-- **packages/cli/src/cli.ts** and **packages/cli/src/help.ts** changed together in 5 of 7 commits, inside the cli part.
-- **packages/cli/src/cli.ts** and **packages/cli/src/tests/help.test.ts** changed together in 5 of 7 commits, inside the cli part.
-- **packages/memories/src/index-gen.ts** and **packages/memories/src/validate.ts** changed together in 5 of 7 commits, inside the memories part.
-- **packages/memories/src/tests/index-gen.test.ts** and **packages/memories/src/validate.ts** changed together in 4 of 7 commits, inside the memories part.
+- **packages/cli/src/cli.ts** and **packages/cli/src/help.ts** changed together in 6 of 8 commits, inside the cli part.
+- **packages/memories/src/index-gen.ts** and **packages/memories/src/validate.ts** changed together in 6 of 8 commits, inside the memories part.
+- **packages/memories/src/tests/index-gen.test.ts** and **packages/memories/src/tests/validate.test.ts** changed together in 5 of 7 commits, inside the memories part.
+- **packages/cli/src/cli.ts** and **packages/cli/src/tests/help.test.ts** changed together in 5 of 8 commits, inside the cli part.
+- **packages/memories/src/index-gen.ts** and **packages/memories/src/tests/validate.test.ts** changed together in 5 of 8 commits, inside the memories part.
 
-4 files changed together with their own tests, as expected.
+5 files changed together with their own tests, as expected.
 
 Confidence is low: fewer than 25 source files reach 10 revisions in the window.
 

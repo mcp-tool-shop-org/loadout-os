@@ -37,6 +37,14 @@ function hasExplicitPriority(content: string): boolean {
   return false;
 }
 
+function stripSurroundingQuotes(s: string): string {
+  const t = s.trim();
+  if (t.length >= 2 && ((t.startsWith('"') && t.endsWith('"')) || (t.startsWith("'") && t.endsWith("'")))) {
+    return t.slice(1, -1).trim();
+  }
+  return t;
+}
+
 /**
  * Check if the raw YAML frontmatter block explicitly declared a non-empty `id:` line.
  */
@@ -47,9 +55,9 @@ export function hasExplicitId(content: string): boolean {
   for (let i = 1; i < lines.length; i++) {
     const t = lines[i].trim();
     if (t === "---") break;
-    const m = t.match(/^id\s*:\s*(.*)$/);
-    if (m) {
-      const val = m[1].trim().replace(/^["']|["']$/g, "").trim();
+    const colonIdx = t.indexOf(":");
+    if (colonIdx !== -1 && t.slice(0, colonIdx).trim() === "id") {
+      const val = stripSurroundingQuotes(t.slice(colonIdx + 1));
       if (val.length > 0) return true;
     }
   }
@@ -70,11 +78,14 @@ function parseRawMemoryIdSource(rawMemory: string): IdSource | undefined {
   for (let i = 1; i < lines.length; i++) {
     const t = lines[i].trim();
     if (t === "---") break;
-    const m = t.match(/^(?:idSource|id_source)\s*:\s*(.*)$/);
-    if (m) {
-      const rawVal = m[1].trim().replace(/^["']|["']$/g, "").trim();
-      const parsed = normalizeIdSource(rawVal);
-      if (parsed) return parsed;
+    const colonIdx = t.indexOf(":");
+    if (colonIdx !== -1) {
+      const key = t.slice(0, colonIdx).trim();
+      if (key === "idSource" || key === "id_source") {
+        const rawVal = stripSurroundingQuotes(t.slice(colonIdx + 1));
+        const parsed = normalizeIdSource(rawVal);
+        if (parsed) return parsed;
+      }
     }
   }
   return undefined;

@@ -2516,7 +2516,7 @@
                 {
                   "inner": [
                     {
-                      "line": 120,
+                      "line": 131,
                       "name": "parseFrontmatter",
                       "target": {
                         "file": "packages/kernel/src/index.ts"
@@ -2524,28 +2524,28 @@
                       "via": "resolveStoreIdSource"
                     },
                     {
-                      "line": 160,
+                      "line": 171,
                       "name": "resolveRefPath",
                       "target": {
                         "file": "packages/memories/src/paths.ts"
                       }
                     },
                     {
-                      "line": 193,
+                      "line": 204,
                       "name": "detectSubindex",
                       "target": {
                         "file": "packages/memories/src/analyze.ts"
                       }
                     },
                     {
-                      "line": 197,
+                      "line": 208,
                       "name": "parseFrontmatter",
                       "target": {
                         "file": "packages/kernel/src/index.ts"
                       }
                     },
                     {
-                      "line": 311,
+                      "line": 322,
                       "name": "extractKeywords",
                       "target": {
                         "file": "packages/memories/src/analyze.ts"
@@ -2553,7 +2553,7 @@
                       "via": "entryFromFrontmatter"
                     },
                     {
-                      "line": 337,
+                      "line": 348,
                       "name": "estimateTokens",
                       "target": {
                         "file": "packages/kernel/src/index.ts"
@@ -2561,7 +2561,7 @@
                       "via": "entryFromFrontmatter"
                     },
                     {
-                      "line": 350,
+                      "line": 361,
                       "name": "extractKeywords",
                       "target": {
                         "file": "packages/memories/src/analyze.ts"
@@ -2569,7 +2569,7 @@
                       "via": "entryFromContent"
                     },
                     {
-                      "line": 365,
+                      "line": 376,
                       "name": "estimateTokens",
                       "target": {
                         "file": "packages/kernel/src/index.ts"
@@ -2752,15 +2752,15 @@
             {
               "in": "resolveStoreIdSource",
               "kind": "catch",
-              "line": 106
+              "line": 117
             },
             {
               "in": "resolveStoreIdSource",
               "kind": "catch",
-              "line": 115
+              "line": 126
             }
           ],
-          "hash": "e16b0304747b9f1719f60e2ac52b215902ef723c85923a06c269f3d8de73cbd4",
+          "hash": "ad0c0d683f1e8665c016f002092cf59ae27b5a0b92ab9dd257fcd4c155ad7fda",
           "importsFiles": [
             "packages/kernel/src/index.ts",
             "packages/memories/src/analyze.ts",
@@ -2787,7 +2787,7 @@
             {
               "calls": [
                 {
-                  "line": 120,
+                  "line": 131,
                   "name": "parseFrontmatter",
                   "target": {
                     "file": "packages/kernel/src/index.ts"
@@ -2802,7 +2802,7 @@
             {
               "calls": [
                 {
-                  "line": 120,
+                  "line": 131,
                   "name": "parseFrontmatter",
                   "target": {
                     "file": "packages/kernel/src/index.ts"
@@ -2810,28 +2810,28 @@
                   "via": "resolveStoreIdSource"
                 },
                 {
-                  "line": 160,
+                  "line": 171,
                   "name": "resolveRefPath",
                   "target": {
                     "file": "packages/memories/src/paths.ts"
                   }
                 },
                 {
-                  "line": 193,
+                  "line": 204,
                   "name": "detectSubindex",
                   "target": {
                     "file": "packages/memories/src/analyze.ts"
                   }
                 },
                 {
-                  "line": 197,
+                  "line": 208,
                   "name": "parseFrontmatter",
                   "target": {
                     "file": "packages/kernel/src/index.ts"
                   }
                 },
                 {
-                  "line": 311,
+                  "line": 322,
                   "name": "extractKeywords",
                   "target": {
                     "file": "packages/memories/src/analyze.ts"
@@ -2839,7 +2839,7 @@
                   "via": "entryFromFrontmatter"
                 },
                 {
-                  "line": 337,
+                  "line": 348,
                   "name": "estimateTokens",
                   "target": {
                     "file": "packages/kernel/src/index.ts"
@@ -2847,7 +2847,7 @@
                   "via": "entryFromFrontmatter"
                 },
                 {
-                  "line": 350,
+                  "line": 361,
                   "name": "extractKeywords",
                   "target": {
                     "file": "packages/memories/src/analyze.ts"
@@ -2855,7 +2855,7 @@
                   "via": "entryFromContent"
                 },
                 {
-                  "line": 365,
+                  "line": 376,
                   "name": "estimateTokens",
                   "target": {
                     "file": "packages/kernel/src/index.ts"
@@ -2871,14 +2871,14 @@
             {
               "calls": [
                 {
-                  "line": 311,
+                  "line": 322,
                   "name": "extractKeywords",
                   "target": {
                     "file": "packages/memories/src/analyze.ts"
                   }
                 },
                 {
-                  "line": 337,
+                  "line": 348,
                   "name": "estimateTokens",
                   "target": {
                     "file": "packages/kernel/src/index.ts"
@@ -2893,14 +2893,14 @@
             {
               "calls": [
                 {
-                  "line": 350,
+                  "line": 361,
                   "name": "extractKeywords",
                   "target": {
                     "file": "packages/memories/src/analyze.ts"
                   }
                 },
                 {
-                  "line": 365,
+                  "line": 376,
                   "name": "estimateTokens",
                   "target": {
                     "file": "packages/kernel/src/index.ts"
@@ -3119,7 +3119,7 @@
           "testFramework": "node --test"
         },
         {
-          "hash": "b267c19d651856cbaf81e6e81d03cac716bab744ea5d10107637dea6ffc5afd6",
+          "hash": "e050089b1b99ebef0a8faf8268c3dfc228a76b8904824a4f0f3706798f40a7ba",
           "importOrder": [
             "packages/kernel/src/index.ts",
             "packages/memories/src/analyze.ts",
@@ -6383,7 +6383,7 @@
   ],
   "engine": "1.24.0",
   "generatedFrom": {
-    "commit": "97f2e9ef307235c1513cd97d5114b91b658db471",
+    "commit": "c838284447d36e0435d2840d3bc7d11c2b186a21",
     "tracked": 383
   },
   "landings": [

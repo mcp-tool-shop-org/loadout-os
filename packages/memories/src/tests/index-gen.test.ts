@@ -790,7 +790,7 @@ describe("sub-index expansion, frontmatter summary authority, and keyword extrac
         memPath,
         [
           "---",
-          "id_source: name",
+          'id_source: "name"',
           "---",
           "# Memory",
           "- [Mike](user_profile.md) — User profile",
