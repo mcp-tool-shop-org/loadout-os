@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { matchLoadout } from "@mcptoolshop/ai-loadout";
 import { analyzeMemoryMd } from "../analyze.js";
-import { generateIndex } from "../index-gen.js";
+import { generateIndex, hasExplicitId, hasExplicitPriority } from "../index-gen.js";
 import { validateMemory, validateMemoryIndex } from "../validate.js";
 import { syncSummaries, placeOrMoveEntry, resolveTargetIndexFile } from "../sync.js";
 
@@ -866,6 +866,312 @@ describe("sub-index expansion, frontmatter summary authority, and keyword extrac
 
       assert.equal(globalDefault.entries[0].id, "omen-45l-5080-rig");
       assert.equal(projectDefault.entries[0].id, "omen-45l-gaming-desktop");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("reads metadata.priority when top-level priority is absent, lets top-level win on conflict, and preserves archive default manual when neither is set (#19)", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "loadout-issue19-priority-"));
+    try {
+      // 1. Top-level priority: core only
+      writeFileSync(
+        join(tmp, "board-top.md"),
+        [
+          "---",
+          "name: Top Only Board",
+          "description: Board with top-level priority only",
+          "priority: core",
+          "metadata:",
+          "  loadout_inject: session-start",
+          "---",
+          "# Top Only Board",
+          "",
+        ].join("\n"),
+        "utf-8",
+      );
+
+      // 2. metadata.priority: core only — exact shape Claude Code writes on Edit/Write
+      const claudeCodeRewrittenShape = [
+        "---",
+        "name: Rewritten Board",
+        "description: Session-start board rewritten by Claude Code",
+        "metadata:",
+        "  node_type: memory",
+        "  priority: core",
+        "  loadout_inject: session-start",
+        "  originSessionId: 01965a00-0000-7000-8000-000000000001",
+        "  modified: 1731090000000",
+        "---",
+        "# Rewritten Board",
+        "",
+      ].join("\n");
+      writeFileSync(join(tmp, "board-meta.md"), claudeCodeRewrittenShape, "utf-8");
+
+      // 3. Both top-level priority: core and metadata.priority: core
+      writeFileSync(
+        join(tmp, "board-both.md"),
+        [
+          "---",
+          "name: Both Priority Board",
+          "description: Board with both top-level and metadata priority",
+          "priority: core",
+          "metadata:",
+          "  node_type: memory",
+          "  priority: core",
+          "  loadout_inject: session-start",
+          "---",
+          "# Both Priority Board",
+          "",
+        ].join("\n"),
+        "utf-8",
+      );
+
+      // 4. Conflict: top-level priority: domain vs metadata.priority: core -> top-level wins (domain)
+      writeFileSync(
+        join(tmp, "board-conflict.md"),
+        [
+          "---",
+          "name: Conflict Priority Board",
+          "description: Top-level domain beats metadata core",
+          "priority: domain",
+          "metadata:",
+          "  priority: core",
+          "---",
+          "# Conflict Priority Board",
+          "",
+        ].join("\n"),
+        "utf-8",
+      );
+
+      // 5. Archive sub-index with neither top-level nor metadata.priority set (plus a non-metadata indented line)
+      writeFileSync(
+        join(tmp, "index-archive.md"),
+        [
+          "# Archive",
+          "- [Archived Unset](archive-unset.md) — Archived topic without priority",
+          "- [Archived Invalid](archive-invalid.md) — Archived topic with invalid priority",
+          "- [Archived Meta Core](archive-meta-core.md) — Archived topic with metadata.priority: core",
+          "",
+        ].join("\n"),
+        "utf-8",
+      );
+      const archiveUnsetContent = [
+        "---",
+        "name: Archived Unset",
+        "description: Archived topic without priority",
+        "triggers:",
+        "  task: true",
+        "---",
+        "# Archived Unset",
+        "",
+      ].join("\n");
+      writeFileSync(join(tmp, "archive-unset.md"), archiveUnsetContent, "utf-8");
+
+      const archiveInvalidContent = [
+        "---",
+        "name: Archived Invalid",
+        "description: Archived topic with invalid priority value",
+        "metadata:",
+        "  priority: urgent",
+        "---",
+        "# Archived Invalid",
+        "",
+      ].join("\n");
+      writeFileSync(join(tmp, "archive-invalid.md"), archiveInvalidContent, "utf-8");
+
+      writeFileSync(
+        join(tmp, "archive-meta-core.md"),
+        [
+          "---",
+          "name: Archived Meta Core",
+          "description: Archived topic with explicit metadata.priority",
+          "metadata:",
+          "  priority: core",
+          "---",
+          "# Archived Meta Core",
+          "",
+        ].join("\n"),
+        "utf-8",
+      );
+
+      const memPath = join(tmp, "MEMORY.md");
+      writeFileSync(
+        memPath,
+        [
+          "# Memory",
+          "- [Top Only](board-top.md) — Board with top-level priority only",
+          "- [Rewritten](board-meta.md) — Session-start board rewritten by Claude Code",
+          "- [Both](board-both.md) — Board with both top-level and metadata priority",
+          "- [Conflict](board-conflict.md) — Top-level domain beats metadata core",
+          "- [Archive](index-archive.md) — Archive sub-index",
+          "",
+        ].join("\n"),
+        "utf-8",
+      );
+
+      const analysis = analyzeMemoryMd(memPath);
+      const index = generateIndex(analysis);
+      const byPath = new Map(index.entries.map((e) => [e.path, e]));
+
+      assert.equal(byPath.get("board-top.md")?.priority, "core");
+      assert.equal(byPath.get("board-meta.md")?.priority, "core");
+      assert.equal(byPath.get("board-meta.md")?.metadata?.loadout_inject, "session-start");
+      assert.equal(byPath.get("board-meta.md")?.metadata?.node_type, "memory");
+      assert.equal(byPath.get("board-both.md")?.priority, "core");
+      assert.equal(byPath.get("board-conflict.md")?.priority, "domain");
+      assert.equal(byPath.get("archive-unset.md")?.priority, "manual");
+      assert.equal(byPath.get("archive-invalid.md")?.priority, "manual");
+      assert.equal(byPath.get("archive-meta-core.md")?.priority, "core");
+
+      // hasExplicitPriority agrees with what is actually read
+      assert.equal(hasExplicitPriority(claudeCodeRewrittenShape), true);
+      assert.equal(hasExplicitPriority(archiveUnsetContent), false);
+      assert.equal(hasExplicitPriority(archiveInvalidContent), false);
+      assert.equal(
+        hasExplicitPriority("---\nname: X\ntriggers:\n  priority: core\n---\n"),
+        false,
+        "indented priority outside metadata: must not count as explicit",
+      );
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("reads metadata.id when top-level id is absent, lets top-level id win on conflict, and keeps hasExplicitId aligned (#19)", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "loadout-issue19-id-"));
+    try {
+      const metaIdOnly = [
+        "---",
+        "name: Rewritten Topic Name",
+        "description: Topic whose id was moved under metadata",
+        "metadata:",
+        "  node_type: memory",
+        "  id: custom-meta-id",
+        "---",
+        "# Rewritten Topic",
+        "",
+      ].join("\n");
+      writeFileSync(join(tmp, "meta-id.md"), metaIdOnly, "utf-8");
+
+      const conflictId = [
+        "---",
+        "id: top-level-id",
+        "name: Conflict Id Topic",
+        "description: Top-level id beats metadata.id",
+        "metadata:",
+        "  id: nested-meta-id",
+        "---",
+        "# Conflict Id",
+        "",
+      ].join("\n");
+      writeFileSync(join(tmp, "conflict-id.md"), conflictId, "utf-8");
+
+      const nonMetaIndentedId = [
+        "---",
+        "name: Derived Name Topic",
+        "description: Indented id under triggers must be ignored",
+        "triggers:",
+        "  id: bogus-trigger-id",
+        "---",
+        "# Derived Name",
+        "",
+      ].join("\n");
+      writeFileSync(join(tmp, "non-meta-id.md"), nonMetaIndentedId, "utf-8");
+
+      const memPath = join(tmp, "MEMORY.md");
+      writeFileSync(
+        memPath,
+        [
+          "# Memory",
+          "- [Bullet Title One](meta-id.md) — Topic whose id was moved under metadata",
+          "- [Bullet Title Two](conflict-id.md) — Top-level id beats metadata.id",
+          "- [Bullet Title Three](non-meta-id.md) — Indented id under triggers must be ignored",
+          "",
+        ].join("\n"),
+        "utf-8",
+      );
+
+      assert.equal(hasExplicitId(metaIdOnly), true);
+      assert.equal(hasExplicitId(conflictId), true);
+      assert.equal(hasExplicitId(nonMetaIndentedId), false);
+
+      const analysis = analyzeMemoryMd(memPath);
+      const titleIndex = generateIndex(analysis, { idSource: "title" });
+      const nameIndex = generateIndex(analysis, { idSource: "name" });
+
+      // metadata.id wins over both idSource="title" and idSource="name"
+      assert.equal(titleIndex.entries[0].id, "custom-meta-id");
+      assert.equal(nameIndex.entries[0].id, "custom-meta-id");
+
+      // top-level id wins over metadata.id
+      assert.equal(titleIndex.entries[1].id, "top-level-id");
+      assert.equal(nameIndex.entries[1].id, "top-level-id");
+
+      // non-metadata indented id is ignored, so idSource="title" uses bullet title and idSource="name" uses name:
+      assert.equal(titleIndex.entries[2].id, "bullet-title-three");
+      assert.equal(nameIndex.entries[2].id, "derived-name-topic");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("reads loadout_inject, stale_after_min, max_lines, and max_bytes from metadata (#19)", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "loadout-issue19-meta-keys-"));
+    try {
+      writeFileSync(
+        join(tmp, "board.md"),
+        [
+          "---",
+          "name: Session Board",
+          "description: Session board with metadata keys",
+          "metadata:",
+          "  node_type: memory",
+          "  priority: core",
+          "  loadout_inject: session-start",
+          "  stale_after_min: 45",
+          "---",
+          "# Session Board",
+          "",
+        ].join("\n"),
+        "utf-8",
+      );
+
+      const memPath = join(tmp, "MEMORY.md");
+      // 12 lines total, exceeding metadata.max_lines: 5 and metadata.max_bytes: 100
+      writeFileSync(
+        memPath,
+        [
+          "---",
+          "name: Memory Index",
+          "metadata:",
+          "  max_lines: 5",
+          "  max_bytes: 100",
+          "---",
+          "# Memory",
+          "- [Session Board](board.md) — Session board with metadata keys",
+          "",
+          "## Notes",
+          "Extra line 1",
+          "Extra line 2",
+          "",
+        ].join("\n"),
+        "utf-8",
+      );
+
+      const analysis = analyzeMemoryMd(memPath);
+      const index = generateIndex(analysis);
+      assert.equal(index.entries.length, 1);
+      assert.equal(index.entries[0].priority, "core");
+      assert.equal(index.entries[0].metadata?.loadout_inject, "session-start");
+      assert.equal(index.entries[0].metadata?.stale_after_min, 45);
+
+      const issues = validateMemory(analysis);
+      const limitIssue = issues.find((i) => i.code === "MEMORY_LIMIT_EXCEEDED");
+      assert.ok(limitIssue, "metadata.max_lines / metadata.max_bytes must trigger MEMORY_LIMIT_EXCEEDED");
+      assert.equal(limitIssue.severity, "error");
+      assert.match(limitIssue.message, /lines > limit 5/);
+      assert.match(limitIssue.message, /bytes > limit 100/);
     } finally {
       rmSync(tmp, { recursive: true, force: true });
     }

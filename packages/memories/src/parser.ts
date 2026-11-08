@@ -27,7 +27,7 @@ const INLINE_PATH_RE = /`(memory\/[^\s`]+|[^\s`]+\.md)`/;
 // "- **[Title](dir/file.md)** — hook", "- **⭐ [Title](file.md)** — hook".
 // This is the index format Claude Code's own memory instructions prescribe.
 const LINK_REF_RE =
-  /^[-*]\s+(\*\*)?(?:[^\[\]\w\s*]{1,4}\s*)?\[([^\]]+)\]\(([^)\s]+?\.md)(?:#[^)\s]*)?\)\1?(.*)$/;
+  /^[-*]\s+(\*\*)?(?:[^\[\]\w\s*]{1,4}\s*)?\[([^\]]+)\]\(([^)#\s]+\.md)(?:#[^)\s]*)?\)\1?(.*)$/;
 
 /**
  * Is `path` a genuine relative topic ref (not a prose path-citation)?
@@ -122,35 +122,35 @@ function parseRefLine(line: string, lineNum: number): MemoryRef | null {
   const stripped = line.replace(/^[-*]\s+/, "").trim();
   if (!stripped) return null;
 
-  // Try arrow pattern first (handles both bulleted and non-bulleted)
   const arrowMatch = line.match(ARROW_REF_RE);
-  if (arrowMatch) {
-    const [, nameDesc, path] = arrowMatch;
-    const { name, description } = splitNameDesc(nameDesc);
-    return { name, description, path, line: lineNum };
-  }
+  const hasBacktickedArrowTarget =
+    arrowMatch !== null && line.trimEnd().endsWith("`" + arrowMatch[2] + "`");
 
   // Markdown-link entries: "- [Title](file.md) — hook".
   //
-  // MEM-B12: the header always promised Markdown links, but no branch parsed
-  // them, so every entry written in Claude Code's prescribed index format was
-  // silently dropped: never indexed, and reported ORPHAN_TOPIC_FILE even though
-  // MEMORY.md links it. Gated like MEM-001: the link must be the bullet's first
-  // token (a link inside prose is a citation, not an entry), the target must be
-  // a relative topic path, and the derived id must be clean.
-  const linkMatch = line.match(LINK_REF_RE);
+  // MEM-B12 / #20: for a bullet whose first token is a Markdown link to a
+  // relative .md file, the link branch wins unless the line has an arrow whose
+  // target is backticked (the MEM-B12 shape: `- [Old](old.md) Topic — desc → \`memory/topic.md\``).
+  const linkMatch = !hasBacktickedArrowTarget ? line.match(LINK_REF_RE) : null;
   if (linkMatch) {
     const [, , text, path, rest] = linkMatch;
     if (isRelativeTopicPath(path) && !/^[a-z][a-z0-9+.-]*:/i.test(path)) {
       const split = splitNameDesc(text);
       const name = split.name;
-      const after = rest.replace(/^\s*(?:—|--|-|:)\s*/, "").trim();
+      const after = rest.trim().replace(/^(?:—|--|-|:)\s*/, "").trim();
       const description = after || split.description;
       const id = nameToId(name);
       if (id && !id.startsWith("-") && !id.endsWith("-")) {
         return { name, description, path, line: lineNum };
       }
     }
+  }
+
+  // Try arrow pattern (handles lines with no leading link, or with a backticked arrow target)
+  if (arrowMatch) {
+    const [, nameDesc, path] = arrowMatch;
+    const { name, description } = splitNameDesc(nameDesc);
+    return { name, description, path, line: lineNum };
   }
 
   // Try inline path pattern (backtick path anywhere in line).

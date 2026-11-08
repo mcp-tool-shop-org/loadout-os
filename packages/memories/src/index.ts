@@ -36,6 +36,7 @@ export {
   extractKeywordsFromTitle,
   nameToId,
   hasExplicitId,
+  hasExplicitPriority,
   resolveStoreIdSource,
 } from "./index-gen.js";
 export type { GenerateIndexOptions } from "./index-gen.js";

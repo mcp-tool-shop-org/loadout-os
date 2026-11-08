@@ -1,6 +1,11 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { parseMemoryMd } from "../parser.js";
+import { analyzeMemoryMd } from "../analyze.js";
+import { validateMemory } from "../validate.js";
 
 describe("parseMemoryMd", () => {
   it("parses sections from headings", () => {
@@ -233,5 +238,111 @@ Full frame in [user profile](user_profile.md).
     const { refs } = parseMemoryMd("- [Old](old.md) Topic — desc → `memory/topic.md`\n");
     assert.equal(refs.length, 1);
     assert.equal(refs[0].path, "memory/topic.md");
+  });
+
+  it("parses Markdown-link bullets with arrows in their hook text via the link branch without MISSING_TOPIC_FILE, while keeping arrow-form lines on the arrow branch (#20)", () => {
+    const table: Array<{ line: string; name: string; path: string; description: string }> = [
+      // Four #20 hook texts
+      {
+        line: "- [Loop](loop.md) — teach → apply → verify",
+        name: "Loop",
+        path: "loop.md",
+        description: "teach → apply → verify",
+      },
+      {
+        line: "- [Loop](loop.md) — teach then apply → verify",
+        name: "Loop",
+        path: "loop.md",
+        description: "teach then apply → verify",
+      },
+      {
+        line: "- [Loop](loop.md) — one → arrow",
+        name: "Loop",
+        path: "loop.md",
+        description: "one → arrow",
+      },
+      {
+        line: "- [Loop](loop.md) — see loop.md → apply",
+        name: "Loop",
+        path: "loop.md",
+        description: "see loop.md → apply",
+      },
+      // Non-separator text after leading link (no em-dash/hyphen/colon prefix)
+      {
+        line: "- [Loop](loop.md) (11-08) teach loop",
+        name: "Loop",
+        path: "loop.md",
+        description: "(11-08) teach loop",
+      },
+      {
+        line: "- [Loop](loop.md) **core** teach loop",
+        name: "Loop",
+        path: "loop.md",
+        description: "**core** teach loop",
+      },
+      // Plain-text .md tail after arrow (not backticked)
+      {
+        line: "- [Loop](loop.md) — teach → notes.md",
+        name: "Loop",
+        path: "loop.md",
+        description: "teach → notes.md",
+      },
+      // Existing arrow-form line (no leading link)
+      {
+        line: "- Name — desc → `path.md`",
+        name: "Name",
+        path: "path.md",
+        description: "desc",
+      },
+      // MEM-B12 shape (leading link + backticked arrow target)
+      {
+        line: "- [Old](old.md) Topic — desc → `memory/topic.md`",
+        name: "[Old](old.md) Topic",
+        path: "memory/topic.md",
+        description: "desc",
+      },
+    ];
+
+    for (const c of table) {
+      const { refs } = parseMemoryMd(`## Active\n${c.line}\n`);
+      assert.equal(refs.length, 1, `expected 1 ref for: ${c.line}`);
+      assert.equal(refs[0].name, c.name, `name mismatch for: ${c.line}`);
+      assert.equal(refs[0].path, c.path, `path mismatch for: ${c.line}`);
+      assert.equal(refs[0].description, c.description, `description mismatch for: ${c.line}`);
+    }
+
+    // Verify in a temp store with loop.md and path.md present that none of the
+    // link-branch bullets trigger MISSING_TOPIC_FILE or ORPHAN_TOPIC_FILE.
+    const tmp = mkdtempSync(join(tmpdir(), "loadout-issue20-"));
+    try {
+      writeFileSync(join(tmp, "loop.md"), "# Loop\nBody.\n", "utf-8");
+      writeFileSync(join(tmp, "path.md"), "# Path\nBody.\n", "utf-8");
+      for (const c of table.filter((row) => row.path === "loop.md")) {
+        const memPath = join(tmp, "MEMORY.md");
+        writeFileSync(
+          memPath,
+          `# Memory\n${c.line}\n- Name — desc → \`path.md\`\n`,
+          "utf-8",
+        );
+        const analysis = analyzeMemoryMd(memPath);
+        const issues = validateMemory(analysis);
+        assert.equal(
+          analysis.missingFiles.length,
+          0,
+          `bullet "${c.line}" must not report missingFiles (got ${analysis.missingFiles.join(", ")})`,
+        );
+        assert.equal(
+          analysis.orphanFiles.length,
+          0,
+          `bullet "${c.line}" must not report orphanFiles (got ${analysis.orphanFiles.join(", ")})`,
+        );
+        assert.ok(
+          !issues.some((iss) => iss.code === "MISSING_TOPIC_FILE"),
+          `bullet "${c.line}" must not raise MISSING_TOPIC_FILE`,
+        );
+      }
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
   });
 });
