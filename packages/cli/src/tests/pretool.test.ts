@@ -26,7 +26,7 @@ import {
   capRuleMessage,
   hashToolInput,
   defaultSeatsPath,
-  defaultDecisionLogPath,
+  defaultDecisionLogPath, DEFAULT_PRETOOL_TIMEOUT_MS,
   type PreToolRule,
   type DecisionLogEntry,
 } from "../pretool.js";
@@ -568,3 +568,315 @@ describe("Part 1: hook pre-tool entry, seat map, pass-through, rule table, decis
     });
   });
 });
+
+// ════════════════════════════════════════════════════════════════
+// Part 2: the failure policy
+// ════════════════════════════════════════════════════════════════
+
+describe("Part 2: failure policy (fail-open, fail-closed, single exit-2 mechanism, internal timeout)", () => {
+  let tempDir: string;
+  let seatsPath: string;
+  let logPath: string;
+
+  beforeEach(() => {
+    tempDir = mkdtempSync(join(tmpdir(), "loadout-pretool-p2-"));
+    seatsPath = join(tempDir, "seats.json");
+    logPath = join(tempDir, "hook-decisions.jsonl");
+    writeFileSync(
+      seatsPath,
+      JSON.stringify({ "E:/AI/Research and Development": "rnd" }),
+      "utf-8",
+    );
+  });
+
+  afterEach(() => {
+    rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  // ── 2.1 Fail open ─────────────────────────────────────────────
+  describe("2.1 Fail open (error_open, exit 0)", () => {
+    it("fails open and logs error_open on unreadable/malformed stdin", () => {
+      for (const badStdin of ["", "{not-json", JSON.stringify({ no_tool: 1 })]) {
+        const res = runPreTool({
+          stdinJson: badStdin,
+          seatsPath,
+          logPath,
+        });
+        assert.equal(res.exitCode, 0);
+        assert.equal(res.outcome, "error_open");
+        assert.equal(res.stdout, "");
+        assert.equal(res.stderr, "");
+      }
+
+      const entries = readFileSync(logPath, "utf-8")
+        .trim()
+        .split("\n")
+        .map((l) => JSON.parse(l) as DecisionLogEntry);
+      assert.equal(entries.length, 3);
+      for (const e of entries) {
+        assert.equal(e.outcome, "error_open");
+      }
+    });
+
+    it("fails open and logs error_open on a bad or missing explicit seat map", () => {
+      const corruptSeats = join(tempDir, "corrupt-seats.json");
+      writeFileSync(corruptSeats, "{ broken json", "utf-8");
+
+      const resCorrupt = runPreTool({
+        stdinJson: JSON.stringify({
+          tool_name: "Bash",
+          tool_input: { command: "echo hi" },
+          cwd: "E:/AI/Research and Development",
+        }),
+        seatsPath: corruptSeats,
+        logPath,
+      });
+      assert.equal(resCorrupt.exitCode, 0);
+      assert.equal(resCorrupt.outcome, "error_open");
+
+      const resMissingExplicit = runPreTool({
+        stdinJson: JSON.stringify({
+          tool_name: "Bash",
+          tool_input: { command: "echo hi" },
+        }),
+        seatsPath: join(tempDir, "does-not-exist.json"),
+        logPath,
+      });
+      assert.equal(resMissingExplicit.exitCode, 0);
+      assert.equal(resMissingExplicit.outcome, "error_open");
+    });
+
+    it("fails open and logs error_open on a crash in the Bash parser or pre-match rule error", () => {
+      const resParserCrash = runPreTool({
+        stdinJson: JSON.stringify({
+          tool_name: "Bash",
+          tool_input: { command: "npm publish" },
+          cwd: "E:/AI/Research and Development",
+        }),
+        seatsPath,
+        logPath,
+        bashParser: () => {
+          throw new Error("Simulated parser crash");
+        },
+      });
+      assert.equal(resParserCrash.exitCode, 0);
+      assert.equal(resParserCrash.outcome, "error_open");
+
+      const throwingBlockRule: PreToolRule = {
+        id: "throwing-block-rule",
+        layer: "A",
+        tools: ["Bash"],
+        action: { default: "block" },
+        memory: "mem-err",
+        skill: "skill-err",
+        message: "Should not block when matcher throws",
+        match: () => {
+          throw new Error("Matcher exploded before matching");
+        },
+      };
+
+      const resRuleCrash = runPreTool({
+        stdinJson: JSON.stringify({
+          tool_name: "Bash",
+          tool_input: { command: "npm publish" },
+          cwd: "E:/AI/Research and Development",
+        }),
+        seatsPath,
+        logPath,
+        rules: [throwingBlockRule],
+      });
+      assert.equal(resRuleCrash.exitCode, 0);
+      assert.equal(resRuleCrash.outcome, "error_open");
+    });
+
+    it("fails open and logs error_open on an error in the warn layer", () => {
+      const throwingWarnRule: PreToolRule = {
+        id: "throwing-warn-rule",
+        layer: "B",
+        tools: ["Bash"],
+        action: { default: "warn" },
+        memory: "mem-warn",
+        skill: "skill-warn",
+        message: () => {
+          throw new Error("Warn formatter exploded");
+        },
+        match: () => true,
+      };
+
+      const res = runPreTool({
+        stdinJson: JSON.stringify({
+          tool_name: "Bash",
+          tool_input: { command: "npm publish" },
+          cwd: "E:/AI/Research and Development",
+        }),
+        seatsPath,
+        logPath,
+        rules: [throwingWarnRule],
+      });
+      assert.equal(res.exitCode, 0);
+      assert.equal(res.outcome, "error_open");
+      assert.equal(res.stdout, "");
+      assert.equal(res.stderr, "");
+      assert.equal(res.logEntry?.outcome, "error_open");
+    });
+  });
+
+  // ── 2.2 Fail closed ───────────────────────────────────────────
+  describe("2.2 Fail closed (error_closed, exit 2 once a block rule has matched)", () => {
+    it("exits 2 with the block message on stderr even when a subsequent rule throws", () => {
+      const rules: PreToolRule[] = [
+        {
+          id: "first-block",
+          layer: "A",
+          tools: ["Bash"],
+          action: { default: "block" },
+          memory: "mem-1",
+          skill: "skill-1",
+          message: "Hard block from first-block",
+          match: () => true,
+        },
+        {
+          id: "second-exploding-rule",
+          layer: "A",
+          tools: ["Bash"],
+          action: { default: "block" },
+          memory: "mem-2",
+          skill: "skill-2",
+          message: "Unreached",
+          match: () => {
+            throw new Error("Later step crashed after block match");
+          },
+        },
+      ];
+
+      const res = runPreTool({
+        stdinJson: JSON.stringify({
+          tool_name: "Bash",
+          tool_input: { command: "gh pr merge 21" },
+          cwd: "E:/AI/Research and Development",
+        }),
+        seatsPath,
+        logPath,
+        rules,
+      });
+
+      assert.equal(res.exitCode, 2);
+      assert.equal(res.outcome, "error_closed");
+      assert.equal(res.stdout, "");
+      assert.equal(res.stderr, "Hard block from first-block\n");
+      assert.equal(res.logEntry?.outcome, "error_closed");
+    });
+
+    it("exits 2 with the block message on stderr even when decision log writing throws", () => {
+      const rules: PreToolRule[] = [
+        {
+          id: "first-block",
+          layer: "A",
+          tools: ["Bash"],
+          action: { default: "block" },
+          memory: "mem-1",
+          skill: "skill-1",
+          message: "Hard block survives log write failure",
+          match: () => true,
+        },
+      ];
+
+      const res = runPreTool({
+        stdinJson: JSON.stringify({
+          tool_name: "Bash",
+          tool_input: { command: "gh pr merge 21" },
+          cwd: "E:/AI/Research and Development",
+        }),
+        seatsPath,
+        logPath,
+        rules,
+        logWriter: () => {
+          throw new Error("Disk full / permission denied on log");
+        },
+      });
+
+      assert.equal(res.exitCode, 2);
+      assert.equal(res.outcome, "error_closed");
+      assert.equal(res.stdout, "");
+      assert.equal(res.stderr, "Hard block survives log write failure\n");
+    });
+  });
+
+  // ── 2.3 Single mechanism: exit 2 + stderr, never JSON deny ────
+  describe("2.3 Never emit JSON permissionDecision: deny together with exit 2", () => {
+    it("emits strictly empty stdout and stderr message when exiting 2", () => {
+      const rule: PreToolRule = {
+        id: "strict-block",
+        layer: "A",
+        tools: ["Bash"],
+        action: { default: "block" },
+        memory: "mem-1",
+        skill: "skill-1",
+        message: "Blocked via exit 2 + stderr only",
+        match: () => true,
+      };
+
+      const res = runPreTool({
+        stdinJson: JSON.stringify({
+          tool_name: "Bash",
+          tool_input: { command: "gh pr merge 21" },
+        }),
+        seatsPath,
+        logPath,
+        rules: [rule],
+      });
+
+      assert.equal(res.exitCode, 2);
+      assert.equal(res.stdout, "");
+      assert.equal(res.stdout.includes("permissionDecision"), false);
+      assert.equal(res.stdout.includes("deny"), false);
+      assert.equal(res.stderr, "Blocked via exit 2 + stderr only\n");
+    });
+  });
+
+  // ── 2.4 Hard internal timeout ─────────────────────────────────
+  describe("2.4 Hard internal timeout (default 300 ms) fails open and logs timeout", () => {
+    it("defaults to 300 ms and fails open with outcome 'timeout' when budget is exceeded", () => {
+      assert.equal(DEFAULT_PRETOOL_TIMEOUT_MS, 300);
+
+      let ruleEvaluated = false;
+      const slowRule: PreToolRule = {
+        id: "slow-rule",
+        layer: "A",
+        tools: ["Bash"],
+        action: { default: "block" },
+        memory: "mem-slow",
+        skill: "skill-slow",
+        message: "Should not run after timeout",
+        match: () => {
+          ruleEvaluated = true;
+          return true;
+        },
+      };
+
+      const res = runPreTool({
+        stdinJson: JSON.stringify({
+          tool_name: "Bash",
+          tool_input: { command: "npm publish" },
+          cwd: "E:/AI/Research and Development",
+        }),
+        seatsPath,
+        logPath,
+        rules: [slowRule],
+        timeoutMs: 300,
+        simulatedElapsedMs: 350,
+      });
+
+      assert.equal(res.exitCode, 0);
+      assert.equal(res.outcome, "timeout");
+      assert.equal(res.stdout, "");
+      assert.equal(res.stderr, "");
+      assert.equal(ruleEvaluated, false);
+      assert.equal(res.logEntry?.outcome, "timeout");
+
+      const logged = JSON.parse(readFileSync(logPath, "utf-8").trim()) as DecisionLogEntry;
+      assert.equal(logged.outcome, "timeout");
+    });
+  });
+});
+
