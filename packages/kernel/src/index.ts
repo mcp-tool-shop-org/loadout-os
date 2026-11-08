@@ -43,7 +43,7 @@ export { findDeadEntries, findKeywordOverlaps, analyzeBudget } from "./analysis.
 export type { DeadEntry, KeywordOverlap, BudgetBreakdown } from "./analysis.js";
 
 // ── Resolver ─────────────────────────────────────────────────
-export { discoverLayers, resolveLoadout, explainEntry } from "./resolve.js";
+export { discoverLayers, resolveLoadout, explainEntry, findProjectIndex } from "./resolve.js";
 export type {
   DiscoveredLayer,
   SearchedLayer,

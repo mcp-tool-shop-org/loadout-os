@@ -13,7 +13,7 @@
  */
 
 import { readFileSync, existsSync } from "node:fs";
-import { join, resolve as resolvePath } from "node:path";
+import { dirname, join, resolve as resolvePath } from "node:path";
 import { homedir } from "node:os";
 import type { LoadoutIndex, LoadoutEntry, MergedIndex, Priority } from "./types.js";
 import { mergeIndexes } from "./merge.js";
@@ -74,12 +74,37 @@ export interface EntryExplanation {
 export interface ResolveOptions {
   /** Override the project root (default: cwd). */
   projectRoot?: string;
+  /** Explicit project-level index path. Falls back to $AI_LOADOUT_PROJECT_INDEX or walking up from projectRoot. */
+  projectIndexPath?: string;
+  /** Walk up from projectRoot to the first parent directory holding `.claude/loadout/index.json`. */
+  walkUpProject?: boolean;
   /** Override the global directory (default: ~/.ai-loadout). */
   globalDir?: string;
   /** Explicit org-level index path. Falls back to $AI_LOADOUT_ORG. */
   orgPath?: string;
   /** Explicit session overlay index path. Falls back to $AI_LOADOUT_SESSION. */
   sessionPath?: string;
+}
+
+// ── Project Index Walk-up ────────────────────────────────────────
+
+/**
+ * Walk up from `startDir` to the first directory containing `.claude/loadout/index.json`.
+ * Returns the absolute path to `index.json` if found, or `null` if none exists up to the filesystem root.
+ */
+export function findProjectIndex(startDir: string): string | null {
+  let current = resolvePath(startDir);
+  while (true) {
+    const candidate = join(current, ".claude", "loadout", "index.json");
+    if (existsSync(candidate)) {
+      return candidate;
+    }
+    const parent = dirname(current);
+    if (parent === current) {
+      return null;
+    }
+    current = parent;
+  }
 }
 
 // ── Discovery ────────────────────────────────────────────────────
@@ -98,6 +123,7 @@ export function discoverLayers(opts?: ResolveOptions): {
   const globalDir = opts?.globalDir ?? join(homedir(), ".ai-loadout");
   const orgPath = opts?.orgPath ?? process.env.AI_LOADOUT_ORG ?? null;
   const sessionPath = opts?.sessionPath ?? process.env.AI_LOADOUT_SESSION ?? null;
+  const envProjectIndex = opts?.projectIndexPath ?? process.env.AI_LOADOUT_PROJECT_INDEX ?? null;
 
   const candidates: { name: string; path: string }[] = [
     { name: "global", path: join(globalDir, "index.json") },
@@ -107,9 +133,20 @@ export function discoverLayers(opts?: ResolveOptions): {
     candidates.push({ name: "org", path: resolvePath(orgPath) });
   }
 
+  let projectPath: string;
+  if (envProjectIndex && envProjectIndex.trim()) {
+    projectPath = resolvePath(envProjectIndex.trim());
+  } else if (opts?.walkUpProject) {
+    projectPath =
+      findProjectIndex(projectRoot) ??
+      join(projectRoot, ".claude", "loadout", "index.json");
+  } else {
+    projectPath = join(projectRoot, ".claude", "loadout", "index.json");
+  }
+
   candidates.push({
     name: "project",
-    path: join(projectRoot, ".claude", "loadout", "index.json"),
+    path: projectPath,
   });
 
   if (sessionPath) {
@@ -127,6 +164,9 @@ export function discoverLayers(opts?: ResolveOptions): {
       try {
         const raw = readFileSync(path, "utf-8");
         const index = JSON.parse(raw) as LoadoutIndex;
+        if (!index || !Array.isArray(index.entries)) {
+          throw new Error("Index JSON is missing entries[] array");
+        }
         layers.push({ name, path, index });
       } catch (e) {
         // Malformed file — skip it (don't sink the whole resolve), but record

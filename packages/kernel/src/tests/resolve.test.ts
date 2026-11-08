@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { writeFileSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { discoverLayers, resolveLoadout, explainEntry } from "../resolve.js";
+import { discoverLayers, resolveLoadout, explainEntry, findProjectIndex } from "../resolve.js";
 import type { LoadoutIndex, LoadoutEntry, DiscoveredLayer } from "../index.js";
 import { DEFAULT_TRIGGERS } from "../types.js";
 
@@ -407,5 +407,69 @@ describe("explainEntry", () => {
     assert.deepEqual(result.definitions[0].keywords, ["auth"]);
     assert.deepEqual(result.definitions[1].keywords, ["auth", "sso"]);
     assert.deepEqual(result.definitions[2].keywords, ["auth", "jwt"]);
+  });
+});
+
+
+// ── findProjectIndex & walkUpProject ─────────────────────────────
+
+describe("findProjectIndex and walkUpProject", () => {
+  it("walks up from a nested cwd to find .claude/loadout/index.json", () => {
+    const { root, globalDir, projectRoot } = setupTmpDirs();
+    writeIndex(
+      join(projectRoot, ".claude", "loadout"),
+      makeIndex([makeEntry({ id: "walked-project-rule" })])
+    );
+    const nestedDir = join(projectRoot, "packages", "subpkg", "src");
+    mkdirSync(nestedDir, { recursive: true });
+
+    const foundPath = findProjectIndex(nestedDir);
+    assert.equal(foundPath, join(projectRoot, ".claude", "loadout", "index.json"));
+
+    const resolved = resolveLoadout({
+      globalDir,
+      projectRoot: nestedDir,
+      walkUpProject: true,
+    });
+    assert.equal(resolved.layers.length, 1);
+    assert.equal(resolved.layers[0].name, "project");
+    assert.equal(resolved.merged.entries[0].id, "walked-project-rule");
+    cleanup(root);
+  });
+
+  it("returns null when no parent directory contains .claude/loadout/index.json", () => {
+    const emptyRoot = mkdtempSync(join(tmpdir(), "ai-loadout-no-proj-"));
+    try {
+      const nested = join(emptyRoot, "a", "b");
+      mkdirSync(nested, { recursive: true });
+      const found = findProjectIndex(nested);
+      assert.equal(found, null);
+    } finally {
+      cleanup(emptyRoot);
+    }
+  });
+
+  it("respects projectIndexPath override over walkUpProject", () => {
+    const { root, globalDir, projectRoot } = setupTmpDirs();
+    writeIndex(
+      join(projectRoot, ".claude", "loadout"),
+      makeIndex([makeEntry({ id: "walked-rule" })])
+    );
+    const customIndex = join(root, "custom-project-index.json");
+    writeFileSync(
+      customIndex,
+      JSON.stringify(makeIndex([makeEntry({ id: "override-rule" })]))
+    );
+
+    const resolved = resolveLoadout({
+      globalDir,
+      projectRoot,
+      projectIndexPath: customIndex,
+      walkUpProject: true,
+    });
+    assert.equal(resolved.layers.length, 1);
+    assert.equal(resolved.layers[0].name, "project");
+    assert.equal(resolved.merged.entries[0].id, "override-rule");
+    cleanup(root);
   });
 });
