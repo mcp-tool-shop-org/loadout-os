@@ -880,3 +880,617 @@ describe("Part 2: failure policy (fail-open, fail-closed, single exit-2 mechanis
   });
 });
 
+// ════════════════════════════════════════════════════════════════
+// Part 3: the first rules (each with tests)
+// ════════════════════════════════════════════════════════════════
+
+import {
+  PRETOOL_RULES,
+  findQuoteViolations,
+  quoteTextsFromTool,
+  parseToolStampedTime,
+} from "../pretool-rules.js";
+
+/**
+ * Ported verbatim from `~/.claude/hooks/quote-gate.py` (sha256 af95dd4e...):
+ * 15 `_MUST_BLOCK` cases and 19 `_MUST_PASS` cases = 34 total cases.
+ * (In the 19th `_MUST_PASS` case, the home directory prefix before
+ * `.claude/projects/F--AI/memory/Feedback/feedback_never_quote_the_director.md`
+ * is `/home/user` so no home path is committed.)
+ */
+export const QUOTE_GATE_MUST_BLOCK: ReadonlyArray<readonly [string, string]> = [
+  [
+    "P1 practice marker",
+    "## 1. What he intends\n\nHis words, and these are the load-bearing ones:\n",
+  ],
+  [
+    "P1 possessive",
+    "The Director's words: the pipeline ships before the docs do.",
+  ],
+  [
+    "P1 void instruction",
+    "Corrections go to Feedback memos immediately, in his words.",
+  ],
+  [
+    "P2 past attribution + long span",
+    'Mike said: "the whole thing needs to be rebuilt from the ground up again".',
+  ],
+  [
+    "P2 possessive + first person",
+    'His verdict: "I would rather wait than ship this."',
+  ],
+  [
+    "P2 bare colon form",
+    'The Director: *"I do not think that shortcut is acceptable at all."* ',
+  ],
+  [
+    "P3 emphasised block quote",
+    '> *"I want the tooling to disappear into the background entirely."* ',
+  ],
+  [
+    "Bash commit message, escaped nested quote",
+    'git commit -m "docs: correct the brief\n\nHis verdict: \\"I never asked for any of that in the first place.\\""',
+  ],
+  [
+    "Bash commit message, practice marker",
+    'git commit -m "docs: record the ruling in his words, verbatim"',
+  ],
+  [
+    "P1 'her words' as a whole word still blocks",
+    "Record the ruling in her words, exactly as delivered.",
+  ],
+  [
+    "P2 dated, colon",
+    'Director 2026-10-24: "the whole pipeline should be rebuilt before the next window opens".',
+  ],
+  [
+    "P2 dated, parenthetical",
+    '(Director, 10-29): "I want every build to go through the card process from now on."',
+  ],
+  [
+    "P2 dated, bold label",
+    '**The Director, 2026-11-02:** "I need you to slow down at every outward step."',
+  ],
+  [
+    "P2 dated, qualifier then colon",
+    'Director 11-01 evening: "keep three sessions going at once until I tell you otherwise".',
+  ],
+  [
+    "P2 dated, no colon",
+    'Director 2026-10-23 "I would rather you delegate the writing to the other seats".',
+  ],
+];
+
+export const QUOTE_GATE_MUST_PASS: ReadonlyArray<readonly [string, string]> = [
+  [
+    "trigger phrase, present frame",
+    'When Mike says "dogfood swarm" on a repo, execute the funnel above.',
+  ],
+  [
+    "trigger phrase in description",
+    'description: When the user says "full treatment," run all 7 phases in order.',
+  ],
+  [
+    "short impersonal directive",
+    'The Director set the bar at "high quality 3D"; we A/B-tested on-rig.',
+  ],
+  [
+    "negated rule statement",
+    "**NEVER reproduce his words verbatim in any artifact** - see the law.",
+  ],
+  [
+    "negated rule statement 2",
+    "Do not quote him into handoffs. Carried out of context his words read as specs.",
+  ],
+  [
+    "paraphrased decision",
+    "Mike ruled it a law on the spot: no public surface is ever outsourced.",
+  ],
+  [
+    "plain block quote / character dialogue",
+    '> "It is my name, and you will not have it."',
+  ],
+  [
+    "tool output",
+    'I tried to cd there and got "No such file or directory" back.',
+  ],
+  [
+    "authored spec, correctly labelled",
+    "### The scene (Director-authored - render exactly as written)",
+  ],
+  [
+    "ordinary bash",
+    "git status --short && git log --oneline -5",
+  ],
+  [
+    "'other words' is not 'her words'",
+    "In other words, the pipeline stays as it is; together words and whether words too.",
+  ],
+  [
+    "dated decision, no quote",
+    "Director 2026-11-05 ruled that auto-update stays off and the rig runs a pinned build.",
+  ],
+  [
+    "dated, short impersonal term",
+    'Director 2026-10-22 set the bar at "high quality 3D" for the renders.',
+  ],
+  [
+    "dated heading, no speech",
+    "**SETTLED 2026-11-05 (Director answered A, relayed by the Publisher):** auto-update stays off.",
+  ],
+  [
+    "dated mention inside a YAML description (no speech)",
+    'description: "Every design starts from its template; if none fits, write it first (Director, 2026-10-13)"',
+  ],
+  [
+    "dated mention mid-description, quote far away",
+    'description: "Medium effort, cap 4 cards (Director 11-07); drops to 3 once the memory system is addressed"',
+  ],
+  [
+    "non-publishing bash with prose",
+    'echo "He said I should refactor the whole module before Friday"',
+  ],
+  [
+    "commit message with indirect speech (a paraphrase, which is the FIX)",
+    'git commit -m "docs: correct the brief\n\nHe replied that he had never asked for any of that, so the framing is withdrawn."',
+  ],
+  [
+    "shell heredoc rewriting the law file itself",
+    'python - <<PY\np = "/home/user/.claude/projects/F--AI/memory/Feedback/feedback_never_quote_the_director.md"\n# documents git commit -m and the practice markers: his words, the Director\'s words\nPY',
+  ],
+];
+
+describe("Part 3: the first five rules (unreviewed-merge, director-quote, memory-shell-write, future-stamp, release-reminder)", () => {
+  let tempDir: string;
+  let seatsPath: string;
+  let logPath: string;
+  const configuredStore = "E:/AI/CustomSeatStore/memory";
+
+  beforeEach(() => {
+    tempDir = mkdtempSync(join(tmpdir(), "loadout-pretool-p3-"));
+    seatsPath = join(tempDir, "seats.json");
+    logPath = join(tempDir, "hook-decisions.jsonl");
+    writeFileSync(
+      seatsPath,
+      JSON.stringify(
+        {
+          seats: {
+            "E:/AI/Research and Development": {
+              seat: "rnd",
+              store: configuredStore,
+            },
+            "E:/AI/Publisher": {
+              seat: "publisher",
+              store: "E:/AI/PublisherStore/memory",
+            },
+          },
+        },
+        null,
+        2,
+      ),
+      "utf-8",
+    );
+  });
+
+  afterEach(() => {
+    rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  // ── 3.1 unreviewed-merge ──────────────────────────────────────
+  describe("3.1 unreviewed-merge (Layer A)", () => {
+    it("blocks `gh pr merge` and `gatemerge` (any path/form) on R&D seat, and warns on Publisher and default seats", () => {
+      const mergeCommands = [
+        "gh pr merge 21 --squash",
+        "gh -R mcp-tool-shop-org/loadout-os pr merge 21",
+        "gatemerge 21",
+        "./scripts/gatemerge.ps1 -Pr 21",
+        "pwsh E:/AI/scripts/gatemerge.ps1",
+      ];
+
+      for (const command of mergeCommands) {
+        // R&D seat -> block (exit 2)
+        const rndRes = runPreTool({
+          stdinJson: JSON.stringify({
+            tool_name: "Bash",
+            tool_input: { command },
+            cwd: "E:/AI/Research and Development",
+          }),
+          seatsPath,
+          logPath,
+        });
+        assert.equal(rndRes.exitCode, 2, `R&D should block: ${command}`);
+        assert.equal(rndRes.outcome, "block");
+        assert.match(rndRes.stderr, /R&D never merges/i);
+
+        // Publisher seat -> warn (exit 0 + Argon-verdict sha reminder mentioning ledger step 2)
+        const pubRes = runPreTool({
+          stdinJson: JSON.stringify({
+            tool_name: "Bash",
+            tool_input: { command },
+            cwd: "E:/AI/Publisher",
+          }),
+          seatsPath,
+          logPath,
+        });
+        assert.equal(pubRes.exitCode, 0, `Publisher should warn: ${command}`);
+        assert.equal(pubRes.outcome, "warn");
+        assert.match(pubRes.stdout, /Argon-verdict sha/);
+        assert.match(pubRes.stdout, /step 2/);
+
+        // Default seat -> warn
+        const defRes = runPreTool({
+          stdinJson: JSON.stringify({
+            tool_name: "Bash",
+            tool_input: { command },
+            cwd: "E:/AI/UnmappedRepo",
+          }),
+          seatsPath,
+          logPath,
+        });
+        assert.equal(defRes.exitCode, 0, `Default should warn: ${command}`);
+        assert.equal(defRes.outcome, "warn");
+      }
+    });
+  });
+
+  // ── 3.2 director-quote (quote-gate.py port) ───────────────────
+  describe("3.2 director-quote (Layer A, all 34 quote-gate.py self-test cases)", () => {
+    it("blocks all 15 _MUST_BLOCK cases and passes all 19 _MUST_PASS cases from quote-gate.py (34/34)", () => {
+      assert.equal(QUOTE_GATE_MUST_BLOCK.length, 15);
+      assert.equal(QUOTE_GATE_MUST_PASS.length, 19);
+
+      for (const [name, text] of QUOTE_GATE_MUST_BLOCK) {
+        const isBash =
+          text.startsWith("git ") ||
+          text.startsWith("echo ") ||
+          text.startsWith("python ");
+        const toolName = isBash ? "Bash" : "Write";
+        const toolInput = isBash
+          ? { command: text }
+          : { file_path: "docs/handoff.md", content: text };
+
+        const extracted = quoteTextsFromTool(toolName, toolInput);
+        const violations = extracted.flatMap((t) => findQuoteViolations(t));
+        assert.ok(
+          violations.length > 0,
+          `Expected _MUST_BLOCK case '${name}' to produce violations`,
+        );
+
+        const res = runPreTool({
+          stdinJson: JSON.stringify({
+            tool_name: toolName,
+            tool_input: toolInput,
+            cwd: "E:/AI/Research and Development",
+          }),
+          seatsPath,
+          logPath,
+        });
+        assert.equal(
+          res.exitCode,
+          2,
+          `Expected runPreTool to block _MUST_BLOCK case '${name}'`,
+        );
+        assert.equal(res.outcome, "block");
+      }
+
+      for (const [name, text] of QUOTE_GATE_MUST_PASS) {
+        const isBash =
+          text.startsWith("git ") ||
+          text.startsWith("echo ") ||
+          text.startsWith("python ");
+        const toolName = isBash ? "Bash" : "Write";
+        const toolInput = isBash
+          ? { command: text }
+          : { file_path: "docs/handoff.md", content: text };
+
+        const extracted = quoteTextsFromTool(toolName, toolInput);
+        const violations = extracted.flatMap((t) => findQuoteViolations(t));
+        assert.equal(
+          violations.length,
+          0,
+          `Expected _MUST_PASS case '${name}' to produce 0 violations, got: ${JSON.stringify(violations)}`,
+        );
+
+        const res = runPreTool({
+          stdinJson: JSON.stringify({
+            tool_name: toolName,
+            tool_input: toolInput,
+            cwd: "E:/AI/Research and Development",
+          }),
+          seatsPath,
+          logPath,
+        });
+        assert.equal(
+          res.exitCode,
+          0,
+          `Expected runPreTool to allow _MUST_PASS case '${name}'`,
+        );
+      }
+    });
+
+    it("blocks quotes in Edit, MultiEdit, git tag -m, and gh pr/issue/release, while allowing allowlisted law files", () => {
+      const editRes = runPreTool({
+        stdinJson: JSON.stringify({
+          tool_name: "Edit",
+          tool_input: {
+            file_path: "notes.md",
+            old_string: "old",
+            new_string: 'His verdict: "I would rather wait than ship this."',
+          },
+          cwd: "E:/AI/Publisher",
+        }),
+        seatsPath,
+        logPath,
+      });
+      assert.equal(editRes.exitCode, 2);
+
+      const ghPrRes = runPreTool({
+        stdinJson: JSON.stringify({
+          tool_name: "Bash",
+          tool_input: {
+            command:
+              'gh pr create --title "t" --body "Director 2026-10-24: \\"the whole pipeline should be rebuilt before the next window opens\\""',
+          },
+          cwd: "E:/AI/Unmapped",
+        }),
+        seatsPath,
+        logPath,
+      });
+      assert.equal(ghPrRes.exitCode, 2);
+
+      const allowlistedWrite = runPreTool({
+        stdinJson: JSON.stringify({
+          tool_name: "Write",
+          tool_input: {
+            file_path:
+              "/home/user/.claude/projects/F--AI/memory/feedback/feedback_never_quote_the_director.md",
+            content: 'His verdict: "I would rather wait than ship this."',
+          },
+          cwd: "E:/AI/Research and Development",
+        }),
+        seatsPath,
+        logPath,
+      });
+      assert.equal(allowlistedWrite.exitCode, 0);
+    });
+  });
+
+  // ── 3.3 memory-shell-write ────────────────────────────────────
+  describe("3.3 memory-shell-write (Layer A)", () => {
+    it("blocks redirection, tee, sed -i, cp, mv, rm, touch, python/node inline/heredoc writes, and git -C <store> commit/checkout/reset", () => {
+      const claudeStoreFile =
+        "~/.claude/projects/E--AI-Research-and-Development/memory/BOARD.md";
+      const seatStoreFile = `${configuredStore}/topic.md`;
+
+      const blockedShellWrites = [
+        `echo "hi" > ${claudeStoreFile}`,
+        `echo "hi" >> ${seatStoreFile}`,
+        `cat notes.md | tee ${claudeStoreFile}`,
+        `sed -i 's/old/new/' ${seatStoreFile}`,
+        `cp /tmp/draft.md ${claudeStoreFile}`,
+        `mv /tmp/draft.md ${seatStoreFile}`,
+        `rm -f ${claudeStoreFile}`,
+        `touch ${seatStoreFile}`,
+        `python -c "open('${seatStoreFile}', 'w').write('x')"`,
+        `node -e "fs.writeFileSync('${seatStoreFile}', 'x')"`,
+        `python - <<EOF\nwith open('${claudeStoreFile}', 'w') as f:\n    f.write('hi')\nEOF`,
+        `git -C ${configuredStore} commit -m "manual store commit"`,
+        `git -C ${configuredStore} checkout -- MEMORY.md`,
+        `git -C ${configuredStore} reset --hard HEAD~1`,
+      ];
+
+      for (const command of blockedShellWrites) {
+        const res = runPreTool({
+          stdinJson: JSON.stringify({
+            tool_name: "Bash",
+            tool_input: { command },
+            cwd: "E:/AI/Research and Development",
+          }),
+          seatsPath,
+          logPath,
+        });
+        assert.equal(
+          res.exitCode,
+          2,
+          `Expected memory-shell-write to block: ${command}`,
+        );
+        assert.equal(res.outcome, "block");
+        assert.ok(
+          res.logEntry?.matched.some((m) => m.id === "memory-shell-write"),
+        );
+      }
+    });
+
+    it("allows `loadout-os ...` commands, read-only commands on store paths, and Write/Edit tool calls", () => {
+      const allowedCommands = [
+        `loadout-os memories place ${configuredStore}/topic.md main --store ${configuredStore}`,
+        `loadout-os refresh --store ${configuredStore} --project .`,
+        `cat ${configuredStore}/MEMORY.md`,
+        `git -C ${configuredStore} status`,
+        `python -c "print(open('${configuredStore}/MEMORY.md').read())"`,
+      ];
+
+      for (const command of allowedCommands) {
+        const res = runPreTool({
+          stdinJson: JSON.stringify({
+            tool_name: "Bash",
+            tool_input: { command },
+            cwd: "E:/AI/Research and Development",
+          }),
+          seatsPath,
+          logPath,
+        });
+        assert.equal(
+          res.exitCode,
+          0,
+          `Expected memory-shell-write to allow: ${command}`,
+        );
+      }
+
+      // Claude Code's Write/Edit tools are out of scope for memory-shell-write
+      const writeRes = runPreTool({
+        stdinJson: JSON.stringify({
+          tool_name: "Write",
+          tool_input: {
+            file_path: `${configuredStore}/topic.md`,
+            content: "# Clean topic\n\nBody text without future stamps.\n",
+          },
+          cwd: "E:/AI/Research and Development",
+        }),
+        seatsPath,
+        logPath,
+      });
+      assert.equal(writeRes.exitCode, 0);
+    });
+  });
+
+  // ── 3.4 future-stamp ──────────────────────────────────────────
+  describe("3.4 future-stamp (Layer A)", () => {
+    // Fixed clock: 2026-11-08 15:44:00 local time
+    const fixedClockMs = new Date(2026, 10, 8, 15, 44, 0, 0).getTime();
+
+    it("blocks tool-stamped fields (> 5 min ahead of OS clock) in `2026-11-08 15:03 ET`, `~15:05 ET`, and ISO 8601 forms", () => {
+      const futurePayloads = [
+        "**Last updated:** 2026-11-08 17:00 ET\n",
+        "**Last updated:** ~15:55 ET\n",
+        "---\ncreated_at: 2026-11-08T16:30:00\n---\n",
+        "---\nmodified: 2026-11-08 16:00 ET\n---\n",
+        "---\nverified_at: 2026-11-09\n---\n",
+      ];
+
+      for (const new_string of futurePayloads) {
+        const res = runPreTool({
+          stdinJson: JSON.stringify({
+            tool_name: "Edit",
+            tool_input: {
+              file_path: `${configuredStore}/BOARD.md`,
+              old_string: "old",
+              new_string,
+            },
+            cwd: "E:/AI/Research and Development",
+          }),
+          seatsPath,
+          logPath,
+          nowMs: fixedClockMs,
+        });
+        assert.equal(
+          res.exitCode,
+          2,
+          `Expected future-stamp to block: ${new_string.trim()}`,
+        );
+        assert.equal(res.outcome, "block");
+        assert.ok(res.logEntry?.matched.some((m) => m.id === "future-stamp"));
+      }
+    });
+
+    it("allows current/past stamps (<= +5 min), ignores non-stamped future deadlines, and logs unparseable stamps without blocking", () => {
+      // Current stamp (15:44 ET) and +4 min (~15:48 ET) pass
+      for (const stamp of [
+        "**Last updated:** 2026-11-08 15:44 ET",
+        "**Last updated:** ~15:48 ET",
+        "created_at: 2026-11-08T15:03:00",
+        // Future deadline in prose is ignored
+        "**Last updated:** 2026-11-08 15:44 ET\nDeadline: 2026-12-31 23:59 ET",
+      ]) {
+        const res = runPreTool({
+          stdinJson: JSON.stringify({
+            tool_name: "Edit",
+            tool_input: {
+              file_path: "E:/AI/Research and Development/BOARD.md",
+              old_string: "old",
+              new_string: stamp,
+            },
+            cwd: "E:/AI/Research and Development",
+          }),
+          seatsPath,
+          logPath,
+          nowMs: fixedClockMs,
+        });
+        assert.equal(res.exitCode, 0, `Expected future-stamp to allow: ${stamp}`);
+      }
+
+      // Unparseable form on a stamped field passes and is logged in `notes`
+      const unparseableRes = runPreTool({
+        stdinJson: JSON.stringify({
+          tool_name: "Edit",
+          tool_input: {
+            file_path: "E:/AI/Research and Development/BOARD.md",
+            old_string: "old",
+            new_string: "**Last updated:** <stamped-by-cli-later>",
+          },
+          cwd: "E:/AI/Research and Development",
+        }),
+        seatsPath,
+        logPath,
+        nowMs: fixedClockMs,
+      });
+      assert.equal(unparseableRes.exitCode, 0);
+      assert.equal(unparseableRes.outcome, "allow");
+      assert.ok(
+        unparseableRes.logEntry?.notes?.some((n) =>
+          n.startsWith("unparseable_timestamp:Last updated="),
+        ),
+      );
+      assert.equal(parseToolStampedTime("not-a-timestamp", fixedClockMs), null);
+    });
+  });
+
+  // ── 3.5 release-reminder (Layer B) ────────────────────────────
+  describe("3.5 release-reminder (Layer B, soft warn on all seats)", () => {
+    it("warns on `npm publish`, `gh release create`, and `git push --tags` across all seats, and stays silent on dry-run or normal push", () => {
+      const releaseCommands = [
+        "npm publish",
+        "npm publish --access public",
+        "gh release create v1.1.2 --generate-notes",
+        "git push --tags",
+        "git push origin --tags",
+      ];
+
+      for (const command of releaseCommands) {
+        for (const cwd of [
+          "E:/AI/Research and Development",
+          "E:/AI/Publisher",
+          "E:/AI/OtherRepo",
+        ]) {
+          const res = runPreTool({
+            stdinJson: JSON.stringify({
+              tool_name: "Bash",
+              tool_input: { command },
+              cwd,
+            }),
+            seatsPath,
+            logPath,
+          });
+          assert.equal(res.exitCode, 0);
+          assert.equal(res.outcome, "warn");
+          assert.match(res.stdout, /publisher-approves-every-publish/);
+          assert.match(res.stdout, /full-treatment/);
+        }
+      }
+
+      // Non-firing commands (dry-run or ordinary branch push)
+      for (const safeCmd of [
+        "npm publish --dry-run",
+        "git push origin feat/pretool-framework",
+        "git push --tags --dry-run",
+      ]) {
+        const res = runPreTool({
+          stdinJson: JSON.stringify({
+            tool_name: "Bash",
+            tool_input: { command: safeCmd },
+            cwd: "E:/AI/Publisher",
+          }),
+          seatsPath,
+          logPath,
+        });
+        assert.equal(res.exitCode, 0);
+        assert.equal(res.outcome, "allow");
+        assert.equal(res.stdout, "");
+      }
+
+      assert.equal(PRETOOL_RULES.length, 5);
+    });
+  });
+});
+
+
