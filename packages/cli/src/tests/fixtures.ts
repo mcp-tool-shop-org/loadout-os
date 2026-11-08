@@ -277,3 +277,103 @@ export function captureLog(fn: () => void): string {
   }
   return lines.join("\n");
 }
+
+/**
+ * The 5 R&D project index entries referenced by the Part 3/Part 4.3 rule table,
+ * copied from `.claude/loadout/index.json` with store-relative paths (`memory/<id>.md`)
+ * so no home paths are committed.
+ */
+export const RND_TRIAD_ENTRIES: LoadoutIndex["entries"] = [
+  {
+    id: "rnd-memory-system",
+    path: "memory/rnd-memory-system.md",
+    keywords: ["loadout", "memory", "rnd", "system", "works"],
+    patterns: ["rnd_memory_system"],
+    priority: "domain",
+    summary:
+      "How R&D memory works since the 2026-11-08 cutover to loadout-os 1.1.0: BOARD injected at start/compaction by loadout-os ",
+    triggers: { task: true, plan: true, edit: false },
+    tokens_est: 977,
+    lines: 52,
+    metadata: {
+      node_type: "memory",
+      type: "reference",
+      originSessionId: "de321234-740c-46e3-a4de-c1be5fbb071c",
+      modified: "2026-11-08T11:25:59.656Z",
+    },
+  },
+  {
+    id: "publisher-approves-every-publish",
+    path: "memory/publisher-approves-every-publish.md",
+    keywords: ["approves", "publish", "publisher"],
+    patterns: ["publisher_approves_every_publish"],
+    priority: "domain",
+    summary:
+      "Director 2026-10-21 via Publisher — nothing publishes (npm/PyPI/binary, a tag or release that triggers one, Store, repo/",
+    triggers: { task: true, plan: true, edit: false },
+    tokens_est: 336,
+    lines: 18,
+    metadata: {
+      node_type: "memory",
+      type: "feedback",
+      originSessionId: "cee64436-f327-4887-b701-506d061395dc",
+      modified: "2026-10-21T01:58:06.571Z",
+    },
+    subindex: true,
+  },
+  {
+    id: "publisher-merges",
+    path: "memory/publisher-merges.md",
+    keywords: ["merges", "publisher"],
+    patterns: ["publisher_merges"],
+    priority: "domain",
+    summary:
+      "R&D never merges PRs, even when its re-check is the last gate; the Publisher merges via gatemerge",
+    triggers: { task: true, plan: true, edit: false },
+    tokens_est: 228,
+    lines: 16,
+    metadata: {
+      node_type: "memory",
+      type: "feedback",
+      originSessionId: "4f3291fb-4c6f-4baa-afe7-02032688e512",
+      modified: "2026-10-12T02:44:18.541Z",
+    },
+  },
+  {
+    id: "never-quote-director-in-public",
+    path: "memory/never-quote-director-in-public.md",
+    keywords: ["director", "never", "public", "quote"],
+    patterns: ["never_quote_director_in_public"],
+    priority: "domain",
+    summary:
+      "Records carry the Director's decisions, never his words; brief status lines are where the slip happens; nothing is exemp",
+    triggers: { task: true, plan: true, edit: false },
+    tokens_est: 364,
+    lines: 20,
+    metadata: {
+      node_type: "memory",
+      type: "feedback",
+      originSessionId: "4f3291fb-4c6f-4baa-afe7-02032688e512",
+      modified: "2026-10-14T19:56:53.784Z",
+    },
+  },
+  {
+    id: "build-in-studio-tools-not-side-scripts",
+    path: "memory/build-in-studio-tools-not-side-scripts.md",
+    keywords: ["build", "scripts", "side", "studio", "tools"],
+    patterns: ["build_in_studio_tools_not_side_scripts"],
+    priority: "domain",
+    summary:
+      "Director 2026-11-08 (very unhappy): infrastructure is built INSIDE the studio's own tools (loadout-os etc.) as Argon bui",
+    triggers: { task: true, plan: true, edit: false },
+    tokens_est: 388,
+    lines: 26,
+    metadata: {
+      node_type: "memory",
+      type: "feedback",
+      originSessionId: "de321234-740c-46e3-a4de-c1be5fbb071c",
+      modified: "2026-11-08T07:48:45.358Z",
+    },
+  },
+];
+

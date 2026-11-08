@@ -235,11 +235,13 @@ export const COMMAND_HELP: Record<string, HelpEntry> = {
 
   // ── rituals ──────────────────────────────────────────────────
   doctor: {
-    synopsis: "loadout-os doctor [--store <dir>] [--index <p>] [--settings <p>] [--usage <p>] [--repo-root <dir>] [--json]",
+    synopsis: "loadout-os doctor [--store <dir>] [--index <p>] [--project-index <p>] [--settings <p>] [--skills <dir>] [--usage <p>] [--repo-root <dir>] [--json]",
     flags: [
       ["--store <dir>", "memory store dir (default canonical store)"],
       ["--index <p>", "global resolver index (default ~/.ai-loadout/index.json)"],
+      ["--project-index <p>", "additional project index searched for triad memory IDs (default <repo-root>/.claude/loadout/index.json)"],
       ["--settings <p>", "Claude Code settings.json (default ~/.claude/settings.json)"],
+      ["--skills <dir>", "skills directory for triad skill checks (default ~/.claude/skills)"],
       ["--usage <p>", "usage.jsonl path (default ~/.ai-loadout/usage.jsonl)"],
       ["--repo-root <dir>", "repo root for the hook-drift check (default cwd)"],
       ["--json", "machine-readable output"],

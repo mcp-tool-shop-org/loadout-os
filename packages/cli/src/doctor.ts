@@ -21,7 +21,7 @@
 
 import { readFileSync, existsSync, statSync } from "node:fs";
 import { createHash } from "node:crypto";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { homedir } from "node:os";
 
 import { analyzeMemoryMd, validateMemory } from "@mcptoolshop/claude-memories";
@@ -32,6 +32,8 @@ import {
 } from "@mcptoolshop/ai-loadout";
 
 import { BOLD, DIM, RESET, GREEN, YELLOW, RED, log } from "./console.js";
+import type { PreToolRule } from "./pretool.js";
+import { PRETOOL_RULES } from "./pretool-rules.js";
 
 export type CheckStatus = "pass" | "warn" | "fail";
 
@@ -60,13 +62,23 @@ export interface DoctorPaths {
   hookSource: string;
   /** Live mirror of the hook Claude Code actually runs (~/.claude/loadout-hook/loadout-hook.mjs). */
   hookMirror: string;
+  /** Skills directory holding `<name>/SKILL.md` (defaults to `<dirname(settings)>/skills` or `~/.claude/skills`). */
+  skillsDir?: string;
+  /** Additional index paths (e.g. project `.claude/loadout/index.json`) searched by the triad memory check. */
+  extraIndexes?: string[];
+  /** Override pre-tool rule table for the triad check (defaults to `PRETOOL_RULES`). */
+  rules?: readonly PreToolRule[];
 }
 
 /** ~7 days — a usage.jsonl untouched longer than this is "stale" (warn). */
 const RECENT_MS = 7 * 24 * 60 * 60 * 1000;
 
-export function defaultDoctorPaths(repoRoot: string = process.cwd()): DoctorPaths {
-  const home = homedir();
+export function defaultDoctorPaths(
+  repoRoot: string = process.cwd(),
+  homeDir: string = homedir(),
+): DoctorPaths {
+  const home = homeDir;
+  const projectIndex = resolve(repoRoot, ".claude", "loadout", "index.json");
   return {
     store: resolve(home, ".claude", "projects", "F--AI", "memory"),
     index: resolve(home, ".ai-loadout", "index.json"),
@@ -74,6 +86,8 @@ export function defaultDoctorPaths(repoRoot: string = process.cwd()): DoctorPath
     usage: resolve(home, ".ai-loadout", "usage.jsonl"),
     hookSource: resolve(repoRoot, "apps", "hook", "dist", "loadout-hook.mjs"),
     hookMirror: resolve(home, ".claude", "loadout-hook", "loadout-hook.mjs"),
+    skillsDir: resolve(home, ".claude", "skills"),
+    extraIndexes: existsSync(projectIndex) ? [projectIndex] : [],
   };
 }
 
@@ -409,8 +423,167 @@ export function runDoctor(paths: DoctorPaths): DoctorResult {
     }
   }
 
+  // ── Part 4.2: Triad checks (memory, skill, pre-tool hook) ─────
+  const rules = paths.rules ?? PRETOOL_RULES;
+
+  // (i) triad-memories: every rule in the table names a memory id that exists in some index
+  const knownMemoryIds = new Set<string>();
+  if (index) {
+    for (const e of index.entries) {
+      if (e && typeof e.id === "string") knownMemoryIds.add(e.id);
+    }
+  }
+  for (const extraPath of paths.extraIndexes ?? []) {
+    const extraLoaded = loadIndex(extraPath);
+    if ("index" in extraLoaded) {
+      for (const e of extraLoaded.index.entries) {
+        if (e && typeof e.id === "string") knownMemoryIds.add(e.id);
+      }
+    }
+  }
+
+  const missingMemoryRules: string[] = [];
+  for (const r of rules) {
+    if (!r.memory || !knownMemoryIds.has(r.memory)) {
+      missingMemoryRules.push(`${r.id} -> ${r.memory || "(empty)"}`);
+    }
+  }
+  if (missingMemoryRules.length > 0) {
+    checks.push({
+      id: "triad-memories",
+      status: "fail",
+      message: `Triad memory id missing from index(es): ${missingMemoryRules.join(", ")}`,
+      hint: "Ensure every rule in PRETOOL_RULES references a memory id present in the global or project index.json.",
+    });
+  } else {
+    checks.push({
+      id: "triad-memories",
+      status: "pass",
+      message: `All ${rules.length} pre-tool rule memory id(s) exist in loaded index(es)`,
+    });
+  }
+
+  // (j) triad-skills: every rule names a skill under ~/.claude/skills/<name>/SKILL.md, or skill: "none" with a reason
+  const skillsDir =
+    paths.skillsDir ?? resolve(dirname(paths.settings), "skills");
+  const brokenSkillRules: string[] = [];
+  const noneWithReasonRules: string[] = [];
+
+  for (const r of rules) {
+    if (r.skill === "none") {
+      if (r.skillNoneReason && r.skillNoneReason.trim().length > 0) {
+        noneWithReasonRules.push(`${r.id} (${r.skillNoneReason.trim()})`);
+      } else {
+        brokenSkillRules.push(`${r.id} (skill: none without reason)`);
+      }
+    } else if (!r.skill || !r.skill.trim()) {
+      brokenSkillRules.push(`${r.id} (empty skill)`);
+    } else {
+      const skillFile = join(skillsDir, r.skill, "SKILL.md");
+      if (!existsSync(skillFile)) {
+        brokenSkillRules.push(`${r.id} -> ${r.skill}/SKILL.md`);
+      }
+    }
+  }
+
+  if (brokenSkillRules.length > 0) {
+    checks.push({
+      id: "triad-skills",
+      status: "fail",
+      message: `Triad skill link broken: ${brokenSkillRules.join(", ")}`,
+      hint: `Ensure <skillsDir>/<name>/SKILL.md exists (checked ${skillsDir}) or mark skill: "none" with skillNoneReason.`,
+    });
+  } else if (noneWithReasonRules.length > 0) {
+    checks.push({
+      id: "triad-skills",
+      status: "warn",
+      message: `All named skills exist; ${noneWithReasonRules.length} rule(s) marked skill: none — ${noneWithReasonRules.join("; ")}`,
+    });
+  } else {
+    checks.push({
+      id: "triad-skills",
+      status: "pass",
+      message: `All ${rules.length} pre-tool rule skill(s) exist under ${skillsDir}`,
+    });
+  }
+
+  // (k) triad-pretool-hook: pre-tool hook wired in user settings, with command and mode reported
+  if (!existsSync(paths.settings)) {
+    checks.push({
+      id: "triad-pretool-hook",
+      status: "fail",
+      message: `Pre-tool hook NOT wired (settings.json not found: ${paths.settings})`,
+      hint: "Wire `loadout-os hook pre-tool` under hooks.PreToolUse in ~/.claude/settings.json.",
+    });
+  } else {
+    try {
+      const rawSettings = readFileSync(paths.settings, "utf-8");
+      const parsedSettings = JSON.parse(rawSettings) as Record<string, unknown>;
+      const preToolCmd = findPreToolHookCommand(parsedSettings);
+      if (preToolCmd) {
+        const mode = parsePreToolCommandMode(preToolCmd);
+        checks.push({
+          id: "triad-pretool-hook",
+          status: "pass",
+          message: `Pre-tool hook wired in settings.json (command: "${preToolCmd}", mode: ${mode})`,
+        });
+      } else {
+        checks.push({
+          id: "triad-pretool-hook",
+          status: "fail",
+          message:
+            "Pre-tool hook NOT wired in settings.json (no PreToolUse `hook pre-tool` command)",
+          hint: "Add a PreToolUse hook running `loadout-os hook pre-tool --mode log-only` (or `--mode enforce`).",
+        });
+      }
+    } catch (e) {
+      checks.push({
+        id: "triad-pretool-hook",
+        status: "fail",
+        message: `Could not parse settings.json for PreToolUse hook: ${(e as Error).message}`,
+      });
+    }
+  }
+
   const ok = !checks.some((c) => c.status === "fail");
   return { checks, ok };
+}
+
+function findPreToolHookCommand(settingsObj: Record<string, unknown>): string | null {
+  const hooks = settingsObj.hooks;
+  if (!hooks || typeof hooks !== "object") return null;
+  const preToolUse = (hooks as Record<string, unknown>).PreToolUse;
+  const found: string[] = [];
+
+  const walk = (node: unknown) => {
+    if (!node) return;
+    if (typeof node === "string") {
+      if (/\bhook\s+pre-tool\b/.test(node)) found.push(node.trim());
+      return;
+    }
+    if (Array.isArray(node)) {
+      for (const item of node) walk(item);
+      return;
+    }
+    if (typeof node === "object") {
+      const rec = node as Record<string, unknown>;
+      if (typeof rec.command === "string" && /\bhook\s+pre-tool\b/.test(rec.command)) {
+        found.push(rec.command.trim());
+      }
+      if (rec.hooks) walk(rec.hooks);
+    }
+  };
+
+  walk(preToolUse);
+  return found[0] ?? null;
+}
+
+function parsePreToolCommandMode(command: string): string {
+  const m = command.match(/--mode(?:=|\s+)["']?([a-zA-Z0-9_-]+)["']?/i);
+  if (m && m[1]) {
+    return m[1].toLowerCase();
+  }
+  return "enforce";
 }
 
 /** Render a doctor result as a human screen. */

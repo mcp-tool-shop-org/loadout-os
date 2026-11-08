@@ -3,6 +3,7 @@ export type {
   Priority,
   Triggers,
   LoadMode,
+  VerificationStatus,
   LoadoutEntry,
   Budget,
   LoadoutIndex,
