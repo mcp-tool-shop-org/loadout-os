@@ -599,23 +599,23 @@ export interface PostWriteResult {
  * - Resolves relative paths against `baseDir` (default `process.cwd()`)
  */
 export function normalizeHookPath(rawPath: string, baseDir?: string): string {
-  let p = rawPath.trim();
+  let p = rawPath.trim().replace(/\\/g, "/");
 
   // 1. Strip Windows extended-length prefix \\?\ or //?/
-  if (p.startsWith("\\\\?\\") || p.startsWith("//?/") || p.startsWith("\\\\.\\") || p.startsWith("//./")) {
+  if (p.startsWith("//?/") || p.startsWith("//./")) {
     const rest = p.slice(4);
-    if (/^UNC[\\/]/i.test(rest)) {
-      p = "\\\\" + rest.slice(4);
+    if (/^UNC\//i.test(rest)) {
+      p = "//" + rest.slice(4);
     } else {
       p = rest;
     }
   }
 
-  // 2. Expand leading ~ or ~/ or ~\
+  // 2. Expand leading ~ or ~/
   if (p === "~") {
-    p = homedir();
-  } else if (p.startsWith("~/") || p.startsWith("~\\")) {
-    p = join(homedir(), p.slice(2));
+    p = homedir().replace(/\\/g, "/");
+  } else if (p.startsWith("~/")) {
+    p = join(homedir(), p.slice(2)).replace(/\\/g, "/");
   }
 
   // 3. Convert MSYS /c/... or /c to C:/... on Windows

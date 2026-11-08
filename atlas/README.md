@@ -1,20 +1,14 @@
 # loadout-os: how it works
 
-Mapped at 2026-11-08 from commit 6ddc377 by Atlas 1.24.0.
+Mapped at 2026-11-08 from commit fa95b53 by Atlas 1.24.0.
 
 ## What this is
 
 9 parts, mostly Markdown (236 files); code in TypeScript (85), CSS (8), JavaScript (7), Astro (4) and PowerShell (1). Work enters through 6 doors; the busiest is CI, which reaches 6 parts. It publishes @mcptoolshop/loadout-os to npm. It deploys a site to GitHub Pages. People run ai-loadout, claude-memories, claude-rules and loadout-os.
 
-## What changed since 2026-11-08 (e522fa1)
+## What changed since 2026-11-08 (6ddc377)
 
-- CI now also runs apps/hook/esbuild.config.mjs.
-- Release now also runs apps/hook/esbuild.config.mjs.
-- .claude/loadout is now written by packages/cli/src/refresh.ts.
-- README.md is now read by packages/cli/src/tests/help.test.ts.
-- package.json is now also read by packages/cli/src/tests/doctor.test.ts.
-- And 2 more new writers and readers of places.
-- 21 files changed content, across 6 parts.
+Nothing structural changed since 2026-11-08; 1 file changed content.
 
 ## What comes in
 
@@ -59,9 +53,14 @@ CI writes only to .claude/loadout/, which is not tracked.
 
 ## What tends to change together
 
-No two source files, other than a file and its own test, changed together often enough to name.
+- **packages/cli/src/cli.ts** and **packages/cli/src/help.ts** changed together in 5 of 7 commits, inside the cli part.
+- **packages/cli/src/cli.ts** and **packages/cli/src/tests/help.test.ts** changed together in 5 of 7 commits, inside the cli part.
+- **packages/memories/src/index-gen.ts** and **packages/memories/src/validate.ts** changed together in 5 of 7 commits, inside the memories part.
+- **packages/memories/src/tests/index-gen.test.ts** and **packages/memories/src/validate.ts** changed together in 4 of 7 commits, inside the memories part.
 
-2 files changed together with their own tests, as expected.
+4 files changed together with their own tests, as expected.
+
+Confidence is low: fewer than 25 source files reach 10 revisions in the window.
 
 Window: 180 days; a pair counts from 3 shared commits, since 0 source files reach 10 revisions; the floor rises to 10 when 25 do.
 

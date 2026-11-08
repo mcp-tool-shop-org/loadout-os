@@ -61,76 +61,93 @@
   "changes": {
     "fileCounts": {
       "added": 0,
-      "changed": 21,
+      "changed": 1,
       "moved": 0,
-      "parts": 6,
+      "parts": 1,
       "removed": 0
     },
     "items": [
       {
-        "kind": "door",
-        "sentence": "CI now also runs apps/hook/esbuild.config.mjs.",
-        "subjects": [
-          ".github/workflows/ci.yml",
-          "apps/hook/esbuild.config.mjs"
-        ]
-      },
-      {
-        "kind": "door",
-        "sentence": "Release now also runs apps/hook/esbuild.config.mjs.",
-        "subjects": [
-          ".github/workflows/release.yml",
-          "apps/hook/esbuild.config.mjs"
-        ]
-      },
-      {
-        "kind": "landing",
-        "sentence": ".claude/loadout is now written by packages/cli/src/refresh.ts.",
-        "subjects": [
-          ".claude/loadout",
-          "packages/cli/src/refresh.ts"
-        ]
-      },
-      {
-        "kind": "landing",
-        "sentence": "README.md is now read by packages/cli/src/tests/help.test.ts.",
-        "subjects": [
-          "README.md",
-          "packages/cli/src/tests/help.test.ts"
-        ]
-      },
-      {
-        "kind": "landing",
-        "sentence": "package.json is now also read by packages/cli/src/tests/doctor.test.ts.",
-        "subjects": [
-          "package.json",
-          "packages/cli/src/tests/doctor.test.ts"
-        ]
-      },
-      {
-        "kind": "landing",
-        "sentence": "And 2 more new writers and readers of places.",
-        "subjects": []
-      },
-      {
         "kind": "counts",
-        "sentence": "21 files changed content, across 6 parts.",
+        "sentence": "Nothing structural changed since 2026-11-08; 1 file changed content.",
         "subjects": []
       }
     ],
     "since": {
-      "commit": "e522fa11bf75804124da8a0a41fec27cf0f5ff59",
-      "generatedAt": "2026-11-08T13:05:05.600Z"
+      "commit": "6ddc3772f65288e2f7c3536eded5ec2d25223978",
+      "generatedAt": "2026-11-08T16:53:02.329Z"
     },
-    "unchanged": false
+    "unchanged": true
   },
-  "changesTogether": [],
+  "changesTogether": [
+    {
+      "a": "packages/cli/src/cli.ts",
+      "b": "packages/cli/src/help.ts",
+      "either": 7,
+      "partLabels": [
+        "cli",
+        "cli"
+      ],
+      "parts": [
+        "cli",
+        "cli"
+      ],
+      "relation": "inside",
+      "shared": 5
+    },
+    {
+      "a": "packages/cli/src/cli.ts",
+      "b": "packages/cli/src/tests/help.test.ts",
+      "either": 7,
+      "partLabels": [
+        "cli",
+        "cli"
+      ],
+      "parts": [
+        "cli",
+        "cli"
+      ],
+      "relation": "inside",
+      "shared": 5
+    },
+    {
+      "a": "packages/memories/src/index-gen.ts",
+      "b": "packages/memories/src/validate.ts",
+      "either": 7,
+      "partLabels": [
+        "memories",
+        "memories"
+      ],
+      "parts": [
+        "memories",
+        "memories"
+      ],
+      "relation": "inside",
+      "shared": 5
+    },
+    {
+      "a": "packages/memories/src/tests/index-gen.test.ts",
+      "b": "packages/memories/src/validate.ts",
+      "either": 7,
+      "partLabels": [
+        "memories",
+        "memories"
+      ],
+      "parts": [
+        "memories",
+        "memories"
+      ],
+      "relation": "inside",
+      "shared": 4
+    }
+  ],
   "changesTogetherNote": [
-    "2 files changed together with their own tests, as expected.",
+    "4 files changed together with their own tests, as expected.",
+    "Confidence is low: fewer than 25 source files reach 10 revisions in the window.",
     "Window: 180 days; a pair counts from 3 shared commits, since 0 source files reach 10 revisions; the floor rises to 10 when 25 do."
   ],
-  "changesTogetherWithTests": 2,
-  "commit": "6ddc3772f65288e2f7c3536eded5ec2d25223978",
+  "changesTogetherWithTests": 4,
+  "commit": "fa95b532f33c7815c06f5b26a1ff771d8a8b2d00",
   "defaultBranch": "main",
   "derived": "9 parts, mostly Markdown (236 files); code in TypeScript (85), CSS (8), JavaScript (7), Astro (4) and PowerShell (1). Work enters through 6 doors; the busiest is CI, which reaches 6 parts. It publishes @mcptoolshop/loadout-os to npm. It deploys a site to GitHub Pages. People run ai-loadout, claude-memories, claude-rules and loadout-os.",
   "doors": [
@@ -516,7 +533,7 @@
   ],
   "engine": "1.24.0",
   "generated": [],
-  "generatedAt": "2026-11-08T16:53:02.329Z",
+  "generatedAt": "2026-11-08T16:56:16.454Z",
   "limits": [
     "6 writes and 23 reads use paths built at run time and are not named here.",
     "1 write goes to places this repository does not track, so it is not listed as generated.",
