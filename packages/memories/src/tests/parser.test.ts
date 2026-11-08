@@ -1,6 +1,11 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { parseMemoryMd } from "../parser.js";
+import { analyzeMemoryMd } from "../analyze.js";
+import { validateMemory } from "../validate.js";
 
 describe("parseMemoryMd", () => {
   it("parses sections from headings", () => {
@@ -233,5 +238,60 @@ Full frame in [user profile](user_profile.md).
     const { refs } = parseMemoryMd("- [Old](old.md) Topic — desc → `memory/topic.md`\n");
     assert.equal(refs.length, 1);
     assert.equal(refs[0].path, "memory/topic.md");
+  });
+
+  it("parses Markdown-link bullets with arrows in their hook text via the link branch without MISSING_TOPIC_FILE, while keeping arrow-form lines on the arrow branch (#20)", () => {
+    const hooks = [
+      "teach → apply → verify",
+      "teach then apply → verify",
+      "one → arrow",
+      "see loop.md → apply",
+    ];
+    const lines = [
+      "## Active",
+      ...hooks.map((h) => `- [Loop](loop.md) — ${h}`),
+      "- Name — desc → `path.md`",
+      "",
+    ].join("\n");
+
+    const { refs } = parseMemoryMd(lines);
+    assert.equal(refs.length, 5);
+    for (let i = 0; i < hooks.length; i++) {
+      assert.equal(refs[i].name, "Loop");
+      assert.equal(refs[i].path, "loop.md");
+      assert.equal(refs[i].description, hooks[i]);
+    }
+    assert.equal(refs[4].name, "Name");
+    assert.equal(refs[4].description, "desc");
+    assert.equal(refs[4].path, "path.md");
+
+    // Verify in a temp store with loop.md and path.md present that none of the
+    // four arrow-bearing hook texts trigger MISSING_TOPIC_FILE.
+    const tmp = mkdtempSync(join(tmpdir(), "loadout-issue20-"));
+    try {
+      writeFileSync(join(tmp, "loop.md"), "# Loop\nBody.\n", "utf-8");
+      writeFileSync(join(tmp, "path.md"), "# Path\nBody.\n", "utf-8");
+      for (const hook of hooks) {
+        const memPath = join(tmp, "MEMORY.md");
+        writeFileSync(
+          memPath,
+          `# Memory\n- [Loop](loop.md) — ${hook}\n- Name — desc → \`path.md\`\n`,
+          "utf-8",
+        );
+        const analysis = analyzeMemoryMd(memPath);
+        const issues = validateMemory(analysis);
+        assert.equal(
+          analysis.missingFiles.length,
+          0,
+          `hook "${hook}" must not report missingFiles (got ${analysis.missingFiles.join(", ")})`,
+        );
+        assert.ok(
+          !issues.some((iss) => iss.code === "MISSING_TOPIC_FILE"),
+          `hook "${hook}" must not raise MISSING_TOPIC_FILE`,
+        );
+      }
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
   });
 });
