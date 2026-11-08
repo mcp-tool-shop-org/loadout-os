@@ -116,6 +116,7 @@ test("every dispatched leaf command has a per-command help entry", () => {
     "hook session-start",
     "hook pre-compact",
     "hook post-write",
+    "hook pre-tool",
     "refresh",
   ];
   for (const key of dispatched) {

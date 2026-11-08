@@ -41,6 +41,50 @@ export type { ReportResult, ScoreBucket } from "./report.js";
 export { runHookTest, printHookTest, defaultHookPath } from "./hook.js";
 export type { HookTestOptions, HookTestResult } from "./hook.js";
 
+// ── Ritual: pre-tool hook (PreToolUse Layer A/B framework) ─────
+export {
+  runPreTool,
+  parsePreToolStdin,
+  loadSeatConfig,
+  resolveSeat,
+  normalizePreToolPath,
+  parseBashCommand,
+  isSegmentReadOnly,
+  isBashCommandReadOnly,
+  isReadOnlyPassThrough,
+  extractWritePayload,
+  resolveRuleAction,
+  capRuleMessage,
+  hashToolInput,
+  appendDecisionLog,
+  defaultSeatsPath,
+  defaultDecisionLogPath,
+  DEFAULT_PRETOOL_TIMEOUT_MS,
+  READ_ONLY_TOOLS,
+} from "./pretool.js";
+export type {
+  PreToolStdinPayload,
+  SeatConfig,
+  SeatName,
+  CommandRedirection,
+  CommandSegment,
+  ParsedBashCommand,
+  WriteEditItem,
+  WritePayload,
+  RuleLayer,
+  RuleAction,
+  RuleMatchInput,
+  RuleMatchResult,
+  PreToolRule,
+  MatchedRuleRecord,
+  DecisionLogEntry,
+  HookMode,
+  DecisionOutcome,
+  PreToolOptions,
+  PreToolResult,
+} from "./pretool.js";
+export { PRETOOL_RULES } from "./pretool-rules.js";
+
 // ── Ritual: refresh (Index Freshness Ritual) ───────────────────
 export {
   runRefresh,
