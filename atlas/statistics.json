@@ -49,7 +49,7 @@
       "confidence": "low",
       "highWater": null,
       "name": "cli",
-      "qualifyingSourceCommits": 6,
+      "qualifyingSourceCommits": 10,
       "rebaseline": null
     },
     {
@@ -65,7 +65,7 @@
       "confidence": "low",
       "highWater": null,
       "name": "hook",
-      "qualifyingSourceCommits": 3,
+      "qualifyingSourceCommits": 4,
       "rebaseline": null
     },
     {
@@ -86,7 +86,7 @@
       "confidence": "low",
       "highWater": null,
       "name": "kernel",
-      "qualifyingSourceCommits": 4,
+      "qualifyingSourceCommits": 6,
       "rebaseline": null
     },
     {
@@ -104,7 +104,7 @@
       "confidence": "low",
       "highWater": null,
       "name": "memories",
-      "qualifyingSourceCommits": 5,
+      "qualifyingSourceCommits": 8,
       "rebaseline": null
     },
     {
@@ -167,8 +167,8 @@
         "path": ".claude/CLAUDE.md"
       },
       {
-        "commits": 7,
-        "lines": 280,
+        "commits": 9,
+        "lines": 284,
         "path": ".github/workflows/ci.yml"
       },
       {
@@ -187,8 +187,8 @@
         "path": ".gitignore"
       },
       {
-        "commits": 3,
-        "lines": 130,
+        "commits": 5,
+        "lines": 150,
         "path": "CHANGELOG.md"
       },
       {
@@ -197,43 +197,43 @@
         "path": "LICENSE"
       },
       {
-        "commits": 2,
-        "lines": 96,
+        "commits": 3,
+        "lines": 152,
         "path": "README.es.md"
       },
       {
-        "commits": 2,
-        "lines": 116,
+        "commits": 3,
+        "lines": 162,
         "path": "README.fr.md"
       },
       {
-        "commits": 2,
-        "lines": 114,
+        "commits": 3,
+        "lines": 160,
         "path": "README.hi.md"
       },
       {
-        "commits": 2,
-        "lines": 96,
+        "commits": 3,
+        "lines": 150,
         "path": "README.it.md"
       },
       {
-        "commits": 2,
-        "lines": 96,
+        "commits": 3,
+        "lines": 142,
         "path": "README.ja.md"
       },
       {
-        "commits": 10,
-        "lines": 150,
+        "commits": 11,
+        "lines": 170,
         "path": "README.md"
       },
       {
-        "commits": 2,
-        "lines": 96,
+        "commits": 3,
+        "lines": 134,
         "path": "README.pt-BR.md"
       },
       {
-        "commits": 2,
-        "lines": 120,
+        "commits": 3,
+        "lines": 168,
         "path": "README.zh.md"
       },
       {
@@ -252,8 +252,8 @@
         "path": "SECURITY.md"
       },
       {
-        "commits": 1,
-        "lines": 82,
+        "commits": 2,
+        "lines": 86,
         "path": "SHIP_GATE.md"
       },
       {
@@ -262,8 +262,8 @@
         "path": "apps/hook/esbuild.config.mjs"
       },
       {
-        "commits": 4,
-        "lines": 208,
+        "commits": 5,
+        "lines": 454,
         "path": "apps/hook/loadout-hook.mjs"
       },
       {
@@ -277,8 +277,8 @@
         "path": "apps/hook/smoke-test.ps1"
       },
       {
-        "commits": 2,
-        "lines": 172,
+        "commits": 4,
+        "lines": 320,
         "path": "atlas/README.md"
       },
       {
@@ -287,18 +287,18 @@
         "path": "atlas/boundaries.yaml"
       },
       {
-        "commits": 2,
-        "lines": 602,
+        "commits": 4,
+        "lines": 1422,
         "path": "atlas/page.json"
       },
       {
-        "commits": 2,
-        "lines": 4332,
+        "commits": 4,
+        "lines": 4490,
         "path": "atlas/statistics.json"
       },
       {
-        "commits": 2,
-        "lines": 8578,
+        "commits": 4,
+        "lines": 20504,
         "path": "atlas/structure.json"
       },
       {
@@ -312,8 +312,8 @@
         "path": "logo.png"
       },
       {
-        "commits": 9,
-        "lines": 1483,
+        "commits": 10,
+        "lines": 1485,
         "path": "package-lock.json"
       },
       {
@@ -342,18 +342,18 @@
         "path": "packages/cli/esbuild.config.mjs"
       },
       {
-        "commits": 8,
-        "lines": 82,
+        "commits": 9,
+        "lines": 84,
         "path": "packages/cli/package.json"
       },
       {
-        "commits": 3,
-        "lines": 422,
+        "commits": 6,
+        "lines": 607,
         "path": "packages/cli/src/cli.ts"
       },
       {
-        "commits": 3,
-        "lines": 900,
+        "commits": 4,
+        "lines": 1067,
         "path": "packages/cli/src/commands.ts"
       },
       {
@@ -367,13 +367,13 @@
         "path": "packages/cli/src/doctor.ts"
       },
       {
-        "commits": 1,
-        "lines": 289,
+        "commits": 4,
+        "lines": 396,
         "path": "packages/cli/src/help.ts"
       },
       {
-        "commits": 2,
-        "lines": 184,
+        "commits": 4,
+        "lines": 777,
         "path": "packages/cli/src/hook.ts"
       },
       {
@@ -382,8 +382,8 @@
         "path": "packages/cli/src/index.ts"
       },
       {
-        "commits": 3,
-        "lines": 454,
+        "commits": 4,
+        "lines": 1154,
         "path": "packages/cli/src/refresh.ts"
       },
       {
@@ -412,18 +412,18 @@
         "path": "packages/cli/src/tests/fixtures.ts"
       },
       {
-        "commits": 1,
-        "lines": 118,
+        "commits": 4,
+        "lines": 124,
         "path": "packages/cli/src/tests/help.test.ts"
       },
       {
-        "commits": 1,
-        "lines": 48,
+        "commits": 4,
+        "lines": 1147,
         "path": "packages/cli/src/tests/hook.test.ts"
       },
       {
-        "commits": 2,
-        "lines": 310,
+        "commits": 3,
+        "lines": 418,
         "path": "packages/cli/src/tests/refresh.test.ts"
       },
       {
@@ -832,8 +832,8 @@
         "path": "packages/kernel/site/astro.config.mjs"
       },
       {
-        "commits": 2,
-        "lines": 13572,
+        "commits": 4,
+        "lines": 13584,
         "path": "packages/kernel/site/package-lock.json"
       },
       {
@@ -917,13 +917,13 @@
         "path": "packages/kernel/src/cli.ts"
       },
       {
-        "commits": 2,
-        "lines": 179,
+        "commits": 3,
+        "lines": 272,
         "path": "packages/kernel/src/frontmatter.ts"
       },
       {
-        "commits": 4,
-        "lines": 66,
+        "commits": 5,
+        "lines": 68,
         "path": "packages/kernel/src/index.ts"
       },
       {
@@ -937,8 +937,8 @@
         "path": "packages/kernel/src/merge.ts"
       },
       {
-        "commits": 2,
-        "lines": 212,
+        "commits": 3,
+        "lines": 256,
         "path": "packages/kernel/src/resolve.ts"
       },
       {
@@ -957,8 +957,8 @@
         "path": "packages/kernel/src/tests/cli-helpers.test.ts"
       },
       {
-        "commits": 2,
-        "lines": 135,
+        "commits": 3,
+        "lines": 172,
         "path": "packages/kernel/src/tests/frontmatter.test.ts"
       },
       {
@@ -972,8 +972,8 @@
         "path": "packages/kernel/src/tests/merge.test.ts"
       },
       {
-        "commits": 2,
-        "lines": 411,
+        "commits": 3,
+        "lines": 477,
         "path": "packages/kernel/src/tests/resolve.test.ts"
       },
       {
@@ -1002,8 +1002,8 @@
         "path": "packages/kernel/src/tokens.ts"
       },
       {
-        "commits": 2,
-        "lines": 121,
+        "commits": 3,
+        "lines": 128,
         "path": "packages/kernel/src/types.ts"
       },
       {
@@ -1362,8 +1362,8 @@
         "path": "packages/memories/site/astro.config.mjs"
       },
       {
-        "commits": 2,
-        "lines": 13568,
+        "commits": 4,
+        "lines": 13580,
         "path": "packages/memories/site/package-lock.json"
       },
       {
@@ -1427,8 +1427,8 @@
         "path": "packages/memories/site/tsconfig.json"
       },
       {
-        "commits": 2,
-        "lines": 244,
+        "commits": 3,
+        "lines": 442,
         "path": "packages/memories/src/analyze.ts"
       },
       {
@@ -1437,18 +1437,18 @@
         "path": "packages/memories/src/cli.ts"
       },
       {
-        "commits": 5,
-        "lines": 252,
+        "commits": 6,
+        "lines": 394,
         "path": "packages/memories/src/index-gen.ts"
       },
       {
-        "commits": 2,
-        "lines": 46,
+        "commits": 3,
+        "lines": 70,
         "path": "packages/memories/src/index.ts"
       },
       {
-        "commits": 2,
-        "lines": 215,
+        "commits": 3,
+        "lines": 246,
         "path": "packages/memories/src/parser.ts"
       },
       {
@@ -1460,6 +1460,11 @@
         "commits": 1,
         "lines": 104,
         "path": "packages/memories/src/stats.ts"
+      },
+      {
+        "commits": 1,
+        "lines": 303,
+        "path": "packages/memories/src/sync.ts"
       },
       {
         "commits": 1,
@@ -1532,13 +1537,13 @@
         "path": "packages/memories/src/tests/health.test.ts"
       },
       {
-        "commits": 4,
-        "lines": 185,
+        "commits": 5,
+        "lines": 527,
         "path": "packages/memories/src/tests/index-gen.test.ts"
       },
       {
-        "commits": 3,
-        "lines": 179,
+        "commits": 5,
+        "lines": 243,
         "path": "packages/memories/src/tests/parser.test.ts"
       },
       {
@@ -1547,18 +1552,18 @@
         "path": "packages/memories/src/tests/stats.test.ts"
       },
       {
-        "commits": 3,
-        "lines": 100,
+        "commits": 4,
+        "lines": 139,
         "path": "packages/memories/src/tests/validate.test.ts"
       },
       {
-        "commits": 2,
-        "lines": 87,
+        "commits": 3,
+        "lines": 97,
         "path": "packages/memories/src/types.ts"
       },
       {
-        "commits": 4,
-        "lines": 178,
+        "commits": 5,
+        "lines": 291,
         "path": "packages/memories/src/validate.ts"
       },
       {
@@ -1907,8 +1912,8 @@
         "path": "packages/rules/site/astro.config.mjs"
       },
       {
-        "commits": 2,
-        "lines": 13572,
+        "commits": 4,
+        "lines": 13584,
         "path": "packages/rules/site/package-lock.json"
       },
       {
@@ -2072,8 +2077,8 @@
         "path": "site/astro.config.mjs"
       },
       {
-        "commits": 2,
-        "lines": 13862,
+        "commits": 4,
+        "lines": 13874,
         "path": "site/package-lock.json"
       },
       {
@@ -2092,8 +2097,8 @@
         "path": "site/src/content.config.ts"
       },
       {
-        "commits": 1,
-        "lines": 61,
+        "commits": 2,
+        "lines": 76,
         "path": "site/src/content/docs/handbook/architecture.md"
       },
       {
@@ -2157,9 +2162,9 @@
     "level": "low",
     "reason": "fewer than 25 source files reach 10 revisions in the window"
   },
-  "generatedAt": "2026-09-30T21:29:07.823Z",
+  "generatedAt": "2026-11-08T12:52:27.028Z",
   "generatedFrom": {
-    "commit": "532deeed98d8a72bc4c8ada226db1f9024dc5dfb"
+    "commit": "f2fd5992daa9f3521f9e1f648968f03e6e5f8b08"
   },
   "pairs": [],
   "parameters": {
@@ -2172,16 +2177,16 @@
     "floor": "fallen",
     "floorHeld": false,
     "floorTrigger": "revision-depth",
-    "headDate": "2026-09-30T14:25:41-07:00",
-    "inScopeFiles": 387,
+    "headDate": "2026-11-08T07:08:44-05:00",
+    "inScopeFiles": 388,
     "pinnedStart": null,
     "priorFloor": "fallen",
-    "qualifyingCommits": 36,
+    "qualifyingCommits": 44,
     "qualifyingMinimum": 30,
     "revisions": 5,
     "shared": 10,
     "sharedFloorUsed": 3,
-    "since": "2026-04-03T21:25:41.000Z",
+    "since": "2026-05-12T12:08:44.000Z",
     "sourceExtensions": [
       ".js",
       ".mjs",

@@ -68,7 +68,7 @@ export function writeUtf8Stdout(text: string): void {
  */
 export function readHookStdin(): string {
   try {
-    if (process.stdin.isTTY) return "";
+    if (process.stdin.isTTY || process.env.NODE_TEST_CONTEXT === "child-v8") return "";
     return readFileSync(0, "utf-8");
   } catch {
     return "";

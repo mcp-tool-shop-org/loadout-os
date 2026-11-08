@@ -24,7 +24,14 @@ import {
 import { join, resolve } from "node:path";
 import { homedir, tmpdir } from "node:os";
 
-import { runHookTest, defaultHookPath, runSessionStart, runPostWrite } from "../hook.js";
+import {
+  runHookTest,
+  defaultHookPath,
+  runSessionStart,
+  runPostWrite,
+  capBoardContent,
+  parsePostToolUsePayload,
+} from "../hook.js";
 import { runRefresh } from "../refresh.js";
 
 const HOOK = defaultHookPath(process.cwd());
@@ -827,6 +834,16 @@ describe("Part C: loadout-os hook session-start and pre-compact", () => {
       assert.equal(res.truncatedFiles.length, 1);
       assert.match(res.output, /\[truncated: BOARD\.md exceeded session-start cap/);
       assert.ok(!res.output.includes("- Item line 75"), "lines past the cap must be truncated");
+
+      // Single-line byte cap branch
+      const byteCapped = capBoardContent("x".repeat(500), "BOARD.md", 60, 100);
+      assert.equal(byteCapped.truncated, true);
+      assert.match(byteCapped.text, /\[truncated: BOARD\.md/);
+
+      // Store fallback scan when index is absent (--store only)
+      const fallbackRes = runSessionStart({ store: storeDir, maxLines: 10, maxBytes: 2000 });
+      assert.equal(fallbackRes.injectedFiles.length, 1);
+      assert.equal(fallbackRes.truncatedFiles.length, 1);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
@@ -990,6 +1007,7 @@ describe("Part D: loadout-os hook post-write", () => {
         const proc = spawnSync(process.execPath, [CLI_BIN, "hook", "post-write"], {
           encoding: "utf-8",
           input: payloadJson,
+          env: { ...process.env, NODE_TEST_CONTEXT: "" },
         });
         assert.equal(proc.status, 2);
         assert.match(proc.stderr, /MISSING_TOPIC_FILE/);
@@ -1130,6 +1148,15 @@ describe("Part D: loadout-os hook post-write", () => {
       assert.equal(res.matchedStore, true);
       assert.equal(res.exitCode, 2, "must exit 2 (never 1) on timeout/git failure");
       assert.match(res.stderr, /\[loadout-os post-write\]/);
+
+      // Exercise parsePostToolUsePayload variants (tool_response.filePath, invalid JSON, empty)
+      assert.deepEqual(parsePostToolUsePayload(""), {});
+      assert.deepEqual(parsePostToolUsePayload("{bad-json"), {});
+      assert.equal(
+        parsePostToolUsePayload(JSON.stringify({ tool_response: { filePath: "/tmp/x.md" } })).filePath,
+        "/tmp/x.md",
+      );
+      assert.equal(runPostWrite({ stdinJson: "{}" }).exitCode, 0);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

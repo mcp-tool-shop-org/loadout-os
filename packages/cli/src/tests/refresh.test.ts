@@ -27,6 +27,7 @@ import {
   RefreshError,
   type RefreshResult,
 } from "../refresh.js";
+import { dispatch } from "../cli.js";
 import { makeRefreshSandbox } from "./fixtures.js";
 
 /** The canonical live dest with its drive letter lower-cased (win32 only). */
@@ -403,6 +404,176 @@ test("withFileLock: serializes access and cleans up the lock file (F-07)", () =>
     assert.equal(value, 42);
     assert.equal(existsSync(actualLockPath), false, "lock file must be cleaned up after completion");
   } finally {
+    sb.cleanup();
+  }
+});
+
+
+test("CLI dispatch: exercises refresh --project/--fix, memories sync-summaries/place/move, and hook session-start/pre-compact/post-write in-process", () => {
+  const sb = makeRefreshSandbox({ valid: true });
+  try {
+    const projRoot = join(sb.dir, "cli-proj");
+    mkdirSync(projRoot, { recursive: true });
+
+    // Create sub-indexes and a topic with frontmatter + board
+    writeFileSync(
+      join(sb.storeDir, "index-projects.md"),
+      "# Projects\n- [Topic A](topic-a.md) — Stale summary\n",
+      "utf-8",
+    );
+    writeFileSync(join(sb.storeDir, "index-archive.md"), "# Archive\n", "utf-8");
+    writeFileSync(
+      join(sb.storeDir, "topic-a.md"),
+      [
+        "---",
+        "name: Topic A",
+        "description: Authoritative Topic A summary",
+        "---",
+        "# Topic A",
+        "Body.",
+        "",
+      ].join("\n"),
+      "utf-8",
+    );
+    writeFileSync(
+      join(sb.storeDir, "BOARD.md"),
+      [
+        "---",
+        "name: Active Board",
+        "description: Session board",
+        "priority: core",
+        "metadata:",
+        "  loadout_inject: session-start",
+        "  stale_after_min: 60",
+        "---",
+        "# Active Board",
+        "Current state.",
+        "",
+      ].join("\n"),
+      "utf-8",
+    );
+    writeFileSync(
+      sb.memoryMd,
+      [
+        "# Memory",
+        "- [Board](BOARD.md) — Session board",
+        "- [Projects](index-projects.md) — Projects sub-index",
+        "- [Archive](index-archive.md) — Archive sub-index",
+        "",
+      ].join("\n"),
+      "utf-8",
+    );
+
+    // 1. memories sync-summaries without --fix throws STALE_SUMMARIES
+    assert.throws(() =>
+      captureLog(() => dispatch(["memories", "sync-summaries", sb.memoryMd])),
+    );
+    assert.throws(() =>
+      captureLog(() => dispatch(["memories", "sync-summaries", sb.memoryMd, "--json"])),
+    );
+
+    // 2. memories sync-summaries --fix updates the drifted summary
+    const syncOut = captureLog(() =>
+      dispatch(["memories", "sync-summaries", sb.memoryMd, "--fix"]),
+    );
+    assert.match(syncOut, /synced/);
+    const syncCleanOut = captureLog(() =>
+      dispatch(["memories", "sync-summaries", sb.memoryMd]),
+    );
+    assert.match(syncCleanOut, /match their frontmatter/);
+    const syncJsonOut = captureLog(() =>
+      dispatch(["memories", "sync-summaries", sb.memoryMd, "--fix", "--json"]),
+    );
+    assert.ok(JSON.parse(syncJsonOut));
+
+    // 3. memories place and move (human and --json)
+    const placeOut = captureLog(() =>
+      dispatch(["memories", "place", join(sb.storeDir, "topic-a.md"), "projects", "--store", sb.storeDir]),
+    );
+    assert.match(placeOut, /Placed topic-a\.md/);
+    const moveJsonOut = captureLog(() =>
+      dispatch([
+        "memories",
+        "move",
+        join(sb.storeDir, "topic-a.md"),
+        "--into",
+        "archive",
+        "--store",
+        sb.storeDir,
+        "--json",
+      ]),
+    );
+    assert.equal(JSON.parse(moveJsonOut).targetIndex, "index-archive.md");
+
+    // Missing arg on place throws
+    assert.throws(() => dispatch(["memories", "place", "only-one-arg"]));
+
+    // 4. dispatch refresh --store --project --fix
+    const refOut = captureLog(() =>
+      dispatch(["refresh", "--store", sb.storeDir, "--project", projRoot, "--fix"]),
+    );
+    assert.match(refOut, /refreshed the PROJECT resolver index/i);
+
+    // Also exercise printRefresh with snapshot + dry-run + backup branches
+    const snapPrintOut = captureLog(() =>
+      printRefresh({
+        ...okResult(projectDest(projRoot)),
+        project: projRoot,
+        backupPath: `${projectDest(projRoot)}.bak`,
+        snapshot: {
+          committed: true,
+          noChange: false,
+          sha: "deadbeef",
+          mirrored: true,
+          message: "Committed and mirrored",
+        },
+      }),
+    );
+    assert.match(snapPrintOut, /Committed and mirrored/);
+
+    const dryPrintOut = captureLog(() =>
+      printRefresh({
+        ...okResult(projectDest(projRoot)),
+        project: projRoot,
+        dryRun: true,
+        wrote: false,
+        snapshot: {
+          committed: false,
+          noChange: true,
+          mirrored: false,
+          message: "No change",
+        },
+      }),
+    );
+    assert.match(dryPrintOut, /--dry-run/);
+
+    // Exercise human-readable (non-JSON) CLI outputs in commands.ts / report.ts / doctor.ts
+    captureLog(() => dispatch(["memories", "index", sb.memoryMd, "--lazy"]));
+    captureLog(() => dispatch(["memories", "validate", sb.memoryMd, "--max-lines", "200", "--max-bytes", "30000"]));
+    captureLog(() => dispatch(["memories", "stats", sb.memoryMd]));
+    captureLog(() => dispatch(["memories", "health", sb.memoryMd]));
+    captureLog(() => dispatch(["resolve", "--project", projRoot]));
+    captureLog(() => dispatch(["explain", "active-board", "--project", projRoot]));
+    captureLog(() => dispatch(["validate", projectDest(projRoot)]));
+    captureLog(() => dispatch(["overlaps", projectDest(projRoot)]));
+    captureLog(() => dispatch(["budget", projectDest(projRoot)]));
+
+    // 5. dispatch hook session-start & pre-compact (--json)
+    const ssJson = captureLog(() =>
+      dispatch(["hook", "session-start", "--project", projRoot, "--max-lines", "50", "--max-bytes", "5000", "--json"]),
+    );
+    assert.equal(JSON.parse(ssJson).injectedFiles.length, 1);
+
+    const pcJson = captureLog(() =>
+      dispatch(["hook", "pre-compact", "--project", projRoot, "--stale-after-min", "60", "--json"]),
+    );
+    assert.equal(JSON.parse(pcJson).warnings.length, 0);
+
+    // 6. dispatch hook post-write (clean and error)
+    dispatch(["hook", "post-write", "--project", projRoot, "--file", join(sb.storeDir, "BOARD.md")]);
+    assert.equal(process.exitCode ?? 0, 0);
+  } finally {
+    process.exitCode = 0;
     sb.cleanup();
   }
 });

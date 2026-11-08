@@ -1,23 +1,15 @@
 # loadout-os: how it works
 
-Mapped at 2026-09-30 from commit 532deee by Atlas 1.24.0.
+Mapped at 2026-11-08 from commit f2fd599 by Atlas 1.24.0.
 
 ## What this is
 
-9 parts, mostly Markdown (236 files); code in TypeScript (84), CSS (8), JavaScript (7), Astro (4) and PowerShell (1). Work enters through 6 doors; the busiest is CI, which reaches 5 parts. It publishes @mcptoolshop/loadout-os to npm. It deploys a site to GitHub Pages. People run ai-loadout, claude-memories, claude-rules and loadout-os.
+9 parts, mostly Markdown (236 files); code in TypeScript (85), CSS (8), JavaScript (7), Astro (4) and PowerShell (1). Work enters through 6 doors; the busiest is CI, which reaches 5 parts. It publishes @mcptoolshop/loadout-os to npm. It deploys a site to GitHub Pages. People run ai-loadout, claude-memories, claude-rules and loadout-os.
 
-## What changed since 2026-09-23 (741a092)
+## What changed since 2026-09-30 (532deee)
 
-- CI's pull request trigger now also names `codecov.yml`.
-- CI's push trigger now also names `codecov.yml`.
-- CI now also runs packages/cli/src/tests/console.test.ts, packages/cli/src/tests/dispatch.test.ts, packages/cli/src/tests/doctor.test.ts and 11 more.
-- And 5 more changes to doors.
-- .claude/CLAUDE.md is now also read by packages/cli/src/tests/split.test.ts.
-- apps/hook/ is now also read by ROADMAP.md.
-- packages/kernel/site/src/content/docs/ is now read by packages/kernel/site/astro.config.mjs.
-- And 10 more new writers and readers of places.
-- .claude was generated and is now authored.
-- 1 file added and 376 changed content, across 9 parts.
+- .claude/loadout/index.json is now read by packages/kernel/src/resolve.ts.
+- 1 file added and 44 changed content, across 7 parts.
 
 ## What comes in
 
@@ -101,16 +93,16 @@ Read those in order to follow one pull request end to end.
 
 ## What this map cannot see
 
-- 6 writes and 10 reads use paths built at run time and are not named here.
+- 6 writes and 23 reads use paths built at run time and are not named here.
+- 5 writes and 52 reads go to a path their caller passes, not to this repository.
 - 2 writes and 26 reads go to the directory the command is run in, not to this repository.
-- 1 write and 19 reads go to a path their caller passes, not to this repository.
-- 5 writes and 12 reads go to the home directory (.ai-loadout/ and .claude/) or a path their caller passes, not to this repository.
+- 6 writes and 12 reads go to the home directory (.ai-loadout/ and .claude/) or a path their caller passes, not to this repository.
+- 6 writes and 1 read go to a temporary directory, not to this repository.
 - 5 reads go to the directory the command is run in (.claude/ and MEMORY.md/) or the home directory (.claude/), not to this repository.
-- 2 writes and 3 reads go to the home directory (.ai-loadout/), not to this repository.
-- 4 writes go to a temporary directory, not to this repository.
 - 1 write and 2 reads go to the directory the command is run in (.claude/, MEMORY.md/ and memory/), the home directory (.claude/) or a path their caller passes, not to this repository.
+- 2 writes and 1 read go to the home directory (.ai-loadout/), not to this repository.
 - 1 write goes to the directory the command is run in (.claude/ and memory/) or a path its caller passes, not to this repository.
-- 3 commands are built at run time and not followed, 2 of them in tests.
+- 6 commands are built at run time and not followed, 5 of them in tests.
 - Statistics confidence is low: fewer than 25 source files reach 10 revisions in the window.
 
 Regenerate with `npx --yes @dogfood-lab/atlas map`.

@@ -8,7 +8,7 @@ import { matchLoadout } from "@mcptoolshop/ai-loadout";
 import { analyzeMemoryMd } from "../analyze.js";
 import { generateIndex } from "../index-gen.js";
 import { validateMemory } from "../validate.js";
-import { syncSummaries, placeOrMoveEntry } from "../sync.js";
+import { syncSummaries, placeOrMoveEntry, resolveTargetIndexFile } from "../sync.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const FIXTURES = join(__dirname, "..", "..", "src", "tests", "fixtures");
@@ -516,6 +516,47 @@ describe("sub-index expansion, frontmatter summary authority, and keyword extrac
       const finalIssues = validateMemory(finalAnalysis);
       assert.equal(finalIssues.filter((i) => i.severity === "error").length, 0);
       assert.equal(finalAnalysis.orphanFiles.length, 0);
+
+      // 4. Arrow-format line rewrite in syncSummaries + dry-run (fix: false)
+      writeFileSync(
+        memPath,
+        [
+          "# Memory Index",
+          "- Alpha Project — Outdated arrow desc → `project_alpha.md`",
+          "- [Projects](index-projects.md) — Sub-index for projects",
+          "- [Archive](index-archive.md) — Sub-index for archive",
+          "",
+        ].join("\n"),
+        "utf-8",
+      );
+      const drySync = syncSummaries(memPath, { fix: false });
+      assert.equal(drySync.fixed, false);
+      assert.ok(drySync.changes.length >= 1);
+      const fixedArrow = syncSummaries(memPath, { fix: true });
+      assert.equal(fixedArrow.fixed, true);
+
+      // 5. resolveTargetIndexFile shorthands and error branches
+      assert.ok(resolveTargetIndexFile(tmp, "main").endsWith("MEMORY.md"));
+      assert.ok(resolveTargetIndexFile(tmp, "MEMORY.md").endsWith("MEMORY.md"));
+      assert.ok(resolveTargetIndexFile(tmp, "index-archive.md").endsWith("index-archive.md"));
+      assert.ok(resolveTargetIndexFile(tmp, "custom.md").endsWith("custom.md"));
+      assert.throws(() => resolveTargetIndexFile(tmp, "   "), /cannot be empty/);
+      assert.throws(
+        () => placeOrMoveEntry({ storeDir: join(tmp, "no-such-dir"), topicFile: "x.md", targetIndex: "main" }),
+        /MEMORY\.md not found/,
+      );
+      assert.throws(
+        () => placeOrMoveEntry({ storeDir: tmp, topicFile: "   ", targetIndex: "main" }),
+        /Topic file name is required/,
+      );
+      assert.throws(
+        () => placeOrMoveEntry({ storeDir: tmp, topicFile: "missing.md", targetIndex: "main" }),
+        /Topic file not found/,
+      );
+      assert.throws(
+        () => placeOrMoveEntry({ storeDir: tmp, topicFile: "project_beta.md", targetIndex: "nonexistent-sub" }),
+        /Target index file not found/,
+      );
     } finally {
       rmSync(tmp, { recursive: true, force: true });
     }

@@ -53,97 +53,29 @@
   "changes": {
     "fileCounts": {
       "added": 1,
-      "changed": 376,
+      "changed": 44,
       "moved": 0,
-      "parts": 9,
+      "parts": 7,
       "removed": 0
     },
     "items": [
       {
-        "kind": "door",
-        "sentence": "CI's pull request trigger now also names `codecov.yml`.",
-        "subjects": [
-          ".github/workflows/ci.yml"
-        ]
-      },
-      {
-        "kind": "door",
-        "sentence": "CI's push trigger now also names `codecov.yml`.",
-        "subjects": [
-          ".github/workflows/ci.yml"
-        ]
-      },
-      {
-        "kind": "door",
-        "sentence": "CI now also runs packages/cli/src/tests/console.test.ts, packages/cli/src/tests/dispatch.test.ts, packages/cli/src/tests/doctor.test.ts and 11 more.",
-        "subjects": [
-          ".github/workflows/ci.yml",
-          "packages/cli/src/tests/console.test.ts",
-          "packages/cli/src/tests/dispatch.test.ts",
-          "packages/cli/src/tests/doctor.test.ts",
-          "packages/cli/src/tests/help.test.ts",
-          "packages/cli/src/tests/hook.test.ts",
-          "packages/cli/src/tests/refresh.test.ts",
-          "packages/cli/src/tests/report.test.ts",
-          "packages/cli/src/tests/split.test.ts",
-          "packages/cli/src/tests/wrapped.test.ts",
-          "packages/kernel/src/tests/",
-          "packages/memories/src/tests/",
-          "packages/rules/src/tests/",
-          "site/astro.config.mjs",
-          "site/src/"
-        ]
-      },
-      {
-        "kind": "door",
-        "sentence": "And 5 more changes to doors.",
-        "subjects": []
-      },
-      {
         "kind": "landing",
-        "sentence": ".claude/CLAUDE.md is now also read by packages/cli/src/tests/split.test.ts.",
+        "sentence": ".claude/loadout/index.json is now read by packages/kernel/src/resolve.ts.",
         "subjects": [
-          ".claude/CLAUDE.md",
-          "packages/cli/src/tests/split.test.ts"
-        ]
-      },
-      {
-        "kind": "landing",
-        "sentence": "apps/hook/ is now also read by ROADMAP.md.",
-        "subjects": [
-          "apps/hook/",
-          "ROADMAP.md"
-        ]
-      },
-      {
-        "kind": "landing",
-        "sentence": "packages/kernel/site/src/content/docs/ is now read by packages/kernel/site/astro.config.mjs.",
-        "subjects": [
-          "packages/kernel/site/src/content/docs/",
-          "packages/kernel/site/astro.config.mjs"
-        ]
-      },
-      {
-        "kind": "landing",
-        "sentence": "And 10 more new writers and readers of places.",
-        "subjects": []
-      },
-      {
-        "kind": "origin",
-        "sentence": ".claude was generated and is now authored.",
-        "subjects": [
-          ".claude"
+          ".claude/loadout/index.json",
+          "packages/kernel/src/resolve.ts"
         ]
       },
       {
         "kind": "counts",
-        "sentence": "1 file added and 376 changed content, across 9 parts.",
+        "sentence": "1 file added and 44 changed content, across 7 parts.",
         "subjects": []
       }
     ],
     "since": {
-      "commit": "741a0923029b4c5c494f6a2f0089c08f18a6d8e7",
-      "generatedAt": "2026-09-23T17:44:16.191Z"
+      "commit": "532deeed98d8a72bc4c8ada226db1f9024dc5dfb",
+      "generatedAt": "2026-09-30T21:29:07.823Z"
     },
     "unchanged": false
   },
@@ -152,9 +84,9 @@
     "Window: 180 days; a pair counts from 3 shared commits, since 0 source files reach 10 revisions; the floor rises to 10 when 25 do."
   ],
   "changesTogetherWithTests": 0,
-  "commit": "532deeed98d8a72bc4c8ada226db1f9024dc5dfb",
+  "commit": "f2fd5992daa9f3521f9e1f648968f03e6e5f8b08",
   "defaultBranch": "main",
-  "derived": "9 parts, mostly Markdown (236 files); code in TypeScript (84), CSS (8), JavaScript (7), Astro (4) and PowerShell (1). Work enters through 6 doors; the busiest is CI, which reaches 5 parts. It publishes @mcptoolshop/loadout-os to npm. It deploys a site to GitHub Pages. People run ai-loadout, claude-memories, claude-rules and loadout-os.",
+  "derived": "9 parts, mostly Markdown (236 files); code in TypeScript (85), CSS (8), JavaScript (7), Astro (4) and PowerShell (1). Work enters through 6 doors; the busiest is CI, which reaches 5 parts. It publishes @mcptoolshop/loadout-os to npm. It deploys a site to GitHub Pages. People run ai-loadout, claude-memories, claude-rules and loadout-os.",
   "doors": [
     {
       "builds": [
@@ -198,7 +130,7 @@
         {
           "boundary": "memories",
           "depth": 0,
-          "files": 17
+          "files": 18
         },
         {
           "boundary": "rules",
@@ -267,7 +199,7 @@
         {
           "boundary": "memories",
           "depth": 0,
-          "files": 17
+          "files": 18
         },
         {
           "boundary": "rules",
@@ -519,18 +451,18 @@
   ],
   "engine": "1.24.0",
   "generated": [],
-  "generatedAt": "2026-09-30T21:29:07.823Z",
+  "generatedAt": "2026-11-08T12:52:27.028Z",
   "limits": [
-    "6 writes and 10 reads use paths built at run time and are not named here.",
+    "6 writes and 23 reads use paths built at run time and are not named here.",
+    "5 writes and 52 reads go to a path their caller passes, not to this repository.",
     "2 writes and 26 reads go to the directory the command is run in, not to this repository.",
-    "1 write and 19 reads go to a path their caller passes, not to this repository.",
-    "5 writes and 12 reads go to the home directory (.ai-loadout/ and .claude/) or a path their caller passes, not to this repository.",
+    "6 writes and 12 reads go to the home directory (.ai-loadout/ and .claude/) or a path their caller passes, not to this repository.",
+    "6 writes and 1 read go to a temporary directory, not to this repository.",
     "5 reads go to the directory the command is run in (.claude/ and MEMORY.md/) or the home directory (.claude/), not to this repository.",
-    "2 writes and 3 reads go to the home directory (.ai-loadout/), not to this repository.",
-    "4 writes go to a temporary directory, not to this repository.",
     "1 write and 2 reads go to the directory the command is run in (.claude/, MEMORY.md/ and memory/), the home directory (.claude/) or a path their caller passes, not to this repository.",
+    "2 writes and 1 read go to the home directory (.ai-loadout/), not to this repository.",
     "1 write goes to the directory the command is run in (.claude/ and memory/) or a path its caller passes, not to this repository.",
-    "3 commands are built at run time and not followed, 2 of them in tests.",
+    "6 commands are built at run time and not followed, 5 of them in tests.",
     "Statistics confidence is low: fewer than 25 source files reach 10 revisions in the window."
   ],
   "mainDoor": ".github/workflows/ci.yml",

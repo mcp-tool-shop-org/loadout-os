@@ -56,13 +56,55 @@ ship together under `loadout-os`.
 
 ### Added
 
+- **Project-layer runtime hook routing** (`apps/hook/loadout-hook.mjs`, `packages/kernel`) —
+  the `UserPromptSubmit` hook now resolves both the global (`~/.ai-loadout/index.json`) and
+  project (`<root>/.claude/loadout/index.json`) layers via `resolveLoadout`, walking up from
+  `payload.cwd` (or `process.cwd()`, overridable via `AI_LOADOUT_PROJECT_INDEX`). Project
+  entries win on ID collisions, share the 5-entry total cap fairly across layers with
+  preference for sub-index entries (`subindex: true`) over top-level `MEMORY.md` entries,
+  exclude `metadata.loadout_inject: session-start` boards from per-prompt slots, emit under
+  `[loadout-hook] Project memory entries relevant to this prompt...`, and log
+  `layer: "global" | "project"` to `~/.ai-loadout/usage.jsonl`. With no project index, output
+  is byte-identical to global-only mode.
+- **Sub-index expansion, frontmatter summary authority, and loader-limit enforcement**
+  (`packages/memories`, `packages/kernel`) — `MEMORY.md` can link to sub-index files
+  (`index-*.md` or files with `metadata.loadout_role: subindex` in frontmatter); sub-index
+  bullets are expanded into the dispatch index with `subindex: true`, counted by orphan
+  detection, and checked for broken links (`MISSING_TOPIC_FILE`). Entries in
+  `index-archive.md` (or sub-indexes with `metadata.loadout_default_priority: manual`)
+  default to `priority: "manual"` unless overridden in topic frontmatter. `parseFrontmatter`
+  now accepts Claude Code's `name` / `description` / `type` / `priority` / `metadata`
+  frontmatter (falling back from `id` to kebab-cased `name`), sources entry `summary` from
+  topic frontmatter `description`, warns with `STALE_INDEX_SUMMARY` when index bullets drift,
+  and adds `loadout-os memories sync-summaries`, `place`, and `move`. `memories validate`
+  errors with `MEMORY_LIMIT_EXCEEDED` above 180 lines or 24,000 bytes (configurable via
+  `--max-lines` / `--max-bytes`), citing the measured 2026-11-08 truncation event.
+- **Project refresh, OS file locking, and git snapshot/mirror** (`packages/cli`) —
+  `loadout-os refresh --store <dir> --project <root>` writes `<root>/.claude/loadout/index.json`
+  (recording `source` for `post-write` store discovery) while leaving the global index
+  untouched, keeping the andon halt and `.bak` compensator natively, serializing via an OS
+  lockfile (`withFileLock`), and supporting `--fix`, `--snapshot-repo <dir>`, and
+  `--mirror-repo <bare>` (`git init --bare -b main`, non-zero exit on commit/push failure,
+  exit `2` on subprocess timeout).
+- **SessionStart, PreCompact, and PostToolUse hooks** (`packages/cli`) —
+  - `loadout-os hook session-start`: prints every `core` entry with
+    `metadata.loadout_inject: session-start` in full as UTF-8 under a file header, enforces
+    line/byte caps with a visible truncation note, warns when older than
+    `metadata.stale_after_min` (with `--user-prompt-submit` warning-only mode), fails open
+    with visible warnings when the index or board is missing or corrupt, and auto-refreshes
+    when any `<store>/*.md` is newer than the project `index.json` (catching shell edits).
+  - `loadout-os hook pre-compact`: warns on stdout when the session-start board is older
+    than `stale_after_min` before compaction.
+  - `loadout-os hook post-write`: `PostToolUse` command for `Write`/`Edit` that validates
+    and refreshes the project index when the edited path is inside the configured store,
+    exiting `2` with the errors on any failure (for `asyncRewake`) and `0` silently otherwise.
 - **Workspace monorepo** — `packages/{kernel,memories,rules,cli}` + `apps/hook` wired
   under one npm-workspaces root, with an intentional topological build order
   (kernel → memories → rules → cli) so the adapters build against the kernel's dist.
 - **Unified `@mcptoolshop/loadout-os` CLI** (`packages/cli`) — one binary that wraps the
   three library surfaces (kernel = ai-loadout, memories, rules) and absorbs the
   operational rituals:
-  - Namespaced adapter surfaces: `memories <index|validate|stats|health>` and
+  - Namespaced adapter surfaces: `memories <index|validate|stats|health|sync-summaries|place|move>` and
     `rules <analyze|validate|stats|split>`.
   - Flat kernel verbs: `resolve`, `explain`, `usage`, `dead`, `overlaps`, `budget`,
     `validate` (the kernel index-structure validator — the flat-vs-namespaced split is
@@ -88,6 +130,10 @@ ship together under `loadout-os`.
 
 ### Fixed
 
+- **Keyword punctuation stripping and stem patterns** (**F-04**) — punctuation (`:`, `(`, `)`,
+  `,`, etc.) is stripped before stop-word filtering during keyword extraction, file-stem
+  tokens are included, and stem/id tokens populate `patterns` so 1–2 exact technical words
+  clear the hook's `0.5` score floor.
 - **Matcher recall** (FT-K1) — domain entries were scored by pure coverage
   (`matched / declared keyword count`), which starved keyword-rich entries: a genuine
   2–3 keyword match on the live 30+-keyword entries scored below the 0.1 inclusion floor.
