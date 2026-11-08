@@ -13,9 +13,12 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, existsSync, writeFileSync, statSync, mkdirSync } from "node:fs";
-import { isAbsolute, join, resolve } from "node:path";
+import { spawn, spawnSync } from "node:child_process";
+import { readFileSync, existsSync, writeFileSync, statSync, mkdirSync, openSync, closeSync, unlinkSync } from "node:fs";
+import { dirname, isAbsolute, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
+import * as refreshMod from "../refresh.js";
 import {
   runRefresh,
   printRefresh,
@@ -27,6 +30,7 @@ import {
   RefreshError,
   type RefreshResult,
 } from "../refresh.js";
+import { runPostWrite } from "../hook.js";
 import { dispatch } from "../cli.js";
 import { makeRefreshSandbox } from "./fixtures.js";
 
@@ -611,3 +615,127 @@ test("CLI dispatch: exercises refresh --project/--fix, memories sync-summaries/p
     sb.cleanup();
   }
 });
+
+test("Q3-4: LOCK_WAIT_MS is at least DEFAULT_GIT_TIMEOUT_MS, and a second post-write waits rather than fails while the first holds the lock for a long git step", async () => {
+  const sb = makeRefreshSandbox({ valid: true });
+  try {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const refreshSrc = readFileSync(resolve(here, "..", "..", "src", "refresh.ts"), "utf-8");
+    const mWait = refreshSrc.match(/LOCK_WAIT_MS\s*=\s*([0-9_]+|DEFAULT_GIT_TIMEOUT_MS[^\n;]*)/);
+    assert.ok(mWait, "LOCK_WAIT_MS must be defined in refresh.ts");
+    const modAny = refreshMod as Record<string, unknown>;
+    const gitTimeout = typeof modAny.DEFAULT_GIT_TIMEOUT_MS === "number" ? modAny.DEFAULT_GIT_TIMEOUT_MS : 30_000;
+    const lockWait = typeof modAny.LOCK_WAIT_MS === "number" ? modAny.LOCK_WAIT_MS : 15_000;
+    assert.ok(
+      lockWait >= gitTimeout,
+      `LOCK_WAIT_MS (${lockWait}) must be >= DEFAULT_GIT_TIMEOUT_MS (${gitTimeout})`,
+    );
+
+    // Simulate a first post-write holding the project index lock during a git step,
+    // while a second post-write arrives and waits until the lock is released rather than failing.
+    const projRoot = join(sb.dir, "concurrent-proj");
+    mkdirSync(projRoot, { recursive: true });
+    runRefresh({ store: sb.storeDir, project: projRoot });
+
+    const dest = projectDest(projRoot);
+    const lockPath = lockFilePathForKey(dest);
+    const fd = openSync(lockPath, "wx");
+    writeFileSync(fd, `${process.pid}\n${Date.now()}\n`, "utf-8");
+
+    // Release the lock from a child process after 350ms while the parent is blocked in runPostWrite's Atomics.wait loop
+    const releaser = spawn(
+      process.execPath,
+      [
+        "-e",
+        `setTimeout(() => { try { require("node:fs").unlinkSync(${JSON.stringify(lockPath)}); } catch {} }, 350);`,
+      ],
+      { stdio: "ignore" },
+    );
+    closeSync(fd);
+
+    const t0 = Date.now();
+    const res = runPostWrite({
+      project: projRoot,
+      store: sb.storeDir,
+      filePath: join(sb.storeDir, "topic-a.md"),
+    });
+    const elapsed = Date.now() - t0;
+    await new Promise<void>((r) => releaser.on("close", () => r()));
+
+    assert.equal(res.matchedStore, true);
+    assert.equal(res.exitCode, 0, "second post-write must wait and succeed (exit 0) after first releases lock");
+    assert.ok(elapsed >= 200, `expected second post-write to wait for lock release, elapsed=${elapsed}ms`);
+  } finally {
+    sb.cleanup();
+  }
+});
+
+test("Q2-6 / follow-up 1: runRefresh writes <dest>.tmp.<pid> and renameSyncs over <dest>, leaving old global index intact on mid-write crash", () => {
+  const sb = makeRefreshSandbox({ valid: true });
+  try {
+    // 1. Seed initial valid global index
+    const first = runRefresh({ store: sb.storeDir, dest: sb.destPath });
+    assert.equal(first.wrote, true);
+    const initialDestContent = readFileSync(sb.destPath, "utf-8");
+    const initialParsed = JSON.parse(initialDestContent);
+    assert.equal(initialParsed.entries.length, 1);
+
+    // 2. Verify refresh.ts uses <dest>.tmp.<pid> and renameSync(tmpDest, dest)
+    const here = dirname(fileURLToPath(import.meta.url));
+    const refreshSrc = readFileSync(resolve(here, "..", "..", "src", "refresh.ts"), "utf-8");
+    assert.match(
+      refreshSrc,
+      /`\$\{dest\}\.tmp\.\$\{process\.pid\}`/,
+      "refresh.ts must stage index to `${dest}.tmp.${process.pid}`",
+    );
+    assert.match(
+      refreshSrc,
+      /renameSync\(tmpDest,\s*dest\)/,
+      "refresh.ts must atomically renameSync(tmpDest, dest)",
+    );
+
+    // 3. Simulate a crash mid-write in a child process (after writing truncated bytes to <dest>.tmp.<pid>, before renameSync)
+    writeFileSync(
+      join(sb.storeDir, "MEMORY.md"),
+      readFileSync(join(sb.storeDir, "MEMORY.md"), "utf-8") +
+        "- [Topic C](topic-c.md) — Added before crash\n",
+      "utf-8",
+    );
+    writeFileSync(
+      join(sb.storeDir, "topic-c.md"),
+      `---\nname: Topic C\ndescription: Added before crash\ntype: project\n---\n\nBody of topic C.\n`,
+      "utf-8",
+    );
+
+    const refreshJsUrl = new URL("../refresh.js", import.meta.url).href;
+    const crashScript = `
+      import { createRequire, syncBuiltinESMExports } from "node:module";
+      const require = createRequire(import.meta.url);
+      const fs = require("node:fs");
+      const origWriteFileSync = fs.writeFileSync;
+      const targetDest = ${JSON.stringify(sb.destPath)};
+      fs.writeFileSync = function(file, data, options) {
+        if (typeof file === "string" && file === \`\${targetDest}.tmp.\${process.pid}\`) {
+          origWriteFileSync.call(this, file, String(data).slice(0, 24), options);
+          process.exit(137);
+        }
+        return origWriteFileSync.call(this, file, data, options);
+      };
+      syncBuiltinESMExports();
+      const { runRefresh } = await import(${JSON.stringify(refreshJsUrl)});
+      runRefresh({ store: ${JSON.stringify(sb.storeDir)}, dest: targetDest });
+    `;
+    const child = spawnSync(process.execPath, ["--input-type=module", "-e", crashScript], {
+      encoding: "utf-8",
+    });
+    assert.equal(child.status, 137, `expected simulated crash exit 137, got ${child.status}: ${child.stderr}`);
+
+    // The truncated <dest>.tmp.<pid> was written by the crashed child, but <dest> must still be intact!
+    const afterCrashContent = readFileSync(sb.destPath, "utf-8");
+    assert.equal(afterCrashContent, initialDestContent, "old global index must be 100% intact after mid-write crash");
+    assert.doesNotThrow(() => JSON.parse(afterCrashContent), "old global index must still be valid JSON");
+  } finally {
+    sb.cleanup();
+  }
+});
+

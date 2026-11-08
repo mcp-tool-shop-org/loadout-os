@@ -17,6 +17,10 @@ function slugifyName(name: string): string {
   const lower = name.toLowerCase();
   for (let i = 0; i < lower.length; i++) {
     const code = lower.charCodeAt(i);
+    // Strip ASCII and curly apostrophes the way nameToId does so "Tool's" -> "tools" (Q5-1a)
+    if (code === 39 || code === 8217 || code === 8216) {
+      continue;
+    }
     const isAlphaNum = (code >= 97 && code <= 122) || (code >= 48 && code <= 57);
     if (isAlphaNum) {
       current += lower[i];
@@ -176,7 +180,15 @@ export function parseFrontmatter(
   if (data.metadata && typeof data.metadata === "object" && !Array.isArray(data.metadata)) {
     Object.assign(metadata, data.metadata as Record<string, string | number | boolean>);
   }
-  for (const TopMetaKey of ["loadout_role", "loadout_inject", "loadout_default_priority", "stale_after_min"]) {
+  for (const TopMetaKey of [
+    "loadout_role",
+    "loadout_inject",
+    "loadout_default_priority",
+    "stale_after_min",
+    "enforce_limits",
+    "max_lines",
+    "max_bytes",
+  ]) {
     if (data[TopMetaKey] !== undefined && metadata[TopMetaKey] === undefined) {
       const val = data[TopMetaKey];
       if (typeof val === "string") {

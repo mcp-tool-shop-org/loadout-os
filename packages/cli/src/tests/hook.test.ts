@@ -29,6 +29,7 @@ import {
   defaultHookPath,
   runSessionStart,
   runPostWrite,
+  isPathInsideDir,
   capBoardContent,
   parsePostToolUsePayload,
 } from "../hook.js";
@@ -1157,6 +1158,101 @@ describe("Part D: loadout-os hook post-write", () => {
         "/tmp/x.md",
       );
       assert.equal(runPostWrite({ stdinJson: "{}" }).exitCode, 0);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("5. Q3-1: runPostWrite and isPathInsideDir resolve relative tool_input.file_path against payload.cwd, normalise MSYS /c/..., ~/..., and \\\\?\\ prefixes, and compare case-insensitively on Windows", () => {
+    const root = mkdtempSync(join(tmpdir(), "loadout-part-d-q31-"));
+    try {
+      const projDir = join(root, "proj");
+      const storeDir = join(projDir, "memory");
+      mkdirSync(storeDir, { recursive: true });
+
+      const topicPath = join(storeDir, "topic-a.md");
+      writeFileSync(topicPath, "# Topic A\nContent.\n", "utf-8");
+      writeFileSync(
+        join(storeDir, "MEMORY.md"),
+        "# Memory\n- [Topic A](topic-a.md) — Topic A\n",
+        "utf-8",
+      );
+      runRefresh({ store: storeDir, project: projDir });
+
+      // (a) Relative tool_input.file_path resolved against payload.cwd (even when process.cwd() differs)
+      assert.notEqual(resolve(projDir), resolve(process.cwd()));
+      const relRes = runPostWrite({
+        stdinJson: JSON.stringify({
+          hook_event_name: "PostToolUse",
+          tool_name: "Edit",
+          cwd: projDir,
+          tool_input: { file_path: "memory/topic-a.md" },
+        }),
+      });
+      assert.equal(relRes.matchedStore, true, "relative tool_input.file_path must resolve against payload.cwd");
+      assert.equal(relRes.exitCode, 0);
+
+      // (b) ~/... tilde prefix normalisation
+      const homeStore = join(homedir(), ".claude-test-virtual-store", "memory");
+      assert.equal(
+        isPathInsideDir("~/.claude-test-virtual-store/memory/BOARD.md", homeStore),
+        true,
+        "~/... prefix must expand to homedir()",
+      );
+      assert.equal(
+        isPathInsideDir("~\\.claude-test-virtual-store\\memory\\BOARD.md", homeStore),
+        true,
+        "~\\... prefix must expand to homedir()",
+      );
+
+      // (c) MSYS /c/... prefix normalisation
+      const msysPath = topicPath
+        .replace(/\\/g, "/")
+        .replace(/^([A-Za-z]):\//, (_m, d: string) => `/${d.toLowerCase()}/`);
+      assert.equal(
+        isPathInsideDir(msysPath, storeDir),
+        true,
+        `MSYS path ${msysPath} must match ${storeDir}`,
+      );
+      const msysRes = runPostWrite({
+        stdinJson: JSON.stringify({
+          hook_event_name: "PostToolUse",
+          tool_name: "Write",
+          cwd: projDir,
+          tool_input: { file_path: msysPath },
+        }),
+      });
+      assert.equal(msysRes.matchedStore, true, "runPostWrite must match MSYS /c/... path");
+      assert.equal(msysRes.exitCode, 0);
+
+      // (d) Windows extended-length \\?\ prefix normalisation
+      const winExtPath = `\\\\?\\${topicPath.replace(/\//g, "\\")}`;
+      assert.equal(
+        isPathInsideDir(winExtPath, storeDir),
+        true,
+        `\\\\?\\ path ${winExtPath} must match ${storeDir}`,
+      );
+      const extRes = runPostWrite({
+        stdinJson: JSON.stringify({
+          hook_event_name: "PostToolUse",
+          tool_name: "Write",
+          cwd: projDir,
+          tool_input: { file_path: winExtPath },
+        }),
+      });
+      assert.equal(extRes.matchedStore, true, "runPostWrite must match \\\\?\\ extended path");
+      assert.equal(extRes.exitCode, 0);
+
+      // (e) Case-insensitive comparison on Windows
+      if (process.platform === "win32") {
+        const upperFile = topicPath.toUpperCase();
+        const lowerStore = storeDir.toLowerCase();
+        assert.equal(
+          isPathInsideDir(upperFile, lowerStore),
+          true,
+          "Windows path matching must be case-insensitive",
+        );
+      }
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

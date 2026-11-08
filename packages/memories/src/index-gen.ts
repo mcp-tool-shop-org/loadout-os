@@ -52,6 +52,7 @@ export function generateIndex(
   const fileDir = dirname(resolve(analysis.filePath));
   const parentDir = dirname(fileDir);
   const entries: LoadoutEntry[] = [];
+  const seenStorePaths = new Set<string>();
 
   for (const ref of analysis.refs) {
     // Try relative to MEMORY.md, then relative to parent
@@ -76,6 +77,15 @@ export function generateIndex(
     }
 
     const storePath = toStoreRelative(fileDir, fullPath);
+    const storePathKey = process.platform === "win32" ? storePath.toLowerCase() : storePath;
+
+    // Q5-1(a): Collapse duplicate bullets pointing to the same resolved topic file
+    // into ONE entry at the first bullet's position.
+    if (seenStorePaths.has(storePathKey)) {
+      continue;
+    }
+    seenStorePaths.add(storePathKey);
+
     const content = readFileSync(fullPath, "utf-8");
 
     // Never emit a sub-index file itself as an entry in index.json
@@ -256,6 +266,7 @@ function entryFromContent(
 export function nameToId(name: string): string {
   return name
     .toLowerCase()
+    .replace(/['\u2018\u2019]/g, "")
     .replace(/[^a-z0-9\s-]/g, "")
     .trim()
     .replace(/\s+/g, "-")

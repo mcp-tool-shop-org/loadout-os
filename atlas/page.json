@@ -48,28 +48,81 @@
       "kind": "part",
       "name": "cli",
       "partLabel": "cli"
+    },
+    {
+      "doors": 2,
+      "importedBy": [],
+      "importedByTests": [],
+      "kind": "part",
+      "name": "hook",
+      "partLabel": "hook"
     }
   ],
   "changes": {
     "fileCounts": {
       "added": 0,
-      "changed": 8,
+      "changed": 21,
       "moved": 0,
-      "parts": 4,
+      "parts": 6,
       "removed": 0
     },
     "items": [
       {
+        "kind": "door",
+        "sentence": "CI now also runs apps/hook/esbuild.config.mjs.",
+        "subjects": [
+          ".github/workflows/ci.yml",
+          "apps/hook/esbuild.config.mjs"
+        ]
+      },
+      {
+        "kind": "door",
+        "sentence": "Release now also runs apps/hook/esbuild.config.mjs.",
+        "subjects": [
+          ".github/workflows/release.yml",
+          "apps/hook/esbuild.config.mjs"
+        ]
+      },
+      {
+        "kind": "landing",
+        "sentence": ".claude/loadout is now written by packages/cli/src/refresh.ts.",
+        "subjects": [
+          ".claude/loadout",
+          "packages/cli/src/refresh.ts"
+        ]
+      },
+      {
+        "kind": "landing",
+        "sentence": "README.md is now read by packages/cli/src/tests/help.test.ts.",
+        "subjects": [
+          "README.md",
+          "packages/cli/src/tests/help.test.ts"
+        ]
+      },
+      {
+        "kind": "landing",
+        "sentence": "package.json is now also read by packages/cli/src/tests/doctor.test.ts.",
+        "subjects": [
+          "package.json",
+          "packages/cli/src/tests/doctor.test.ts"
+        ]
+      },
+      {
+        "kind": "landing",
+        "sentence": "And 2 more new writers and readers of places.",
+        "subjects": []
+      },
+      {
         "kind": "counts",
-        "sentence": "Nothing structural changed since 2026-11-08; 8 files changed content.",
+        "sentence": "21 files changed content, across 6 parts.",
         "subjects": []
       }
     ],
     "since": {
-      "commit": "f2fd5992daa9f3521f9e1f648968f03e6e5f8b08",
-      "generatedAt": "2026-11-08T12:52:27.028Z"
+      "commit": "e522fa11bf75804124da8a0a41fec27cf0f5ff59",
+      "generatedAt": "2026-11-08T13:05:05.600Z"
     },
-    "unchanged": true
+    "unchanged": false
   },
   "changesTogether": [],
   "changesTogetherNote": [
@@ -77,9 +130,9 @@
     "Window: 180 days; a pair counts from 3 shared commits, since 0 source files reach 10 revisions; the floor rises to 10 when 25 do."
   ],
   "changesTogetherWithTests": 2,
-  "commit": "e522fa11bf75804124da8a0a41fec27cf0f5ff59",
+  "commit": "6ddc3772f65288e2f7c3536eded5ec2d25223978",
   "defaultBranch": "main",
-  "derived": "9 parts, mostly Markdown (236 files); code in TypeScript (85), CSS (8), JavaScript (7), Astro (4) and PowerShell (1). Work enters through 6 doors; the busiest is CI, which reaches 5 parts. It publishes @mcptoolshop/loadout-os to npm. It deploys a site to GitHub Pages. People run ai-loadout, claude-memories, claude-rules and loadout-os.",
+  "derived": "9 parts, mostly Markdown (236 files); code in TypeScript (85), CSS (8), JavaScript (7), Astro (4) and PowerShell (1). Work enters through 6 doors; the busiest is CI, which reaches 6 parts. It publishes @mcptoolshop/loadout-os to npm. It deploys a site to GitHub Pages. People run ai-loadout, claude-memories, claude-rules and loadout-os.",
   "doors": [
     {
       "builds": [
@@ -116,6 +169,11 @@
           "files": 19
         },
         {
+          "boundary": "hook",
+          "depth": 0,
+          "files": 1
+        },
+        {
           "boundary": "kernel",
           "depth": 0,
           "files": 23
@@ -137,6 +195,7 @@
         }
       ],
       "runs": [
+        "apps/hook/esbuild.config.mjs",
         "packages/cli/src/tests/console.test.ts",
         "packages/cli/src/tests/dispatch.test.ts",
         "packages/cli/src/tests/doctor.test.ts",
@@ -150,8 +209,8 @@
         "packages/memories/src/tests/",
         "packages/rules/src/tests/"
       ],
-      "runsCount": 12,
-      "runsMore": 31,
+      "runsCount": 13,
+      "runsMore": 32,
       "sends": [
         "uploads coverage to Codecov",
         "deploys the site on a push to main"
@@ -161,7 +220,8 @@
         "on a pull request touching 9 paths",
         "on a push to main touching 9 paths",
         "or by hand"
-      ]
+      ],
+      "untracked": ".claude/loadout/, which is not tracked"
     },
     {
       "builds": [
@@ -185,6 +245,11 @@
           "files": 20
         },
         {
+          "boundary": "hook",
+          "depth": 0,
+          "files": 1
+        },
+        {
           "boundary": "kernel",
           "depth": 0,
           "files": 23
@@ -201,6 +266,7 @@
         }
       ],
       "runs": [
+        "apps/hook/esbuild.config.mjs",
         "packages/cli/esbuild.config.mjs",
         "packages/cli/src/tests/console.test.ts",
         "packages/cli/src/tests/dispatch.test.ts",
@@ -215,8 +281,8 @@
         "packages/memories/src/tests/",
         "packages/rules/src/tests/"
       ],
-      "runsCount": 13,
-      "runsMore": 32,
+      "runsCount": 14,
+      "runsMore": 33,
       "sends": [
         "publishes @mcptoolshop/loadout-os to npm",
         "creates a GitHub release"
@@ -224,7 +290,8 @@
       "stages": [],
       "triggers": [
         "when a tag matching `v*` is pushed"
-      ]
+      ],
+      "untracked": ".claude/loadout/, which is not tracked"
     },
     {
       "checks": [],
@@ -432,6 +499,11 @@
       "to": "rules"
     },
     {
+      "from": "hook",
+      "fromTests": false,
+      "to": "kernel"
+    },
+    {
       "from": "memories",
       "fromTests": false,
       "to": "kernel"
@@ -444,12 +516,13 @@
   ],
   "engine": "1.24.0",
   "generated": [],
-  "generatedAt": "2026-11-08T13:05:05.600Z",
+  "generatedAt": "2026-11-08T16:53:02.329Z",
   "limits": [
     "6 writes and 23 reads use paths built at run time and are not named here.",
-    "5 writes and 52 reads go to a path their caller passes, not to this repository.",
+    "1 write goes to places this repository does not track, so it is not listed as generated.",
+    "5 writes and 54 reads go to a path their caller passes, not to this repository.",
     "2 writes and 26 reads go to the directory the command is run in, not to this repository.",
-    "6 writes and 12 reads go to the home directory (.ai-loadout/ and .claude/) or a path their caller passes, not to this repository.",
+    "7 writes and 13 reads go to the home directory (.ai-loadout/ and .claude/) or a path their caller passes, not to this repository.",
     "6 writes and 1 read go to a temporary directory, not to this repository.",
     "5 reads go to the directory the command is run in (.claude/ and MEMORY.md/) or the home directory (.claude/), not to this repository.",
     "1 write and 2 reads go to the directory the command is run in (.claude/, MEMORY.md/ and memory/), the home directory (.claude/) or a path their caller passes, not to this repository.",

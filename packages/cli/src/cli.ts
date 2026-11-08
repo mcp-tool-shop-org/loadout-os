@@ -134,9 +134,9 @@ ${BOLD}loadout-os memories${RESET} — wraps @mcptoolshop/claude-memories
   loadout-os memories validate <MEMORY.md> [--max-lines <n>] [--max-bytes <n>] [--json]
   loadout-os memories stats <MEMORY.md> [--json]
   loadout-os memories health [path] [--json]
-  loadout-os memories sync-summaries <MEMORY.md> [--dry-run] [--json]
-  loadout-os memories place <MEMORY.md> <topic.md> [--target <file>] [--section <h>] [--json]
-  loadout-os memories move <MEMORY.md> <topic.md> --to <file> [--section <h>] [--json]
+  loadout-os memories sync-summaries <MEMORY.md> [--fix] [--json]
+  loadout-os memories place <topic.md> <index> [--store <dir>] [--into <index>] [--json]
+  loadout-os memories move <topic.md> <index> [--store <dir>] [--into <index>] [--json]
 `;
 }
 

@@ -6,9 +6,11 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readdirSync, existsSync } from "node:fs";
+import { readdirSync, existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
-import { runDoctor, type DoctorPaths } from "../doctor.js";
+import { runDoctor, defaultDoctorPaths, type DoctorPaths } from "../doctor.js";
 import { makeSandbox } from "./fixtures.js";
 
 function pathsFor(sb: ReturnType<typeof makeSandbox>): DoctorPaths {
@@ -125,6 +127,57 @@ test("doctor: NEVER writes — sandbox dir file count is unchanged", () => {
     assert.equal(before, after, "doctor must not create files");
     // and it must not have created the missing never-loaded topic file
     assert.equal(existsSync(`${sb.storeDir}/never-loaded.md`), false);
+  } finally {
+    sb.cleanup();
+  }
+});
+
+test("doctor: defaultDoctorPaths points hookSource at bundled apps/hook/dist/loadout-hook.mjs and root npm run build includes apps/hook (Q7-3)", () => {
+  const sb = makeSandbox({ withSettingsHook: true });
+  try {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const repoRoot = resolve(here, "..", "..", "..", "..");
+    const pkgJson = JSON.parse(readFileSync(join(repoRoot, "package.json"), "utf-8"));
+    assert.match(
+      String(pkgJson.scripts?.build ?? ""),
+      /apps\/hook/,
+      "root package.json build script must build apps/hook",
+    );
+
+    const defaults = defaultDoctorPaths(repoRoot);
+    assert.equal(
+      defaults.hookSource,
+      resolve(repoRoot, "apps", "hook", "dist", "loadout-hook.mjs"),
+      "defaultDoctorPaths must compare against bundled apps/hook/dist/loadout-hook.mjs",
+    );
+
+    const fakeRepo = join(sb.dir, "fake-repo");
+    const unbundledDir = join(fakeRepo, "apps", "hook");
+    const bundledDir = join(unbundledDir, "dist");
+    mkdirSync(bundledDir, { recursive: true });
+    writeFileSync(join(unbundledDir, "loadout-hook.mjs"), "// unbundled source\n", "utf-8");
+    writeFileSync(join(bundledDir, "loadout-hook.mjs"), "// bundled standalone\n", "utf-8");
+
+    const mirrorFile = join(sb.dir, "installed-mirror.mjs");
+    writeFileSync(mirrorFile, "// bundled standalone\n", "utf-8");
+
+    const p = {
+      ...pathsFor(sb),
+      hookSource: defaultDoctorPaths(fakeRepo).hookSource,
+      hookMirror: mirrorFile,
+    };
+    const passRes = runDoctor(p);
+    assert.equal(
+      find(passRes.checks, "hook-drift").status,
+      "pass",
+      "mirror matching bundled dist/loadout-hook.mjs must pass hook-drift",
+    );
+
+    writeFileSync(mirrorFile, "// unbundled source\n", "utf-8");
+    const failRes = runDoctor(p);
+    const driftCheck = find(failRes.checks, "hook-drift") as { id: string; status: string; hint?: string };
+    assert.equal(driftCheck.status, "fail");
+    assert.match(driftCheck.hint ?? "", /apps\/hook\/dist\/loadout-hook\.mjs/);
   } finally {
     sb.cleanup();
   }

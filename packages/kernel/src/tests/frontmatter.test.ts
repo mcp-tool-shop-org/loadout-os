@@ -98,6 +98,19 @@ describe("parseFrontmatter", () => {
     assert.equal(quotedAndTopMeta.frontmatter.metadata?.loadout_role, "subindex");
     assert.equal(quotedAndTopMeta.frontmatter.metadata?.stale_after_min, 45);
     assert.equal(quotedAndTopMeta.frontmatter.metadata?.loadout_inject, true);
+
+    // Q5-1(a): slugifyName must strip apostrophes the way nameToId does
+    const withApostrophes = parseFrontmatter(
+      [
+        "---",
+        "name: Read the Tool's Own Record — Operator\u2019s Guide",
+        "description: Apostrophe test",
+        "---",
+        "Body",
+      ].join("\n"),
+    );
+    assert.ok(withApostrophes.frontmatter);
+    assert.equal(withApostrophes.frontmatter.id, "read-the-tools-own-record-operators-guide");
   });
 
   it("defaults invalid priority to domain", () => {

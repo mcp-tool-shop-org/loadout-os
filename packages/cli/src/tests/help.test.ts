@@ -11,6 +11,10 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { mkdtempSync, writeFileSync, readFileSync, rmSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import { tmpdir } from "node:os";
+import { fileURLToPath } from "node:url";
 
 import { dispatch } from "../cli.js";
 import { COMMAND_HELP, renderCommandHelp } from "../help.js";
@@ -120,5 +124,65 @@ test("every dispatched leaf command has a per-command help entry", () => {
     const rendered = renderCommandHelp(key);
     assert.match(rendered, /Synopsis:/);
     assert.match(rendered, /Example:/);
+  }
+});
+
+test("Q7-2: --help, cli.ts memoriesHelp, README.md, and packages/cli/README.md match real flags of memories sync-summaries, place, and move, and each documented example runs cleanly", () => {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const repoRoot = resolve(here, "..", "..", "..", "..");
+  const rootReadme = readFileSync(join(repoRoot, "README.md"), "utf-8");
+  const cliReadme = readFileSync(join(repoRoot, "packages", "cli", "README.md"), "utf-8");
+  const memHelpOut = captureLog(() => dispatch(["memories", "--help"]));
+
+  // 1. Check synopses in COMMAND_HELP, memories --help, README.md, and packages/cli/README.md
+  assert.match(COMMAND_HELP["memories sync-summaries"].synopsis, /--fix/);
+  assert.doesNotMatch(COMMAND_HELP["memories sync-summaries"].synopsis, /--dry-run/);
+  assert.match(COMMAND_HELP["memories place"].synopsis, /<topic\.md>\s+<index>/);
+  assert.doesNotMatch(COMMAND_HELP["memories place"].synopsis, /--target/);
+  assert.match(COMMAND_HELP["memories move"].synopsis, /<topic\.md>\s+<index>/);
+  assert.doesNotMatch(COMMAND_HELP["memories move"].synopsis, /--to\b/);
+
+  for (const docText of [memHelpOut, rootReadme, cliReadme]) {
+    assert.match(docText, /memories sync-summaries\s+<MEMORY\.md>\s+\[--fix\]/);
+    assert.doesNotMatch(docText, /memories sync-summaries[^\n]*--dry-run/);
+    assert.match(docText, /memories place\s+<topic\.md>\s+<index>/);
+    assert.doesNotMatch(docText, /memories place[^\n]*--target/);
+    assert.match(docText, /memories move\s+<topic\.md>\s+<index>/);
+    assert.doesNotMatch(docText, /memories move[^\n]*--to\b/);
+  }
+
+  // 2. Run each documented Example in COMMAND_HELP in a scratch store directory
+  const scratch = mkdtempSync(join(tmpdir(), "loadout-help-examples-"));
+  const prevCwd = process.cwd();
+  try {
+    writeFileSync(
+      join(scratch, "MEMORY.md"),
+      "# Memory\n- [Projects](index-projects.md) — Active projects\n- [Archive](index-archive.md) — Archived items\n",
+      "utf-8",
+    );
+    writeFileSync(
+      join(scratch, "index-projects.md"),
+      "# Projects\n- [Project Alpha](project_alpha.md) — Outdated summary\n",
+      "utf-8",
+    );
+    writeFileSync(join(scratch, "index-archive.md"), "# Archive\n", "utf-8");
+    writeFileSync(
+      join(scratch, "project_alpha.md"),
+      "---\nname: Project Alpha\ndescription: Authoritative Alpha description\n---\n# Alpha\n",
+      "utf-8",
+    );
+
+    process.chdir(scratch);
+
+    for (const key of ["memories sync-summaries", "memories place", "memories move"] as const) {
+      const exampleCmd = COMMAND_HELP[key].example.trim();
+      assert.ok(exampleCmd.startsWith("loadout-os "), `example for ${key} must start with 'loadout-os '`);
+      const argv = exampleCmd.slice("loadout-os ".length).trim().split(/\s+/);
+      const out = captureLog(() => dispatch(argv));
+      assert.ok(out.length > 0, `documented example '${exampleCmd}' must run cleanly and produce output`);
+    }
+  } finally {
+    process.chdir(prevCwd);
+    rmSync(scratch, { recursive: true, force: true });
   }
 });

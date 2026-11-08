@@ -592,11 +592,52 @@ export interface PostWriteResult {
 }
 
 /**
- * Normalize a path for containment checks, folding case and separators on Windows (F-13).
+ * Normalize a file or directory path for containment checks (F-13 / Q3-1):
+ * - Strips Windows extended-length prefixes (`\\?\UNC\...` -> `\\...`, `\\?\C:\...` -> `C:\...`, `//?/C:/...` -> `C:/...`)
+ * - Expands leading `~` / `~/...` / `~\...` to `homedir()`
+ * - Converts MSYS `/c/...` drive prefixes to `C:/...` on Windows
+ * - Resolves relative paths against `baseDir` (default `process.cwd()`)
  */
-export function isPathInsideDir(filePath: string, dirPath: string): boolean {
-  const normFile = resolve(filePath).replace(/\\/g, "/");
-  const rawDir = resolve(dirPath).replace(/\\/g, "/");
+export function normalizeHookPath(rawPath: string, baseDir?: string): string {
+  let p = rawPath.trim();
+
+  // 1. Strip Windows extended-length prefix \\?\ or //?/
+  if (p.startsWith("\\\\?\\") || p.startsWith("//?/") || p.startsWith("\\\\.\\") || p.startsWith("//./")) {
+    const rest = p.slice(4);
+    if (/^UNC[\\/]/i.test(rest)) {
+      p = "\\\\" + rest.slice(4);
+    } else {
+      p = rest;
+    }
+  }
+
+  // 2. Expand leading ~ or ~/ or ~\
+  if (p === "~") {
+    p = homedir();
+  } else if (p.startsWith("~/") || p.startsWith("~\\")) {
+    p = join(homedir(), p.slice(2));
+  }
+
+  // 3. Convert MSYS /c/... or /c to C:/... on Windows
+  if (process.platform === "win32") {
+    const msysMatch = p.match(/^\/([a-zA-Z])(\/.*|$)/);
+    if (msysMatch) {
+      const drive = msysMatch[1].toUpperCase();
+      const tail = msysMatch[2] || "/";
+      p = `${drive}:${tail}`;
+    }
+  }
+
+  const resolvedBase = baseDir ? normalizeHookPath(baseDir) : process.cwd();
+  return resolve(resolvedBase, p).replace(/\\/g, "/");
+}
+
+/**
+ * Normalize a path for containment checks, folding case and separators on Windows (F-13 / Q3-1).
+ */
+export function isPathInsideDir(filePath: string, dirPath: string, baseDir?: string): boolean {
+  const normFile = normalizeHookPath(filePath, baseDir);
+  const rawDir = normalizeHookPath(dirPath, baseDir);
   let dirEnd = rawDir.length;
   while (dirEnd > 0 && rawDir.charCodeAt(dirEnd - 1) === 47) {
     dirEnd--;
@@ -659,25 +700,27 @@ export function runPostWrite(opts: PostWriteOptions = {}): PostWriteResult {
   }
 
   const startDir = opts.project
-    ? resolve(opts.project)
+    ? normalizeHookPath(opts.project)
     : opts.cwd
-      ? resolve(opts.cwd)
+      ? normalizeHookPath(opts.cwd)
       : payload.cwd
-        ? resolve(payload.cwd)
+        ? normalizeHookPath(payload.cwd)
         : process.cwd();
+
+  const resolvedEditedPath = normalizeHookPath(editedPath, startDir);
 
   const envProjectIndex = process.env.AI_LOADOUT_PROJECT_INDEX?.trim();
   let indexPath: string | null = null;
   if (envProjectIndex) {
-    indexPath = resolve(envProjectIndex);
+    indexPath = normalizeHookPath(envProjectIndex, startDir);
   } else if (opts.project) {
-    indexPath = projectDest(opts.project);
+    indexPath = projectDest(startDir);
   } else {
     indexPath = findProjectIndex(startDir);
   }
 
-  let projectRoot = opts.project ? resolve(opts.project) : startDir;
-  let storeDir: string | null = opts.store ? resolve(opts.store) : null;
+  let projectRoot = opts.project ? normalizeHookPath(opts.project) : startDir;
+  let storeDir: string | null = opts.store ? normalizeHookPath(opts.store, startDir) : null;
 
   if (indexPath && existsSync(indexPath)) {
     if (!opts.project && !envProjectIndex) {
@@ -688,7 +731,7 @@ export function runPostWrite(opts: PostWriteOptions = {}): PostWriteResult {
         const raw = readFileSync(indexPath, "utf-8");
         const parsed = JSON.parse(raw) as LoadoutIndex;
         if (parsed && typeof parsed.source === "string" && parsed.source.trim()) {
-          storeDir = dirname(resolve(parsed.source));
+          storeDir = dirname(normalizeHookPath(parsed.source, projectRoot));
         }
       } catch {
         // ignore corrupt index when probing source; if storeDir wasn't passed we can't match
@@ -696,7 +739,7 @@ export function runPostWrite(opts: PostWriteOptions = {}): PostWriteResult {
     }
   }
 
-  if (!storeDir || !isPathInsideDir(editedPath, storeDir)) {
+  if (!storeDir || !isPathInsideDir(resolvedEditedPath, storeDir, startDir)) {
     return { matchedStore: false, exitCode: 0, stderr: "" };
   }
 

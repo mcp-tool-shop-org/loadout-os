@@ -23,7 +23,7 @@ loadout-os unifies four surfaces under one `loadout-os` binary:
 | Surface | What it does |
 |---|---|
 | **Kernel** (knowledge router) | Deterministic keyword/pattern matcher, hierarchical layered resolver (global → org → project → session), and the agent runtime contract. Core entries always load; domain entries load on match; manual entries load on explicit lookup. |
-| **Memories adapter** | Turns a `MEMORY.md` store (plus linked `index-*.md` or `metadata.loadout_role: subindex` sub-indexes) into a machine-readable dispatch table and lints it (loader truncation limits at 180 lines / 24 KB, missing files, orphans across sub-indexes, stale bullet summaries, duplicates, over-long entries). |
+| **Memories adapter** | Turns a `MEMORY.md` store (plus linked `index-*.md` or `metadata.loadout_role: subindex` sub-indexes) into a machine-readable dispatch table and lints it (loader truncation limits at 180 lines / 24 KB — warning by default, error when opted in via `--max-lines`/`--max-bytes`, frontmatter `metadata.enforce_limits: true`, or `.loadout.json` — plus missing files, orphans across sub-indexes, stale bullet summaries, duplicates, over-long entries). |
 | **Rules adapter** | Splits a bloated `CLAUDE.md` into a lean always-loaded index plus on-demand rule files, and validates frontmatter against the index. |
 | **Runtime hooks** | `UserPromptSubmit` pointer router (`loadout-hook.mjs`, merging global + project layers with fair-share cap and sub-index preference), `hook session-start` (UTF-8 board injection + staleness & shell-edit refresh), `hook pre-compact` (staleness warning before compaction), and `hook post-write` (`PostToolUse` validator + project refresh). |
 
@@ -37,9 +37,9 @@ loadout-os memories index          <MEMORY.md> [--lazy] [--json]
 loadout-os memories validate       <MEMORY.md> [--max-lines <n>] [--max-bytes <n>] [--json]
 loadout-os memories stats          <MEMORY.md> [--json]
 loadout-os memories health         [path] [--json]
-loadout-os memories sync-summaries <MEMORY.md> [--dry-run] [--json]
-loadout-os memories place          <MEMORY.md> <topic.md> [--target <file>] [--json]
-loadout-os memories move           <MEMORY.md> <topic.md> --to <file> [--json]
+loadout-os memories sync-summaries <MEMORY.md> [--fix] [--json]
+loadout-os memories place          <topic.md> <index> [--store <dir>] [--into <index>] [--json]
+loadout-os memories move           <topic.md> <index> [--store <dir>] [--into <index>] [--json]
 
 # Instruction-file adapter
 loadout-os rules analyze  <CLAUDE.md> [--rules-dir <dir>] [--json]

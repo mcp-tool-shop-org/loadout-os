@@ -1,19 +1,25 @@
 # loadout-os: how it works
 
-Mapped at 2026-11-08 from commit e522fa1 by Atlas 1.24.0.
+Mapped at 2026-11-08 from commit 6ddc377 by Atlas 1.24.0.
 
 ## What this is
 
-9 parts, mostly Markdown (236 files); code in TypeScript (85), CSS (8), JavaScript (7), Astro (4) and PowerShell (1). Work enters through 6 doors; the busiest is CI, which reaches 5 parts. It publishes @mcptoolshop/loadout-os to npm. It deploys a site to GitHub Pages. People run ai-loadout, claude-memories, claude-rules and loadout-os.
+9 parts, mostly Markdown (236 files); code in TypeScript (85), CSS (8), JavaScript (7), Astro (4) and PowerShell (1). Work enters through 6 doors; the busiest is CI, which reaches 6 parts. It publishes @mcptoolshop/loadout-os to npm. It deploys a site to GitHub Pages. People run ai-loadout, claude-memories, claude-rules and loadout-os.
 
-## What changed since 2026-11-08 (f2fd599)
+## What changed since 2026-11-08 (e522fa1)
 
-Nothing structural changed since 2026-11-08; 8 files changed content.
+- CI now also runs apps/hook/esbuild.config.mjs.
+- Release now also runs apps/hook/esbuild.config.mjs.
+- .claude/loadout is now written by packages/cli/src/refresh.ts.
+- README.md is now read by packages/cli/src/tests/help.test.ts.
+- package.json is now also read by packages/cli/src/tests/doctor.test.ts.
+- And 2 more new writers and readers of places.
+- 21 files changed content, across 6 parts.
 
 ## What comes in
 
-1. **CI.** On a pull request touching 9 paths; on a push to main touching 9 paths; or by hand. Runs packages/cli/src/tests/console.test.ts, packages/cli/src/tests/dispatch.test.ts, packages/cli/src/tests/doctor.test.ts and 31 more; builds packages/cli/src/, packages/kernel/src/, packages/memories/src/ and 17 more. On a push to main, it also runs site/astro.config.mjs and site/src/.
-2. **Release.** When a tag matching `v*` is pushed. Runs packages/cli/esbuild.config.mjs, packages/cli/src/tests/console.test.ts, packages/cli/src/tests/dispatch.test.ts and 32 more; builds packages/cli/src/, packages/kernel/src/, packages/memories/src/ and 17 more.
+1. **CI.** On a pull request touching 9 paths; on a push to main touching 9 paths; or by hand. Runs apps/hook/esbuild.config.mjs, packages/cli/src/tests/console.test.ts, packages/cli/src/tests/dispatch.test.ts and 32 more; builds packages/cli/src/, packages/kernel/src/, packages/memories/src/ and 17 more. On a push to main, it also runs site/astro.config.mjs and site/src/.
+2. **Release.** When a tag matching `v*` is pushed. Runs apps/hook/esbuild.config.mjs, packages/cli/esbuild.config.mjs, packages/cli/src/tests/console.test.ts and 33 more; builds packages/cli/src/, packages/kernel/src/, packages/memories/src/ and 17 more.
 3. **claude-memories** (a command people run). Runs packages/memories/src/cli.ts.
 4. **claude-rules** (a command people run). Runs packages/rules/src/cli.ts.
 5. **ai-loadout** (a command people run). Runs packages/kernel/src/cli.ts.
@@ -21,18 +27,19 @@ Nothing structural changed since 2026-11-08; 8 files changed content.
 
 ## What happens through CI
 
-1. The workflow runs 9 files in cli, packages/kernel/src/tests/ in kernel, packages/memories/src/tests/ in memories, and packages/rules/src/tests/ in rules; it builds packages/cli/src/ in cli, packages/kernel/src/ in kernel, packages/memories/src/ in memories and packages/rules/src/ in rules.
+1. The workflow runs 9 files in cli, apps/hook/esbuild.config.mjs in hook, packages/kernel/src/tests/ in kernel, packages/memories/src/tests/ in memories, and packages/rules/src/tests/ in rules; it builds packages/cli/src/ in cli, packages/kernel/src/ in kernel, packages/memories/src/ in memories and packages/rules/src/ in rules.
 2. On a push to main, it also runs site/astro.config.mjs and site/src/.
-3. It uploads coverage to Codecov.
-4. It deploys the site on a push to main.
+3. It writes to .claude/loadout/, which is not tracked.
+4. It uploads coverage to Codecov.
+5. It deploys the site on a push to main.
 
 ## Who reads the results
 
-CI writes nothing this map can see.
+CI writes only to .claude/loadout/, which is not tracked.
 
 ## The other doors
 
-**Release** runs packages/cli/esbuild.config.mjs, packages/cli/src/tests/console.test.ts, packages/cli/src/tests/dispatch.test.ts and 32 more, builds packages/cli/src/, packages/kernel/src/, packages/memories/src/ and 17 more, publishes @mcptoolshop/loadout-os to npm, and creates a GitHub release.
+**Release** runs apps/hook/esbuild.config.mjs, packages/cli/esbuild.config.mjs, packages/cli/src/tests/console.test.ts and 33 more, builds packages/cli/src/, packages/kernel/src/, packages/memories/src/ and 17 more, writes to .claude/loadout/, which is not tracked, publishes @mcptoolshop/loadout-os to npm, and creates a GitHub release.
 
 **claude-memories** (a command people run) runs packages/memories/src/cli.ts and reaches kernel.
 
@@ -48,6 +55,7 @@ CI writes nothing this map can see.
 - **memories** is imported by 1 part (cli) and sits on the path of 3 doors.
 - **rules** is imported by 1 part (cli) and sits on the path of 3 doors.
 - **cli** is imported by no other part and sits on the path of 2 doors.
+- **hook** is imported by no other part and sits on the path of 2 doors.
 
 ## What tends to change together
 
@@ -95,9 +103,10 @@ Read those in order to follow one pull request end to end.
 ## What this map cannot see
 
 - 6 writes and 23 reads use paths built at run time and are not named here.
-- 5 writes and 52 reads go to a path their caller passes, not to this repository.
+- 1 write goes to places this repository does not track, so it is not listed as generated.
+- 5 writes and 54 reads go to a path their caller passes, not to this repository.
 - 2 writes and 26 reads go to the directory the command is run in, not to this repository.
-- 6 writes and 12 reads go to the home directory (.ai-loadout/ and .claude/) or a path their caller passes, not to this repository.
+- 7 writes and 13 reads go to the home directory (.ai-loadout/ and .claude/) or a path their caller passes, not to this repository.
 - 6 writes and 1 read go to a temporary directory, not to this repository.
 - 5 reads go to the directory the command is run in (.claude/ and MEMORY.md/) or the home directory (.claude/), not to this repository.
 - 1 write and 2 reads go to the directory the command is run in (.claude/, MEMORY.md/ and memory/), the home directory (.claude/) or a path their caller passes, not to this repository.

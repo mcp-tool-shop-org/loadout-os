@@ -49,7 +49,7 @@
       "confidence": "low",
       "highWater": null,
       "name": "cli",
-      "qualifyingSourceCommits": 11,
+      "qualifyingSourceCommits": 12,
       "rebaseline": null
     },
     {
@@ -86,7 +86,7 @@
       "confidence": "low",
       "highWater": null,
       "name": "kernel",
-      "qualifyingSourceCommits": 6,
+      "qualifyingSourceCommits": 7,
       "rebaseline": null
     },
     {
@@ -104,7 +104,7 @@
       "confidence": "low",
       "highWater": null,
       "name": "memories",
-      "qualifyingSourceCommits": 9,
+      "qualifyingSourceCommits": 10,
       "rebaseline": null
     },
     {
@@ -277,8 +277,8 @@
         "path": "apps/hook/smoke-test.ps1"
       },
       {
-        "commits": 5,
-        "lines": 350,
+        "commits": 6,
+        "lines": 361,
         "path": "atlas/README.md"
       },
       {
@@ -287,18 +287,18 @@
         "path": "atlas/boundaries.yaml"
       },
       {
-        "commits": 5,
-        "lines": 1528,
+        "commits": 6,
+        "lines": 1557,
         "path": "atlas/page.json"
       },
       {
-        "commits": 5,
-        "lines": 4699,
+        "commits": 6,
+        "lines": 4790,
         "path": "atlas/statistics.json"
       },
       {
-        "commits": 5,
-        "lines": 21198,
+        "commits": 6,
+        "lines": 21262,
         "path": "atlas/structure.json"
       },
       {
@@ -312,13 +312,13 @@
         "path": "logo.png"
       },
       {
-        "commits": 10,
-        "lines": 1485,
+        "commits": 11,
+        "lines": 1525,
         "path": "package-lock.json"
       },
       {
-        "commits": 4,
-        "lines": 32,
+        "commits": 5,
+        "lines": 36,
         "path": "package.json"
       },
       {
@@ -372,8 +372,8 @@
         "path": "packages/cli/src/help.ts"
       },
       {
-        "commits": 5,
-        "lines": 779,
+        "commits": 6,
+        "lines": 793,
         "path": "packages/cli/src/hook.ts"
       },
       {
@@ -422,8 +422,8 @@
         "path": "packages/cli/src/tests/hook.test.ts"
       },
       {
-        "commits": 4,
-        "lines": 589,
+        "commits": 5,
+        "lines": 623,
         "path": "packages/cli/src/tests/refresh.test.ts"
       },
       {
@@ -917,8 +917,8 @@
         "path": "packages/kernel/src/cli.ts"
       },
       {
-        "commits": 3,
-        "lines": 272,
+        "commits": 4,
+        "lines": 295,
         "path": "packages/kernel/src/frontmatter.ts"
       },
       {
@@ -957,8 +957,8 @@
         "path": "packages/kernel/src/tests/cli-helpers.test.ts"
       },
       {
-        "commits": 3,
-        "lines": 172,
+        "commits": 4,
+        "lines": 199,
         "path": "packages/kernel/src/tests/frontmatter.test.ts"
       },
       {
@@ -1437,8 +1437,8 @@
         "path": "packages/memories/src/cli.ts"
       },
       {
-        "commits": 6,
-        "lines": 394,
+        "commits": 7,
+        "lines": 425,
         "path": "packages/memories/src/index-gen.ts"
       },
       {
@@ -1462,8 +1462,8 @@
         "path": "packages/memories/src/stats.ts"
       },
       {
-        "commits": 1,
-        "lines": 303,
+        "commits": 2,
+        "lines": 335,
         "path": "packages/memories/src/sync.ts"
       },
       {
@@ -2162,24 +2162,24 @@
     "level": "low",
     "reason": "fewer than 25 source files reach 10 revisions in the window"
   },
-  "generatedAt": "2026-11-08T13:05:05.600Z",
+  "generatedAt": "2026-11-08T16:53:02.329Z",
   "generatedFrom": {
-    "commit": "e522fa11bf75804124da8a0a41fec27cf0f5ff59"
+    "commit": "6ddc3772f65288e2f7c3536eded5ec2d25223978"
   },
   "pairs": [
     {
       "a": "packages/cli/src/hook.ts",
       "b": "packages/cli/src/tests/hook.test.ts",
-      "either": 6,
+      "either": 7,
       "shared": 4,
-      "strength": 0.666667
+      "strength": 0.571429
     },
     {
       "a": "packages/memories/src/index-gen.ts",
       "b": "packages/memories/src/tests/index-gen.test.ts",
-      "either": 6,
+      "either": 7,
       "shared": 4,
-      "strength": 0.666667
+      "strength": 0.571429
     }
   ],
   "parameters": {
@@ -2192,16 +2192,16 @@
     "floor": "fallen",
     "floorHeld": false,
     "floorTrigger": "revision-depth",
-    "headDate": "2026-11-08T07:53:52-05:00",
+    "headDate": "2026-11-08T08:06:03-05:00",
     "inScopeFiles": 388,
     "pinnedStart": null,
     "priorFloor": "fallen",
-    "qualifyingCommits": 45,
+    "qualifyingCommits": 46,
     "qualifyingMinimum": 30,
     "revisions": 5,
     "shared": 10,
     "sharedFloorUsed": 3,
-    "since": "2026-05-12T12:53:52.000Z",
+    "since": "2026-05-12T13:06:03.000Z",
     "sourceExtensions": [
       ".js",
       ".mjs",

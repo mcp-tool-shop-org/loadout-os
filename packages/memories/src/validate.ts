@@ -7,8 +7,8 @@
  * and summary drift against frontmatter descriptions).
  */
 
-import { readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import { validateIndex as validateLoadoutIndex, parseFrontmatter } from "@mcptoolshop/ai-loadout";
 import type { ValidationIssue } from "@mcptoolshop/ai-loadout";
 import type { MemoryAnalysis, MemoryIndex } from "./types.js";
@@ -27,10 +27,73 @@ export const DEFAULT_MAX_MEMORY_LINES = 180;
 export const DEFAULT_MAX_MEMORY_BYTES = 24_000;
 
 export interface ValidateMemoryOptions {
-  /** Max allowed lines in MEMORY.md before emitting MEMORY_LIMIT_EXCEEDED error (default 180). */
+  /** Max allowed lines in MEMORY.md (default 180; passing explicitly opts in to error severity). */
   maxLines?: number;
-  /** Max allowed UTF-8 bytes in MEMORY.md before emitting MEMORY_LIMIT_EXCEEDED error (default 24,000). */
+  /** Max allowed UTF-8 bytes in MEMORY.md (default 24,000; passing explicitly opts in to error severity). */
   maxBytes?: number;
+  /** Whether exceeding MEMORY.md limits is an error rather than a warning (default: false unless store or caller opts in). */
+  enforceLimits?: boolean;
+}
+
+/**
+ * Inspect MEMORY.md frontmatter and optional `<store>/.loadout.json` config to see
+ * whether the store opted in to enforcing MEMORY_LIMIT_EXCEEDED as an error (Q5-1b).
+ */
+function resolveStoreLimitOptIn(
+  memoryFilePath: string,
+  rawMemory: string,
+): { optedIn: boolean; maxLines?: number; maxBytes?: number } {
+  let optedIn = false;
+  let maxLines: number | undefined;
+  let maxBytes: number | undefined;
+
+  const { frontmatter } = parseFrontmatter(rawMemory);
+  const meta = frontmatter?.metadata;
+  if (meta) {
+    if (meta.enforce_limits === true || meta.enforce_limits === "true") {
+      optedIn = true;
+    }
+    if (typeof meta.max_lines === "number" && Number.isFinite(meta.max_lines)) {
+      maxLines = meta.max_lines;
+      optedIn = true;
+    }
+    if (typeof meta.max_bytes === "number" && Number.isFinite(meta.max_bytes)) {
+      maxBytes = meta.max_bytes;
+      optedIn = true;
+    }
+  }
+
+  const storeDir = dirname(resolve(memoryFilePath));
+  const cfgPath = join(storeDir, ".loadout.json");
+  if (existsSync(cfgPath)) {
+    try {
+      const cfg = JSON.parse(readFileSync(cfgPath, "utf-8")) as Record<string, unknown>;
+      if (
+        cfg.enforceMemoryLimits === true ||
+        cfg.enforce_limits === true
+      ) {
+        optedIn = true;
+      }
+      if (typeof cfg.maxLines === "number" && Number.isFinite(cfg.maxLines)) {
+        maxLines = cfg.maxLines;
+        optedIn = true;
+      } else if (typeof cfg.max_lines === "number" && Number.isFinite(cfg.max_lines)) {
+        maxLines = cfg.max_lines;
+        optedIn = true;
+      }
+      if (typeof cfg.maxBytes === "number" && Number.isFinite(cfg.maxBytes)) {
+        maxBytes = cfg.maxBytes;
+        optedIn = true;
+      } else if (typeof cfg.max_bytes === "number" && Number.isFinite(cfg.max_bytes)) {
+        maxBytes = cfg.max_bytes;
+        optedIn = true;
+      }
+    } catch {
+      // Ignore malformed optional store config
+    }
+  }
+
+  return { optedIn, maxLines, maxBytes };
 }
 
 /**
@@ -63,14 +126,21 @@ export function validateMemory(
   opts: ValidateMemoryOptions = {},
 ): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
-  const maxLines = opts.maxLines ?? DEFAULT_MAX_MEMORY_LINES;
-  const maxBytes = opts.maxBytes ?? DEFAULT_MAX_MEMORY_BYTES;
 
-  // Part B.3: Loader-limit check on MEMORY.md
-  // Claude Code truncates MEMORY.md past 200 lines or ~25 KB
-  // (measured 2026-11-08: a 242-line / 33 KB index was cut at line 194).
+  // Part B.3 & Q5-1(b): Loader-limit check on MEMORY.md.
+  // Warning by default so large intentional stores (e.g. F--AI) never halt refresh/doctor.
+  // Becomes an error when the store opts in (frontmatter metadata or .loadout.json)
+  // or when the caller explicitly passes maxLines / maxBytes / enforceLimits.
   try {
     const rawMemory = readFileSync(analysis.filePath, "utf-8");
+    const storeOpt = resolveStoreLimitOptIn(analysis.filePath, rawMemory);
+    const maxLines = opts.maxLines ?? storeOpt.maxLines ?? DEFAULT_MAX_MEMORY_LINES;
+    const maxBytes = opts.maxBytes ?? storeOpt.maxBytes ?? DEFAULT_MAX_MEMORY_BYTES;
+    const enforceAsError =
+      opts.enforceLimits !== undefined
+        ? opts.enforceLimits
+        : opts.maxLines !== undefined || opts.maxBytes !== undefined || storeOpt.optedIn;
+
     const rawLines = rawMemory.endsWith("\n")
       ? rawMemory.slice(0, -1).split("\n").length
       : rawMemory.split("\n").length;
@@ -85,10 +155,10 @@ export function validateMemory(
         reasons.push(`${rawBytes} bytes > limit ${maxBytes}`);
       }
       issues.push({
-        severity: "error",
+        severity: enforceAsError ? "error" : "warning",
         code: "MEMORY_LIMIT_EXCEEDED",
         message: `MEMORY.md exceeds Claude Code auto-loader limits (${reasons.join("; ")}) — measured 2026-11-08: a 242-line / 33 KB index was cut at line 194`,
-        hint: `Move domain entries into linked sub-index files (index-*.md) so MEMORY.md stays <= ${maxLines} lines and <= ${maxBytes} bytes`,
+        hint: `Move domain entries into linked sub-index files (index-*.md) so MEMORY.md stays <= ${maxLines} lines and <= ${maxBytes} bytes (opt in to hard error via --max-lines/--max-bytes, frontmatter metadata.enforce_limits: true, or .loadout.json)`,
       });
     }
   } catch {

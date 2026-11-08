@@ -77,8 +77,10 @@ ship together under `loadout-os`.
   frontmatter (falling back from `id` to kebab-cased `name`), sources entry `summary` from
   topic frontmatter `description`, warns with `STALE_INDEX_SUMMARY` when index bullets drift,
   and adds `loadout-os memories sync-summaries`, `place`, and `move`. `memories validate`
-  errors with `MEMORY_LIMIT_EXCEEDED` above 180 lines or 24,000 bytes (configurable via
-  `--max-lines` / `--max-bytes`), citing the measured 2026-11-08 truncation event.
+  reports `MEMORY_LIMIT_EXCEEDED` above 180 lines or 24,000 bytes (`warning` by default;
+  `error` when opted in via `MEMORY.md` frontmatter `enforce_limits: true` / `max_lines` /
+  `max_bytes`, `<store>/.loadout.json`, or `--max-lines` / `--max-bytes`), citing the
+  measured 2026-11-08 truncation event.
 - **Project refresh, OS file locking, and git snapshot/mirror** (`packages/cli`) —
   `loadout-os refresh --store <dir> --project <root>` writes `<root>/.claude/loadout/index.json`
   (recording `source` for `post-write` store discovery) while leaving the global index
@@ -140,6 +142,38 @@ ship together under `loadout-os`.
   The matcher now blends coverage with an absolute recall signal (`max(coverage,
   matched / 5)`), so real multi-keyword matches are reachable while single incidental
   hits stay quiet.
+- **Unmigrated global stores pass `refresh` and `doctor`** (Q5-1) — `slugifyName` in
+  `packages/kernel/src/frontmatter.ts` now strips ASCII and curly apostrophes (`'`,
+  `\u2018`, `\u2019`) before splitting words (aligned with `nameToId` in
+  `packages/memories/src/index-gen.ts`), preventing false `ID_FILENAME_MISMATCH` warnings
+  on possessive titles. `generateIndex` deduplicates multiple bullets pointing to the same
+  resolved `storePath` into one entry at the first bullet's position instead of emitting
+  `DUPLICATE_ID` errors. `MEMORY_LIMIT_EXCEEDED` in `packages/memories/src/validate.ts`
+  is now `severity: "warning"` by default and `severity: "error"` only when a store opts in
+  via `MEMORY.md` frontmatter (`enforce_limits: true` / `max_lines` / `max_bytes`),
+  `<store>/.loadout.json`, or explicit `--max-lines` / `--max-bytes` flags.
+- **`doctor` `hook-drift` compares against the built standalone bundle** (Q7-3) — root
+  `npm run build` now builds `apps/hook/dist/loadout-hook.mjs` (`npm run build -w apps/hook`),
+  and `packages/cli/src/doctor.ts` points `hookSource` to `apps/hook/dist/loadout-hook.mjs`
+  instead of the unbundled `apps/hook/loadout-hook.mjs` entry file.
+- **CLI `--help` and README synopses for `memories sync-summaries`, `place`, and `move`**
+  (Q7-2) — aligned `packages/cli/src/help.ts`, `packages/cli/src/cli.ts`, `README.md`, and
+  `packages/cli/README.md` with `packages/cli/src/commands.ts` (`sync-summaries [<dir>]
+  [--write]`, `place <topic.md> --index <sub-index.md> [--store <dir>]`, and `move <topic.md>
+  --from <a.md> --to <b.md> [--store <dir>] [--priority <p>]`).
+- **Windows path normalization in `hook post-write`** (Q3-1) — `normalizeHookPath`,
+  `isPathInsideDir`, and `runPostWrite` in `packages/cli/src/hook.ts` now resolve relative
+  `tool_input.file_path` values against `payload.cwd` (`startDir`), expand `~/...` and MSYS
+  `/c/...` paths, strip Windows `\\?\` extended-length prefixes, and compare paths
+  case-insensitively on Windows.
+- **`withFileLock` wait timeout vs `gitTimeoutMs`** (Q3-4) — raised `LOCK_WAIT_MS` in
+  `packages/cli/src/refresh.ts` from `15_000` ms to `DEFAULT_GIT_TIMEOUT_MS + 5_000`
+  (`35_000` ms, scaling with `opts.gitTimeoutMs + 5_000`) so a second `post-write` waits
+  for a slow git snapshot/mirror push rather than timing out with `LOCK_TIMEOUT`.
+- **Atomic index writes in `runRefresh`** (Q2-6) — `runRefresh` in
+  `packages/cli/src/refresh.ts` now writes `<dest>.tmp.<pid>` (and
+  `<storeIndexPath>.tmp.<pid>`) and commits via `renameSync` instead of `copyFileSync`,
+  preventing a crash mid-write from leaving a truncated global or project `index.json`.
 
 ### Changed
 

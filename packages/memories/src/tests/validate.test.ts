@@ -90,7 +90,7 @@ describe("validateMemory", () => {
     );
   });
 
-  it("errors with MEMORY_LIMIT_EXCEEDED at 181 lines and at 24,001 bytes, citing the measured truncation event (Part B)", () => {
+  it("warns with MEMORY_LIMIT_EXCEEDED by default at 181 lines or 24,001 bytes, and errors only when the store opts in via frontmatter, config, or explicit maxLines/maxBytes (Q5-1b)", () => {
     const tmp = mkdtempSync(join(tmpdir(), "loadout-limit-"));
     try {
       // 1. Exactly 180 lines -> passes without MEMORY_LIMIT_EXCEEDED
@@ -100,28 +100,60 @@ describe("validateMemory", () => {
       const okIssues = validateMemory(analyzeMemoryMd(memPath));
       assert.ok(!okIssues.some((i) => i.code === "MEMORY_LIMIT_EXCEEDED"));
 
-      // 2. 181 lines -> errors with MEMORY_LIMIT_EXCEEDED
+      // 2. 181 lines with no opt-in -> WARNING by default (never halts refresh/doctor)
       const lines181 = Array.from({ length: 181 }, (_, i) => `# Line ${i + 1}`).join("\n");
       writeFileSync(memPath, lines181, "utf-8");
-      const lineErrIssues = validateMemory(analyzeMemoryMd(memPath));
-      const lineErr = lineErrIssues.find((i) => i.code === "MEMORY_LIMIT_EXCEEDED");
-      assert.ok(lineErr, "181 lines must trigger MEMORY_LIMIT_EXCEEDED");
-      assert.equal(lineErr.severity, "error");
-      assert.match(lineErr.message, /measured 2026-11-08: a 242-line \/ 33 KB index was cut at line 194/);
+      const lineWarnIssues = validateMemory(analyzeMemoryMd(memPath));
+      const lineWarn = lineWarnIssues.find((i) => i.code === "MEMORY_LIMIT_EXCEEDED");
+      assert.ok(lineWarn, "181 lines must trigger MEMORY_LIMIT_EXCEEDED");
+      assert.equal(lineWarn.severity, "warning");
+      assert.match(lineWarn.message, /measured 2026-11-08: a 242-line \/ 33 KB index was cut at line 194/);
 
-      // 3. 24,001 bytes in <= 180 lines -> errors with MEMORY_LIMIT_EXCEEDED
+      // 3. 24,001 bytes in <= 180 lines with no opt-in -> WARNING by default
       const longLine = "# " + "x".repeat(240); // 242 bytes per line
       const bytesOver24k = Array.from({ length: 100 }, () => longLine).join("\n"); // 100 lines, >24,000 bytes
       writeFileSync(memPath, bytesOver24k, "utf-8");
-      const byteErrIssues = validateMemory(analyzeMemoryMd(memPath));
-      const byteErr = byteErrIssues.find((i) => i.code === "MEMORY_LIMIT_EXCEEDED");
-      assert.ok(byteErr, ">24,000 bytes must trigger MEMORY_LIMIT_EXCEEDED");
-      assert.equal(byteErr.severity, "error");
-      assert.match(byteErr.message, /bytes > limit 24000/);
+      const byteWarnIssues = validateMemory(analyzeMemoryMd(memPath));
+      const byteWarn = byteWarnIssues.find((i) => i.code === "MEMORY_LIMIT_EXCEEDED");
+      assert.ok(byteWarn, ">24,000 bytes must trigger MEMORY_LIMIT_EXCEEDED");
+      assert.equal(byteWarn.severity, "warning");
+      assert.match(byteWarn.message, /bytes > limit 24000/);
 
-      // 4. Configurable limits override defaults
+      // 4. Explicit maxLines / maxBytes opts in to ERROR severity (and overrides threshold)
+      const explicitLineErr = validateMemory(analyzeMemoryMd(memPath), { maxBytes: 24_000 }).find(
+        (i) => i.code === "MEMORY_LIMIT_EXCEEDED",
+      );
+      assert.ok(explicitLineErr);
+      assert.equal(explicitLineErr.severity, "error");
+
       const customOk = validateMemory(analyzeMemoryMd(memPath), { maxLines: 200, maxBytes: 30000 });
       assert.ok(!customOk.some((i) => i.code === "MEMORY_LIMIT_EXCEEDED"));
+
+      // 5. Store opt-in via frontmatter in MEMORY.md (metadata.enforce_limits: true or max_lines)
+      const fmOptIn = [
+        "---",
+        "name: Memory Index",
+        "metadata:",
+        "  enforce_limits: true",
+        "---",
+        lines181,
+      ].join("\n");
+      writeFileSync(memPath, fmOptIn, "utf-8");
+      const fmErr = validateMemory(analyzeMemoryMd(memPath)).find(
+        (i) => i.code === "MEMORY_LIMIT_EXCEEDED",
+      );
+      assert.ok(fmErr);
+      assert.equal(fmErr.severity, "error");
+
+      // 6. Store opt-in via .loadout.json config in the store directory
+      writeFileSync(memPath, lines181, "utf-8");
+      const cfgPath = join(tmp, ".loadout.json");
+      writeFileSync(cfgPath, JSON.stringify({ enforceMemoryLimits: true }), "utf-8");
+      const cfgErr = validateMemory(analyzeMemoryMd(memPath)).find(
+        (i) => i.code === "MEMORY_LIMIT_EXCEEDED",
+      );
+      assert.ok(cfgErr);
+      assert.equal(cfgErr.severity, "error");
     } finally {
       rmSync(tmp, { recursive: true, force: true });
     }

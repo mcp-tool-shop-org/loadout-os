@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import { matchLoadout } from "@mcptoolshop/ai-loadout";
 import { analyzeMemoryMd } from "../analyze.js";
 import { generateIndex } from "../index-gen.js";
-import { validateMemory } from "../validate.js";
+import { validateMemory, validateMemoryIndex } from "../validate.js";
 import { syncSummaries, placeOrMoveEntry, resolveTargetIndexFile } from "../sync.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -557,6 +557,94 @@ describe("sub-index expansion, frontmatter summary authority, and keyword extrac
         () => placeOrMoveEntry({ storeDir: tmp, topicFile: "project_beta.md", targetIndex: "nonexistent-sub" }),
         /Target index file not found/,
       );
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("collapses duplicate bullets pointing to the same topic file into ONE entry without DUPLICATE_ID, while still raising DUPLICATE_ID for different files with the same id (Q5-1a)", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "loadout-dup-bullets-"));
+    try {
+      // Topic file with frontmatter description
+      writeFileSync(
+        join(tmp, "forkctl.md"),
+        [
+          "---",
+          "name: forkctl",
+          "description: Authoritative forkctl frontmatter description",
+          "---",
+          "# forkctl",
+          "Body text.",
+          "",
+        ].join("\n"),
+        "utf-8",
+      );
+      // Topic file without frontmatter description (falls back to first bullet's text)
+      writeFileSync(
+        join(tmp, "seed-vault.md"),
+        "# Seed Vault\nBody without frontmatter.\n",
+        "utf-8",
+      );
+      // Two DIFFERENT files that resolve to the same id ("collision-id")
+      writeFileSync(
+        join(tmp, "collision-a.md"),
+        "---\nid: collision-id\ndescription: First collision file\n---\n# A\n",
+        "utf-8",
+      );
+      writeFileSync(
+        join(tmp, "collision-b.md"),
+        "---\nid: collision-id\ndescription: Second collision file\n---\n# B\n",
+        "utf-8",
+      );
+
+      const memPath = join(tmp, "MEMORY.md");
+      writeFileSync(
+        memPath,
+        [
+          "# Memory",
+          "- [forkctl](forkctl.md) — First forkctl bullet description",
+          "- [Seed Vault](seed-vault.md) — First seed-vault bullet description",
+          "- [forkable v1.0.0 ship](forkctl.md) — Second forkctl bullet description",
+          "- [Seed Vault Wave 2](seed-vault.md) — Second seed-vault bullet description",
+          "- [forkctl v2.0.0 ship](forkctl.md) — Third forkctl bullet description",
+          "",
+        ].join("\n"),
+        "utf-8",
+      );
+
+      const analysis = analyzeMemoryMd(memPath);
+      const index = generateIndex(analysis);
+      const issues = validateMemoryIndex(index);
+
+      // 5 bullets pointing to 2 files -> collapsed to 2 entries in first-bullet order
+      assert.equal(index.entries.length, 2);
+      assert.equal(index.entries[0].id, "forkctl");
+      assert.equal(index.entries[0].path, "forkctl.md");
+      assert.equal(index.entries[0].summary, "Authoritative forkctl frontmatter description");
+
+      assert.equal(index.entries[1].id, "seed-vault");
+      assert.equal(index.entries[1].path, "seed-vault.md");
+      assert.equal(index.entries[1].summary, "First seed-vault bullet description");
+
+      // Zero DUPLICATE_ID errors when duplicate bullets point to the same topic file
+      assert.ok(!issues.some((i) => i.code === "DUPLICATE_ID"));
+
+      // Now add two bullets pointing to DIFFERENT files that resolve to the same id -> MUST raise DUPLICATE_ID
+      writeFileSync(
+        memPath,
+        [
+          "# Memory",
+          "- [Collision A](collision-a.md) — First file",
+          "- [Collision B](collision-b.md) — Second file",
+          "",
+        ].join("\n"),
+        "utf-8",
+      );
+      const colAnalysis = analyzeMemoryMd(memPath);
+      const colIndex = generateIndex(colAnalysis);
+      const colIssues = validateMemoryIndex(colIndex);
+      assert.equal(colIndex.entries.length, 2);
+      assert.ok(colIssues.some((i) => i.code === "DUPLICATE_ID" && i.severity === "error"));
     } finally {
       rmSync(tmp, { recursive: true, force: true });
     }

@@ -18,6 +18,7 @@ import {
   existsSync,
   statSync,
   copyFileSync,
+  renameSync,
   mkdirSync,
   readdirSync,
   unlinkSync,
@@ -166,10 +167,11 @@ export class RefreshError extends Error {
   }
 }
 
-// ── OS File Lock (F-07) ─────────────────────────────────────────
+// ── OS File Lock (F-07 / Q3-4) ─────────────────────────────────
 
-const LOCK_STALE_MS = 60_000;
-const LOCK_WAIT_MS = 15_000;
+export const DEFAULT_GIT_TIMEOUT_MS = 30_000;
+export const LOCK_STALE_MS = 60_000;
+export const LOCK_WAIT_MS = DEFAULT_GIT_TIMEOUT_MS + 5_000;
 
 function sleepSync(ms: number): void {
   const sab = new SharedArrayBuffer(4);
@@ -188,11 +190,15 @@ export function lockFilePathForKey(lockKey: string): string {
 /**
  * Execute `fn` while holding an exclusive atomic OS lockfile (`wx`) keyed to `lockKey`.
  * Prevents overlapping async `refresh` / `post-write` runs from racing on `index.json`
- * or git history snapshots (F-07).
+ * or git history snapshots (F-07 / Q3-4).
  */
-export function withFileLock<T>(lockKey: string, fn: () => T): T {
+export function withFileLock<T>(
+  lockKey: string,
+  fn: () => T,
+  waitMs: number = LOCK_WAIT_MS,
+): T {
   const lockPath = lockFilePathForKey(lockKey);
-  const deadline = Date.now() + LOCK_WAIT_MS;
+  const deadline = Date.now() + Math.max(waitMs, LOCK_WAIT_MS);
   let acquiredFd: number | null = null;
 
   while (Date.now() < deadline) {
@@ -298,7 +304,7 @@ export function runSnapshotAndMirror(opts: {
   const snapshotRepo = resolve(opts.snapshotRepo);
   const mirrorRepo = opts.mirrorRepo ? resolve(opts.mirrorRepo) : undefined;
   const note = opts.note?.trim() || "loadout-os refresh snapshot";
-  const timeoutMs = opts.timeoutMs ?? 30_000;
+  const timeoutMs = opts.timeoutMs ?? DEFAULT_GIT_TIMEOUT_MS;
 
   // Ensure snapshotRepo exists and is an initialized git repo on branch `main`
   if (!existsSync(snapshotRepo)) {
@@ -481,8 +487,14 @@ export function runRefresh(opts: RefreshOptions): RefreshResult {
     opts.dest ?? (project ? projectDest(project) : defaultDest()),
   );
   const dryRun = !!opts.dryRun;
+  const lockWaitMs =
+    opts.gitTimeoutMs !== undefined && Number.isFinite(opts.gitTimeoutMs)
+      ? Math.max(LOCK_WAIT_MS, opts.gitTimeoutMs + 5_000)
+      : LOCK_WAIT_MS;
 
-  return withFileLock(dest, () => {
+  return withFileLock(
+    dest,
+    () => {
     // ── precondition: store + MEMORY.md present (exit 2 when missing) ──
     const memoryMd = join(store, "MEMORY.md");
     if (!existsSync(store) || !statSync(store).isDirectory()) {
@@ -565,7 +577,9 @@ export function runRefresh(opts: RefreshOptions): RefreshResult {
     // For --project refresh, only write <project>/.claude/loadout/index.json so we don't leave
     // an unrequested index.json inside the project's memory store (F-36).
     if (!project) {
-      writeFileSync(storeIndexPath, storeJson, "utf-8");
+      const tmpStoreIndex = `${storeIndexPath}.tmp.${process.pid}`;
+      writeFileSync(tmpStoreIndex, storeJson, "utf-8");
+      renameSync(tmpStoreIndex, storeIndexPath);
     }
 
     // ── COMPENSATOR (NAMED, irreversible write to the resolver index) ──
@@ -574,18 +588,18 @@ export function runRefresh(opts: RefreshOptions): RefreshResult {
       backupPath = `${dest}.bak`;
       copyFileSync(dest, backupPath);
     }
+    const tmpDest = `${dest}.tmp.${process.pid}`;
     try {
       const destDir = dirname(dest);
       if (!existsSync(destDir)) mkdirSync(destDir, { recursive: true });
-      const tmpDest = `${dest}.tmp-${process.pid}`;
       writeFileSync(tmpDest, destJson, "utf-8");
-      copyFileSync(tmpDest, dest);
+      renameSync(tmpDest, dest);
+    } catch (e) {
       try {
-        unlinkSync(tmpDest);
+        if (existsSync(tmpDest)) unlinkSync(tmpDest);
       } catch {
         /* ignore */
       }
-    } catch (e) {
       if (backupPath && existsSync(backupPath)) {
         try {
           copyFileSync(backupPath, dest);
@@ -631,7 +645,7 @@ export function runRefresh(opts: RefreshOptions): RefreshResult {
       wrote: true,
       ...(snapshot ? { snapshot } : {}),
     };
-  });
+  }, lockWaitMs);
 }
 
 /** Render a refresh result as a human screen. */
