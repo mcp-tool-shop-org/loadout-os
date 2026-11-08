@@ -43,9 +43,10 @@ interface HelpEntry {
 export const COMMAND_HELP: Record<string, HelpEntry> = {
   // ── memories namespace ───────────────────────────────────────
   "memories index": {
-    synopsis: "loadout-os memories index <MEMORY.md> [--lazy] [--json]",
+    synopsis: "loadout-os memories index <MEMORY.md> [--id-source title|name] [--lazy] [--json]",
     args: [["<MEMORY.md>", "path to the store's MEMORY.md (required, first)"]],
     flags: [
+      ["--id-source <mode>", "entry id source when frontmatter has no explicit id: 'title' or 'name' (overrides store setting)"],
       ["--lazy", "generate a lazy-load index (on-demand topic loading)"],
       ["--json", "machine-readable output"],
     ],
@@ -53,16 +54,25 @@ export const COMMAND_HELP: Record<string, HelpEntry> = {
     exits: [["0", "index generated"], ["1", "MEMORY.md missing / unreadable"]],
   },
   "memories validate": {
-    synopsis: "loadout-os memories validate <MEMORY.md> [--json]",
+    synopsis: "loadout-os memories validate <MEMORY.md> [--id-source title|name] [--max-lines <n>] [--max-bytes <n>] [--json]",
     args: [["<MEMORY.md>", "path to MEMORY.md to lint (required, first)"]],
-    flags: [["--json", "machine-readable output"]],
+    flags: [
+      ["--id-source <mode>", "entry id source when frontmatter has no explicit id: 'title' or 'name' (overrides store setting)"],
+      ["--max-lines <n>", "MEMORY.md line cap (default 180; passing opts in to error on MEMORY_LIMIT_EXCEEDED)"],
+      ["--max-bytes <n>", "MEMORY.md byte cap (default 24000; passing opts in to error on MEMORY_LIMIT_EXCEEDED)"],
+      ["--json", "machine-readable output"],
+    ],
+    note: "MEMORY_LIMIT_EXCEEDED is a warning by default so intentionally large stores do not halt refresh/doctor. Opt in to hard error via --max-lines/--max-bytes, frontmatter metadata.enforce_limits: true, or .loadout.json.",
     example: "loadout-os memories validate ./MEMORY.md",
     exits: [["0", "no errors (warnings allowed)"], ["1", "≥1 error-severity issue"]],
   },
   "memories stats": {
-    synopsis: "loadout-os memories stats <MEMORY.md> [--json]",
+    synopsis: "loadout-os memories stats <MEMORY.md> [--id-source title|name] [--json]",
     args: [["<MEMORY.md>", "path to MEMORY.md (required, first)"]],
-    flags: [["--json", "machine-readable output"]],
+    flags: [
+      ["--id-source <mode>", "entry id source when frontmatter has no explicit id: 'title' or 'name'"],
+      ["--json", "machine-readable output"],
+    ],
     example: "loadout-os memories stats ./MEMORY.md --json",
     exits: [["0", "stats printed"], ["1", "MEMORY.md missing"]],
   },
@@ -72,6 +82,47 @@ export const COMMAND_HELP: Record<string, HelpEntry> = {
     flags: [["--json", "machine-readable output"]],
     example: "loadout-os memories health",
     exits: [["0", "Node OK"], ["1", "Node < 20"]],
+  },
+  "memories sync-summaries": {
+    synopsis: "loadout-os memories sync-summaries <MEMORY.md> [--fix] [--json]",
+    args: [["<MEMORY.md>", "path to the store's MEMORY.md (required, first)"]],
+    flags: [
+      ["--fix", "rewrite drifted index bullet summaries from frontmatter descriptions (default is check-only)"],
+      ["--json", "machine-readable output"],
+    ],
+    example: "loadout-os memories sync-summaries ./MEMORY.md --fix",
+    exits: [
+      ["0", "all summaries match (or synced with --fix)"],
+      ["1", "stale summaries found (without --fix) or MEMORY.md missing"],
+    ],
+  },
+  "memories place": {
+    synopsis: "loadout-os memories place <topic.md> <index> [--store <dir>] [--into <index>] [--json]",
+    args: [
+      ["<topic.md>", "topic file to place in an index (FIRST positional)"],
+      ["<index>", "target index file or shorthand, e.g. 'main' or 'projects' (SECOND positional, or via --into)"],
+    ],
+    flags: [
+      ["--store <dir>", "memory store directory (default: dirname of <topic.md> or cwd)"],
+      ["--into <index>", "target index file or shorthand (alternative to second positional)"],
+      ["--json", "machine-readable output"],
+    ],
+    example: "loadout-os memories place ./project_alpha.md projects --store .",
+    exits: [["0", "entry placed or updated"], ["1", "missing file / invalid args"]],
+  },
+  "memories move": {
+    synopsis: "loadout-os memories move <topic.md> <index> [--store <dir>] [--into <index>] [--json]",
+    args: [
+      ["<topic.md>", "topic file to move across indexes (FIRST positional)"],
+      ["<index>", "target index file or shorthand, e.g. 'archive' or 'index-archive.md' (SECOND positional, or via --into)"],
+    ],
+    flags: [
+      ["--store <dir>", "memory store directory (default: dirname of <topic.md> or cwd)"],
+      ["--into <index>", "target index file or shorthand (alternative to second positional)"],
+      ["--json", "machine-readable output"],
+    ],
+    example: "loadout-os memories move ./project_alpha.md --into index-archive.md --store .",
+    exits: [["0", "entry moved atomically"], ["1", "missing file / invalid args"]],
   },
 
   // ── rules namespace ──────────────────────────────────────────
@@ -219,19 +270,69 @@ export const COMMAND_HELP: Record<string, HelpEntry> = {
     example: 'loadout-os hook test --prompt "scaffold a new game"',
     exits: [["0", "hook ran"], ["1", "hook binary not found"]],
   },
+  "hook session-start": {
+    synopsis: "loadout-os hook session-start [--project <root>] [--store <dir>] [--user-prompt-submit] [--max-lines <n>] [--max-bytes <n>]",
+    flags: [
+      ["--project <root>", "project root containing .claude/loadout/index.json"],
+      ["--store <dir>", "memory store directory"],
+      ["--user-prompt-submit", "emit only stale/missing warnings (for UserPromptSubmit)"],
+      ["--max-lines <n>", "line cap per injected board (default 60)"],
+      ["--max-bytes <n>", "byte cap per injected board (default 6000)"],
+      ["--stale-after-min <n>", "override stale threshold in minutes"],
+      ["--json", "machine-readable output"],
+    ],
+    note: "Prints every core entry with metadata.loadout_inject: session-start in full as UTF-8 under a file header. Fails open with visible warnings when the index or board is missing, corrupt, or stale.",
+    example: "loadout-os hook session-start --project .",
+    exits: [["0", "always exits 0 (fail-open hook)"]],
+  },
+  "hook pre-compact": {
+    synopsis: "loadout-os hook pre-compact [--project <root>] [--store <dir>] [--stale-after-min <n>]",
+    flags: [
+      ["--project <root>", "project root containing .claude/loadout/index.json"],
+      ["--store <dir>", "memory store directory"],
+      ["--stale-after-min <n>", "stale threshold in minutes (default 60)"],
+      ["--json", "machine-readable output"],
+    ],
+    note: "PreCompact hook: warns on stdout when the session-start board is older than stale_after_min so it gets refreshed before compaction.",
+    example: "loadout-os hook pre-compact --project .",
+    exits: [["0", "always exits 0 (fail-open hook)"]],
+  },
+  "hook post-write": {
+    synopsis: "loadout-os hook post-write [--project <root>] [--store <dir>] [--snapshot-repo <dir>] [--mirror-repo <bare>] [--fix]",
+    flags: [
+      ["--project <root>", "project root containing .claude/loadout/index.json"],
+      ["--store <dir>", "memory store directory (default: resolved from index.json source field)"],
+      ["--file <path>", "explicit edited file path (default: read from PostToolUse stdin JSON)"],
+      ["--snapshot-repo <dir>", "git working copy to snapshot store .md files into"],
+      ["--mirror-repo <bare>", "bare git repo to push snapshot commits to"],
+      ["--fix", "synchronize drifted index bullet summaries from topic frontmatter before validating"],
+      ["--timeout-ms <ms>", "subprocess timeout in milliseconds for git commands (default 30000)"],
+    ],
+    note: "PostToolUse hook for Write/Edit: validates and refreshes the project index when the edited file is inside the memory store. Exits 2 on any validation, refresh, git, or timeout failure (for asyncRewake), and exits 0 silently otherwise.",
+    example: "loadout-os hook post-write --project .",
+    exits: [
+      ["0", "clean edit (or path outside store)"],
+      ["2", "validation error, refresh failure, git error, or subprocess timeout"],
+    ],
+  },
   refresh: {
-    synopsis: "loadout-os refresh [--store <dir>] [--dest <path>] [--dry-run]",
+    synopsis: "loadout-os refresh [--store <dir>] [--dest <path>] [--project <root>] [--id-source title|name] [--snapshot-repo <dir>] [--mirror-repo <bare>] [--fix] [--dry-run]",
     flags: [
       ["--store <dir>", "memory store dir (default canonical store)"],
-      ["--dest <path>", "global index to write (default ~/.ai-loadout/index.json)"],
+      ["--dest <path>", "index file to write (default ~/.ai-loadout/index.json)"],
+      ["--project <root>", "write project index to <root>/.claude/loadout/index.json"],
+      ["--id-source <mode>", "entry id source when frontmatter has no explicit id: 'title' or 'name' (overrides store setting)"],
+      ["--snapshot-repo <dir>", "git working copy to snapshot store .md files into"],
+      ["--mirror-repo <bare>", "bare git repo to push snapshot commits to"],
+      ["--fix", "synchronize drifted index bullet summaries from topic frontmatter before validating"],
       ["--dry-run", "compute everything, write NOTHING, print what WOULD change"],
     ],
-    note: "Folds the Index Freshness Ritual (index → validate → copy) into one command. ANDON HALT: any validation error writes nothing. COMPENSATOR: an existing --dest is backed up to <dest>.bak before overwrite and restored on write failure.",
-    example: "loadout-os refresh --dry-run",
+    note: "Folds the Index Freshness Ritual (index → validate → copy) into one command. ANDON HALT: any validation error writes nothing. COMPENSATOR: an existing destination is backed up to <dest>.bak before overwrite and restored on write failure.",
+    example: "loadout-os refresh --project . --store ./memory",
     exits: [
       ["0", "index written (or dry-run printed)"],
-      ["1", "validation error (andon) or write failure"],
-      ["2", "store / MEMORY.md missing"],
+      ["1", "validation error (andon), write failure, or snapshot/mirror git failure"],
+      ["2", "store / MEMORY.md missing or subprocess timeout"],
     ],
   },
 };

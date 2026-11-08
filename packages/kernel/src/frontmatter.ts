@@ -2,8 +2,8 @@
  * Frontmatter parser and serializer.
  *
  * Parses YAML-like --- delimited blocks from payload files.
- * Hand-rolled: supports strings, inline arrays, booleans, and
- * one level of nested objects (triggers). No deps, deterministic.
+ * Hand-rolled: supports strings, inline arrays, booleans, numbers, and
+ * one level of nested objects (triggers, metadata). No deps, deterministic.
  */
 
 import type { Frontmatter, Priority, Triggers } from "./types.js";
@@ -11,11 +11,56 @@ import { DEFAULT_TRIGGERS } from "./types.js";
 
 const VALID_PRIORITIES = new Set<string>(["core", "domain", "manual"]);
 
+function slugifyName(name: string): string {
+  const parts: string[] = [];
+  let current = "";
+  const lower = name.toLowerCase();
+  for (let i = 0; i < lower.length; i++) {
+    const code = lower.charCodeAt(i);
+    // Strip ASCII and curly apostrophes the way nameToId does so "Tool's" -> "tools" (Q5-1a)
+    if (code === 39 || code === 8217 || code === 8216) {
+      continue;
+    }
+    const isAlphaNum = (code >= 97 && code <= 122) || (code >= 48 && code <= 57);
+    if (isAlphaNum) {
+      current += lower[i];
+    } else if (current.length > 0) {
+      parts.push(current);
+      current = "";
+    }
+  }
+  if (current.length > 0) {
+    parts.push(current);
+  }
+  return parts.join("-");
+}
+
+function unquoteScalar(rawVal: string): string {
+  if (rawVal.startsWith('"') && rawVal.endsWith('"') && rawVal.length >= 2) {
+    return rawVal.slice(1, -1).replace(/\\"/g, '"');
+  }
+  if (rawVal.startsWith("'") && rawVal.endsWith("'") && rawVal.length >= 2) {
+    return rawVal.slice(1, -1).replace(/\\'/g, "'");
+  }
+  return rawVal;
+}
+
+function parseScalarValue(rawVal: string): string | number | boolean {
+  if (rawVal === "true") return true;
+  if (rawVal === "false") return false;
+  if (/^-?\d+(\.\d+)?$/.test(rawVal)) {
+    const n = Number(rawVal);
+    if (Number.isFinite(n)) return n;
+  }
+  return unquoteScalar(rawVal);
+}
+
 // ── Parse frontmatter from file content ────────────────────────
 export function parseFrontmatter(
   content: string,
 ): { frontmatter: Frontmatter | null; body: string } {
-  const lines = content.split("\n");
+  const normalized = content.startsWith("\ufeff") ? content.slice(1) : content;
+  const lines = normalized.split("\n");
 
   if (lines[0]?.trim() !== "---") {
     return { frontmatter: null, body: content };
@@ -39,7 +84,7 @@ export function parseFrontmatter(
   const data: Record<string, unknown> = {};
   let currentKey = "";
   let currentArray: string[] | null = null;
-  let currentObject: Record<string, boolean> | null = null;
+  let currentObject: Record<string, string | number | boolean> | null = null;
 
   for (let i = 0; i < fmLines.length; i++) {
     const line = fmLines[i];
@@ -48,7 +93,7 @@ export function parseFrontmatter(
 
     // Block array item
     if (currentArray !== null && trimmed.startsWith("- ")) {
-      currentArray.push(trimmed.slice(2).trim());
+      currentArray.push(unquoteScalar(trimmed.slice(2).trim()));
       continue;
     }
 
@@ -58,7 +103,7 @@ export function parseFrontmatter(
       if (colonIdx !== -1) {
         const key = trimmed.slice(0, colonIdx).trim();
         const val = trimmed.slice(colonIdx + 1).trim();
-        currentObject[key] = val === "true";
+        currentObject[key] = parseScalarValue(val);
         continue;
       }
     }
@@ -101,7 +146,7 @@ export function parseFrontmatter(
       const inner = rawVal.slice(1, -1);
       data[key] = inner
         .split(",")
-        .map((s) => s.trim())
+        .map((s) => unquoteScalar(s.trim()))
         .filter((s) => s.length > 0);
       continue;
     }
@@ -111,29 +156,62 @@ export function parseFrontmatter(
     if (rawVal === "false") { data[key] = false; continue; }
 
     // String
-    data[key] =
-      rawVal.startsWith('"') && rawVal.endsWith('"')
-        ? rawVal.slice(1, -1)
-        : rawVal;
+    data[key] = unquoteScalar(rawVal);
   }
 
   // Flush trailing
   if (currentArray !== null) data[currentKey] = currentArray;
   if (currentObject !== null) data[currentKey] = currentObject;
 
-  // Validate required fields
-  if (typeof data.id !== "string" || !data.id) {
+  // F-03: Fall back to slugified `name` when `id` is absent so Claude Code
+  // memory files carrying `name:` and `description:` (without `id:`) parse
+  // into Frontmatter.
+  const rawId = typeof data.id === "string" && data.id.trim()
+    ? data.id.trim()
+    : typeof data.name === "string" && data.name.trim()
+      ? slugifyName(data.name.trim())
+      : "";
+
+  if (!rawId) {
     return { frontmatter: null, body: content };
   }
 
+  const metadata: Record<string, string | number | boolean> = {};
+  if (data.metadata && typeof data.metadata === "object" && !Array.isArray(data.metadata)) {
+    Object.assign(metadata, data.metadata as Record<string, string | number | boolean>);
+  }
+  for (const TopMetaKey of [
+    "loadout_role",
+    "loadout_inject",
+    "loadout_default_priority",
+    "stale_after_min",
+    "enforce_limits",
+    "max_lines",
+    "max_bytes",
+  ]) {
+    if (data[TopMetaKey] !== undefined && metadata[TopMetaKey] === undefined) {
+      const val = data[TopMetaKey];
+      if (typeof val === "string") {
+        metadata[TopMetaKey] = parseScalarValue(val);
+      } else if (typeof val === "number" || typeof val === "boolean") {
+        metadata[TopMetaKey] = val;
+      }
+    }
+  }
+
   const fm: Frontmatter = {
-    id: data.id as string,
+    id: rawId,
+    ...(typeof data.name === "string" && data.name.trim() ? { name: data.name.trim() } : {}),
+    ...(typeof data.description === "string" && data.description.trim()
+      ? { description: data.description.trim() }
+      : {}),
     keywords: Array.isArray(data.keywords) ? (data.keywords as string[]) : [],
     patterns: Array.isArray(data.patterns) ? (data.patterns as string[]) : [],
     priority: VALID_PRIORITIES.has(data.priority as string)
       ? (data.priority as Priority)
       : "domain",
     triggers: parseTriggers(data.triggers),
+    ...(Object.keys(metadata).length > 0 ? { metadata } : {}),
   };
 
   return { frontmatter: fm, body };
@@ -141,7 +219,7 @@ export function parseFrontmatter(
 
 function parseTriggers(raw: unknown): Triggers {
   if (!raw || typeof raw !== "object") return { ...DEFAULT_TRIGGERS };
-  const obj = raw as Record<string, boolean>;
+  const obj = raw as Record<string, unknown>;
   return {
     task: typeof obj.task === "boolean" ? obj.task : DEFAULT_TRIGGERS.task,
     plan: typeof obj.plan === "boolean" ? obj.plan : DEFAULT_TRIGGERS.plan,
@@ -153,6 +231,8 @@ function parseTriggers(raw: unknown): Triggers {
 export function serializeFrontmatter(fm: Frontmatter): string {
   const lines: string[] = ["---"];
   lines.push(`id: ${fm.id}`);
+  if (fm.name) lines.push(`name: ${fm.name}`);
+  if (fm.description) lines.push(`description: ${fm.description}`);
   lines.push(`keywords: [${fm.keywords.join(", ")}]`);
   if (fm.patterns.length > 0) {
     lines.push(`patterns: [${fm.patterns.join(", ")}]`);
@@ -162,6 +242,12 @@ export function serializeFrontmatter(fm: Frontmatter): string {
   lines.push(`  task: ${fm.triggers.task}`);
   lines.push(`  plan: ${fm.triggers.plan}`);
   lines.push(`  edit: ${fm.triggers.edit}`);
+  if (fm.metadata && Object.keys(fm.metadata).length > 0) {
+    lines.push("metadata:");
+    for (const [k, v] of Object.entries(fm.metadata)) {
+      lines.push(`  ${k}: ${v}`);
+    }
+  }
   lines.push("---");
   return lines.join("\n");
 }

@@ -10,6 +10,9 @@
   - Threshold check (HOK-01): drives the hook with representative prompts and shows what
     it injects. The min-score floor (default 0.5 under the recall-aware scoring) means
     weak/incidental matches and off-topic prompts go silent.
+  - Project-layer check: drives the hook with a synthetic project index under
+    <scratch>/project/.claude/loadout/index.json and confirms project pointers surface
+    under the project header and log `layer: "project"` in usage.jsonl.
 
   Isolation: runs the hook under a SCRATCH HOME (a copy of the live ~/.ai-loadout/index.json),
   so testing never appends to the live usage.jsonl.
@@ -113,6 +116,45 @@ foreach ($p in $prompts) {
   Write-Output ("latency: {0} ms" -f $ms)
   Write-Output ''
 }
+
+# ── 6. Project-layer smoke check ────────────────────────────────
+Write-Output ('=' * 78)
+Write-Output '6. PROJECT LAYER prompt (walks up from nested cwd to .claude/loadout/index.json)'
+Write-Output ('=' * 78)
+$projDir = Join-Path $scratch 'project'
+$nestedCwd = Join-Path $projDir 'src/sub'
+New-Item -ItemType Directory -Force -Path (Join-Path $projDir '.claude/loadout') | Out-Null
+New-Item -ItemType Directory -Force -Path $nestedCwd | Out-Null
+$projIndex = @{
+  version   = '1.0.0'
+  generated = '2026-11-08T00:00:00.000Z'
+  entries   = @(
+    @{
+      id         = 'project-smoke-entry'
+      path       = 'memory/project-smoke.md'
+      keywords   = @('udlab', 'dataset', 'curation')
+      patterns   = @('udlab')
+      priority   = 'domain'
+      summary    = 'Project-layer smoke test entry for UDLab dataset curation'
+      triggers   = @{ task = $true; plan = $true; edit = $false }
+      tokens_est = 40
+      lines      = 10
+      subindex   = $true
+    }
+  )
+  budget = @{ always_loaded_est = 0; on_demand_total_est = 40; avg_task_load_observed = $null }
+} | ConvertTo-Json -Depth 6
+Set-Content -Path (Join-Path $projDir '.claude/loadout/index.json') -Value $projIndex -Encoding UTF8
+
+$projPayload = @{ prompt = 'check udlab dataset curation'; cwd = $nestedCwd } | ConvertTo-Json -Compress
+$projOut = $projPayload | & node $hook 2>$null
+if ($projOut -and $projOut.Trim().Length -gt 0) {
+  $parsedProj = $projOut | ConvertFrom-Json
+  Write-Output $parsedProj.hookSpecificOutput.additionalContext
+} else {
+  Write-Output '(unexpected silence on project prompt)'
+}
+Write-Output ''
 
 # ── Restore env + cleanup scratch ───────────────────────────────
 $env:USERPROFILE = $origUserProfile

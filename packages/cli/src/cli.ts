@@ -5,16 +5,16 @@
  *
  * One binary that wraps the three library packages (kernel = ai-loadout,
  * memories = claude-memories, rules = claude-rules) and absorbs the operational
- * rituals (doctor / report / hook test / refresh).
+ * rituals (doctor / report / hook / refresh).
  *
  * Command tree:
- *   loadout-os memories <index|validate|stats|health> <MEMORY.md>   (namespaced)
+ *   loadout-os memories <index|validate|stats|health|sync-summaries|place|move> <MEMORY.md>
  *   loadout-os rules    <analyze|validate|stats|split> [CLAUDE.md]   (namespaced)
  *   loadout-os resolve|explain|usage|dead|overlaps|budget|validate   (flat → kernel)
  *   loadout-os doctor [--json]                                       (ritual, read-only)
  *   loadout-os report  [--jsonl <p>] [--index <p>] [--json]          (ritual, read-only)
- *   loadout-os hook test [--prompt "<text>"]                         (read-only)
- *   loadout-os refresh [--store <d>] [--dest <p>] [--dry-run]        (ritual; index→validate→publish)
+ *   loadout-os hook <test|session-start|pre-compact> [...]           (runtime hooks)
+ *   loadout-os refresh [--store <d>] [--dest <p>] [--project <r>] [--dry-run]
  *   loadout-os --help | --version
  *
  * The flat `validate <index>` is the KERNEL index-structure validator; the
@@ -43,6 +43,9 @@ import {
   memoriesValidate,
   memoriesStats,
   memoriesHealth,
+  memoriesSyncSummaries,
+  memoriesPlace,
+  memoriesMove,
   rulesAnalyze,
   rulesValidate,
   rulesStats,
@@ -58,7 +61,15 @@ import {
 
 import { runDoctor, printDoctor, defaultDoctorPaths } from "./doctor.js";
 import { buildReport, printReport } from "./report.js";
-import { runHookTest, printHookTest, defaultHookPath } from "./hook.js";
+import {
+  runHookTest,
+  printHookTest,
+  defaultHookPath,
+  runSessionStart,
+  runPostWrite,
+  writeUtf8Stdout,
+  readHookStdin,
+} from "./hook.js";
 import { dispatchRefresh } from "./refresh.js";
 import { interceptHelp } from "./help.js";
 
@@ -79,7 +90,7 @@ export function topLevelHelp(): string {
 ${BOLD}loadout-os${RESET} v${getVersion()} — unified Knowledge OS CLI
 
 ${BOLD}Namespaces (wrapped library surfaces):${RESET}
-  loadout-os memories <index|validate|stats|health> <MEMORY.md>
+  loadout-os memories <index|validate|stats|health|sync-summaries|place|move> <MEMORY.md>
   loadout-os rules    <analyze|validate|stats|split> [CLAUDE.md]
 
 ${BOLD}Flat verbs (knowledge router / kernel):${RESET}
@@ -95,7 +106,10 @@ ${BOLD}Rituals:${RESET}
   loadout-os doctor [--json]                       Read-only health screen
   loadout-os report [--index <p>] [--jsonl <p>]    Observability over usage.jsonl
   loadout-os hook test [--prompt "<text>"]         Drive the runtime hook on a sample prompt
-  loadout-os refresh [--store <d>] [--dest <p>] [--dry-run]   Index Freshness Ritual (index → validate → write global)
+  loadout-os hook session-start [--project <r>]    SessionStart board injection & stale warning
+  loadout-os hook pre-compact [--project <r>]      PreCompact board staleness check
+  loadout-os hook post-write [--project <r>]       PostToolUse Write/Edit validator & project refresh
+  loadout-os refresh [--store <d>] [--dest <p>] [--project <r>] [--dry-run]   Index Freshness Ritual
 
 ${BOLD}Options:${RESET}
   --json       Machine-readable output (doctor/report/most verbs)
@@ -116,10 +130,13 @@ function memoriesHelp(): string {
   return `
 ${BOLD}loadout-os memories${RESET} — wraps @mcptoolshop/claude-memories
 
-  loadout-os memories index <MEMORY.md> [--lazy] [--json]
-  loadout-os memories validate <MEMORY.md> [--json]
-  loadout-os memories stats <MEMORY.md> [--json]
+  loadout-os memories index <MEMORY.md> [--id-source title|name] [--lazy] [--json]
+  loadout-os memories validate <MEMORY.md> [--id-source title|name] [--max-lines <n>] [--max-bytes <n>] [--json]
+  loadout-os memories stats <MEMORY.md> [--id-source title|name] [--json]
   loadout-os memories health [path] [--json]
+  loadout-os memories sync-summaries <MEMORY.md> [--fix] [--json]
+  loadout-os memories place <topic.md> <index> [--store <dir>] [--into <index>] [--json]
+  loadout-os memories move <topic.md> <index> [--store <dir>] [--into <index>] [--json]
 `;
 }
 
@@ -136,8 +153,6 @@ ${BOLD}loadout-os rules${RESET} — wraps @mcptoolshop/claude-rules
 
 // ── Namespace dispatchers ─────────────────────────────────────
 function dispatchMemories(args: string[]): void {
-  // Namespace-level help: `memories --help` or `memories` (no subcommand).
-  // A help flag WITH a subcommand falls through to per-command help below.
   const firstIsSub = args.length > 0 && !args[0].startsWith("-");
   if (args.length === 0 || (hasFlag(args, "help") && !firstIsSub)) {
     log(memoriesHelp());
@@ -145,7 +160,6 @@ function dispatchMemories(args: string[]): void {
   }
   const sub = args[0];
   const rest = args.slice(1);
-  // Per-command help: `memories index --help`, etc.
   if (interceptHelp(`memories ${sub}`, rest)) return;
   switch (sub) {
     case "index":
@@ -156,19 +170,22 @@ function dispatchMemories(args: string[]): void {
       return memoriesStats(rest);
     case "health":
       return memoriesHealth(rest);
+    case "sync-summaries":
+      return memoriesSyncSummaries(rest);
+    case "place":
+      return memoriesPlace(rest);
+    case "move":
+      return memoriesMove(rest);
     default:
       throw new CliError(
         "UNKNOWN_COMMAND",
         `Unknown memories subcommand: ${sub}`,
-        "Expected one of: index, validate, stats, health. Run 'loadout-os memories --help'.",
+        "Expected one of: index, validate, stats, health, sync-summaries, place, move. Run 'loadout-os memories --help'.",
       );
   }
 }
 
 function dispatchRules(args: string[]): void {
-  // Namespace-level help: `rules --help` or `rules` (no subcommand). A help flag
-  // WITH a subcommand falls through to per-command help below — except `split`,
-  // whose --help we own here (we never forward --help into the interactive bin).
   const firstIsSub = args.length > 0 && !args[0].startsWith("-");
   if (args.length === 0 || (hasFlag(args, "help") && !firstIsSub)) {
     log(rulesHelp());
@@ -176,9 +193,6 @@ function dispatchRules(args: string[]): void {
   }
   const sub = args[0];
   const rest = args.slice(1);
-  // Per-command help: `rules analyze --help`, `rules split --help`, etc.
-  // For split we intercept --help BEFORE the passthrough so the readline prompt
-  // is never spawned just to ask for usage.
   if (interceptHelp(`rules ${sub}`, rest)) return;
   switch (sub) {
     case "analyze":
@@ -202,7 +216,6 @@ function dispatchRules(args: string[]): void {
 function dispatchDoctor(args: string[]): void {
   const repoRoot = flagValue(args, "repo-root") ?? process.cwd();
   const paths = defaultDoctorPaths(resolve(repoRoot));
-  // Per-path overrides (all read-only).
   const store = flagValue(args, "store");
   const index = flagValue(args, "index");
   const settings = flagValue(args, "settings");
@@ -245,29 +258,108 @@ function dispatchReport(args: string[]): void {
 
 function dispatchHook(args: string[]): void {
   const sub = args[0];
-  // `hook test --help` (or `hook --help`) → per-command help for "hook test".
-  if (interceptHelp("hook test", args)) return;
-  if (sub !== "test") {
-    throw new CliError(
-      "UNKNOWN_COMMAND",
-      `Unknown hook subcommand: ${sub ?? "(none)"}`,
-      "Only 'loadout-os hook test' is available.",
-    );
-  }
   const rest = args.slice(1);
-  const prompt = flagValue(rest, "prompt") ?? "";
-  const repoRoot = flagValue(rest, "repo-root") ?? process.cwd();
-  const result = runHookTest({
-    prompt,
-    hookPath: defaultHookPath(resolve(repoRoot)),
-  });
-  if (hasFlag(rest, "json")) {
-    log(JSON.stringify(result, null, 2));
-  } else {
-    printHookTest(prompt || "(default sample prompt)", result);
-  }
-  if (!result.ran) {
-    process.exitCode = 1;
+  if (sub && interceptHelp(`hook ${sub}`, rest)) return;
+  if (interceptHelp("hook test", args)) return;
+
+  switch (sub) {
+    case "test": {
+      const prompt = flagValue(rest, "prompt") ?? "";
+      const repoRoot = flagValue(rest, "repo-root") ?? process.cwd();
+      const result = runHookTest({
+        prompt,
+        hookPath: defaultHookPath(resolve(repoRoot)),
+      });
+      if (hasFlag(rest, "json")) {
+        log(JSON.stringify(result, null, 2));
+      } else {
+        printHookTest(prompt || "(default sample prompt)", result);
+      }
+      if (!result.ran) {
+        process.exitCode = 1;
+      }
+      return;
+    }
+    case "session-start":
+    case "pre-compact": {
+      const stdinRaw = readHookStdin();
+      let payloadCwd: string | undefined;
+      let isPromptSubmitPayload = false;
+      if (stdinRaw.trim()) {
+        try {
+          const parsed = JSON.parse(stdinRaw) as Record<string, unknown>;
+          if (typeof parsed.cwd === "string" && parsed.cwd) {
+            payloadCwd = parsed.cwd;
+          }
+          if (parsed.hook_event_name === "UserPromptSubmit") {
+            isPromptSubmitPayload = true;
+          }
+        } catch {
+          // ignore non-JSON stdin
+        }
+      }
+      const project = flagValue(rest, "project");
+      const store = flagValue(rest, "store");
+      const maxLinesRaw = flagValue(rest, "max-lines");
+      const maxBytesRaw = flagValue(rest, "max-bytes");
+      const staleMinRaw = flagValue(rest, "stale-after-min");
+      const maxLines = maxLinesRaw !== undefined ? Number(maxLinesRaw) : undefined;
+      const maxBytes = maxBytesRaw !== undefined ? Number(maxBytesRaw) : undefined;
+      const staleAfterMin = staleMinRaw !== undefined ? Number(staleMinRaw) : undefined;
+
+      const res = runSessionStart({
+        project,
+        store,
+        cwd: payloadCwd,
+        userPromptSubmit: hasFlag(rest, "user-prompt-submit") || isPromptSubmitPayload,
+        preCompact: sub === "pre-compact",
+        maxLines: Number.isFinite(maxLines) ? maxLines : undefined,
+        maxBytes: Number.isFinite(maxBytes) ? maxBytes : undefined,
+        staleAfterMin: Number.isFinite(staleAfterMin) ? staleAfterMin : undefined,
+      });
+
+      if (hasFlag(rest, "json")) {
+        log(JSON.stringify(res, null, 2));
+      } else if (res.output) {
+        writeUtf8Stdout(res.output);
+      }
+      return;
+    }
+    case "post-write": {
+      const stdinRaw = readHookStdin();
+      const project = flagValue(rest, "project");
+      const store = flagValue(rest, "store");
+      const filePath = flagValue(rest, "file");
+      const snapshotRepo = flagValue(rest, "snapshot-repo");
+      const mirrorRepo = flagValue(rest, "mirror-repo");
+      const timeoutRaw = flagValue(rest, "timeout-ms");
+      const gitTimeoutMs = timeoutRaw !== undefined ? Number(timeoutRaw) : undefined;
+
+      const res = runPostWrite({
+        project,
+        store,
+        filePath,
+        stdinJson: stdinRaw,
+        fixSummaries: hasFlag(rest, "fix"),
+        snapshotRepo,
+        mirrorRepo,
+        gitTimeoutMs: Number.isFinite(gitTimeoutMs) ? gitTimeoutMs : undefined,
+      });
+
+      if (res.exitCode !== 0) {
+        if (res.stderr) {
+          process.stderr.write(Buffer.from(res.stderr, "utf-8"));
+        }
+        process.exitCode = 2;
+      }
+      return;
+    }
+    default:
+      throw new CliError(
+        "UNKNOWN_COMMAND",
+        `Unknown hook subcommand: ${sub ?? "(none)"}`,
+        "Expected one of: test, session-start, pre-compact, post-write.",
+      );
   }
 }
 
@@ -289,15 +381,10 @@ const FLAT_KERNEL = new Set([
  */
 export function dispatch(args: string[]): void {
   if (hasFlag(args, "version") && args[0] !== "memories" && args[0] !== "rules") {
-    // top-level --version only (a namespace --version would be ambiguous;
-    // we treat it as top-level too for convenience)
     log(getVersion());
     return;
   }
 
-  // Top-level help: no args, or a help flag with NO command in front of it
-  // (the first token is itself a flag). A help flag AFTER a command routes to
-  // that command's per-command help, handled inside each dispatcher / below.
   const firstIsCmd = args.length > 0 && !args[0].startsWith("-");
   if (args.length === 0 || (hasFlag(args, "help") && !firstIsCmd)) {
     log(topLevelHelp());
@@ -307,8 +394,6 @@ export function dispatch(args: string[]): void {
   const cmd = args[0];
   const rest = args.slice(1);
 
-  // Per-command help for the flat verbs + rituals (namespaces handle their own
-  // inside dispatchMemories/dispatchRules; hook handles "hook test" below).
   if (
     cmd !== "memories" &&
     cmd !== "rules" &&
@@ -347,7 +432,6 @@ export function dispatch(args: string[]): void {
       return kernelValidate(rest);
     default:
       if (FLAT_KERNEL.has(cmd)) {
-        // unreachable — kept for clarity if the set and switch ever diverge
         throw new CliError("INTERNAL", `Unrouted flat verb: ${cmd}`);
       }
       throw new CliError(
@@ -376,7 +460,6 @@ if (isEntrypoint()) {
       if (err.hint) console.error(`  ${DIM}${err.hint}${RESET}`);
       process.exit(err.exitCode);
     }
-    // Unexpected — surface a structured shape, not a raw stack.
     const message = err instanceof Error ? err.message : String(err);
     console.error(`${RED}✗ [RUNTIME_FATAL]${RESET} ${message}`);
     process.exit(1);

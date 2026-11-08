@@ -56,7 +56,7 @@ export interface DoctorPaths {
   settings: string;
   /** Append-only usage log (~/.ai-loadout/usage.jsonl). */
   usage: string;
-  /** Source-of-truth hook entrypoint in this repo (apps/hook/loadout-hook.mjs). */
+  /** Bundled hook artifact in this repo (apps/hook/dist/loadout-hook.mjs). */
   hookSource: string;
   /** Live mirror of the hook Claude Code actually runs (~/.claude/loadout-hook/loadout-hook.mjs). */
   hookMirror: string;
@@ -72,7 +72,7 @@ export function defaultDoctorPaths(repoRoot: string = process.cwd()): DoctorPath
     index: resolve(home, ".ai-loadout", "index.json"),
     settings: resolve(home, ".claude", "settings.json"),
     usage: resolve(home, ".ai-loadout", "usage.jsonl"),
-    hookSource: resolve(repoRoot, "apps", "hook", "loadout-hook.mjs"),
+    hookSource: resolve(repoRoot, "apps", "hook", "dist", "loadout-hook.mjs"),
     hookMirror: resolve(home, ".claude", "loadout-hook", "loadout-hook.mjs"),
   };
 }
@@ -208,13 +208,13 @@ export function runDoctor(paths: DoctorPaths): DoctorResult {
     }
   }
 
-  // (c) drift mirror↔live: hash the source hook vs the installed mirror
+  // (c) drift mirror↔live: hash the bundled source hook vs the installed mirror
   if (!existsSync(paths.hookSource)) {
     checks.push({
       id: "hook-drift",
       status: "warn",
-      message: `Hook source not found: ${paths.hookSource}`,
-      hint: "Expected apps/hook/loadout-hook.mjs in the repo.",
+      message: `Hook bundle not found: ${paths.hookSource}`,
+      hint: "Run `npm run build` in the repo to generate apps/hook/dist/loadout-hook.mjs.",
     });
   } else if (!existsSync(paths.hookMirror)) {
     checks.push({
@@ -231,14 +231,14 @@ export function runDoctor(paths: DoctorPaths): DoctorResult {
         checks.push({
           id: "hook-drift",
           status: "pass",
-          message: "Hook mirror matches repo source (no drift)",
+          message: "Hook mirror matches repo bundle (no drift)",
         });
       } else {
         checks.push({
           id: "hook-drift",
           status: "fail",
-          message: "Hook mirror DRIFTS from repo source",
-          hint: "Re-copy apps/hook/loadout-hook.mjs to ~/.claude/loadout-hook/ (the live hook is stale).",
+          message: "Hook mirror DRIFTS from repo bundle",
+          hint: "Re-copy apps/hook/dist/loadout-hook.mjs to ~/.claude/loadout-hook/ (the live hook is stale).",
         });
       }
     } catch (e) {

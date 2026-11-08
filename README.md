@@ -23,20 +23,23 @@ loadout-os unifies four surfaces under one `loadout-os` binary:
 | Surface | What it does |
 |---|---|
 | **Kernel** (knowledge router) | Deterministic keyword/pattern matcher, hierarchical layered resolver (global → org → project → session), and the agent runtime contract. Core entries always load; domain entries load on match; manual entries load on explicit lookup. |
-| **Memories adapter** | Turns a `MEMORY.md` store into a machine-readable dispatch table and lints it (missing files, orphans, duplicates, over-long entries). Reads both index styles: Claude Code's own `- [Title](file.md) — hook` links and `Name — description → path` arrow references. |
+| **Memories adapter** | Turns a `MEMORY.md` store (plus linked `index-*.md` or `metadata.loadout_role: subindex` sub-indexes) into a machine-readable dispatch table and lints it (loader truncation limits at 180 lines / 24 KB — warning by default, error when opted in via `--max-lines`/`--max-bytes`, frontmatter `metadata.enforce_limits: true`, or `.loadout.json` — plus missing files, orphans across sub-indexes, stale bullet summaries, duplicates, over-long entries). |
 | **Rules adapter** | Splits a bloated `CLAUDE.md` into a lean always-loaded index plus on-demand rule files, and validates frontmatter against the index. |
-| **Runtime hook** | A `UserPromptSubmit` hook that injects ≤5 pointer lines (≤200 tokens) to the entries relevant to your prompt. Fail-silent: every error path exits 0, so a broken hook can never block a prompt. |
+| **Runtime hooks** | `UserPromptSubmit` pointer router (`loadout-hook.mjs`, merging global + project layers with fair-share cap and sub-index preference), `hook session-start` (UTF-8 board injection + staleness & shell-edit refresh), `hook pre-compact` (staleness warning before compaction), and `hook post-write` (`PostToolUse` validator + project refresh). |
 
-Plus three rituals that keep the system honest: **`refresh`** (regenerate → validate → publish the dispatch index, with a backup compensator), **`doctor`** (a read-only 8-check health screen), and **`report`** (usage / dead-entry / token-budget observability).
+Plus three rituals that keep the system honest: **`refresh`** (regenerate → validate → publish the dispatch index to global or `--project <root>`, with a `.bak` compensator, OS file lock, and optional `--snapshot-repo` / `--mirror-repo`), **`doctor`** (a read-only 8-check health screen), and **`report`** (usage / dead-entry / token-budget observability).
 
 ## Command surface
 
 ```
 # Memory store adapter
-loadout-os memories index    <MEMORY.md> [--lazy] [--json]
-loadout-os memories validate <MEMORY.md> [--json]
-loadout-os memories stats    <MEMORY.md> [--json]
-loadout-os memories health   [path] [--json]
+loadout-os memories index          <MEMORY.md> [--id-source title|name] [--lazy] [--json]
+loadout-os memories validate       <MEMORY.md> [--id-source title|name] [--max-lines <n>] [--max-bytes <n>] [--json]
+loadout-os memories stats          <MEMORY.md> [--id-source title|name] [--json]
+loadout-os memories health         [path] [--json]
+loadout-os memories sync-summaries <MEMORY.md> [--fix] [--json]
+loadout-os memories place          <topic.md> <index> [--store <dir>] [--into <index>] [--json]
+loadout-os memories move           <topic.md> <index> [--store <dir>] [--into <index>] [--json]
 
 # Instruction-file adapter
 loadout-os rules analyze  <CLAUDE.md> [--rules-dir <dir>] [--json]
@@ -53,14 +56,97 @@ loadout-os overlaps <index>         # keyword routing ambiguities
 loadout-os budget <index> [jsonl]   # token budget breakdown
 loadout-os validate <index>         # validate index STRUCTURE (kernel)
 
-# Rituals + hook
+# Rituals + hooks
 loadout-os doctor [--json]                    # read-only health screen
 loadout-os report [--index <p>] [--jsonl <p>] # observability over usage.jsonl
 loadout-os hook test [--prompt "<text>"]      # drive the runtime hook on a sample prompt
-loadout-os refresh [--store <d>] [--dest <p>] [--dry-run]  # index → validate → publish
+loadout-os hook session-start [--project <r>] [--user-prompt-submit]
+loadout-os hook pre-compact   [--project <r>]
+loadout-os hook post-write    [--project <r>] [--snapshot-repo <d>] [--mirror-repo <b>] [--fix]
+loadout-os refresh [--store <d>] [--dest <p>] [--project <r>] [--id-source title|name] [--snapshot-repo <d>] [--mirror-repo <b>] [--fix] [--dry-run]
 ```
 
 > **Name collision, resolved by namespacing.** The flat `validate <index>` is the kernel's index-structure validator. The store and rules linters are namespaced — `memories validate <MEMORY.md>` and `rules validate` — so all three coexist. Run `loadout-os <command> --help` for per-command synopsis, arguments, and exit codes.
+
+## Project-Layer Memory & Claude Code Hook Wiring
+
+Each project seat can keep its own `.claude/loadout/index.json` built from its memory store (`loadout-os refresh --store <store> --project <root>`).
+
+### 1. Topic & Board Frontmatter
+
+```markdown
+---
+name: Active Board
+description: Current active task board and handoff state
+priority: core
+metadata:
+  loadout_inject: session-start
+  stale_after_min: 60
+  max_lines: 60
+  max_bytes: 6000
+---
+```
+
+- Sub-indexes (`index-*.md` or files with `metadata.loadout_role: subindex`) are expanded one level into the dispatch index with `subindex: true`.
+- `index-archive.md` (or a sub-index with `metadata.loadout_default_priority: manual`) defaults its entries to `priority: "manual"` unless a topic file explicitly sets `priority:` in frontmatter.
+- `core` entries with `metadata.loadout_inject: session-start` are injected in full at `SessionStart` (and excluded from per-prompt pointer slots so they never starve routed entries).
+- **Entry ID source (`idSource: "title" | "name"`):** An explicit frontmatter `id:` always wins. When `id:` is omitted, global / `--dest` stores default to `title` (kebab-cased bullet title in `MEMORY.md`, preserving `v1.0.4` entry IDs), while `--project` stores default to `name` (kebab-cased frontmatter `name:`). Override per store via `<store>/.loadout.json` (`{ "idSource": "title" | "name" }`) or `MEMORY.md` frontmatter (`metadata.id_source: title | name`), or per invocation via `--id-source title|name` on `refresh` and `memories` commands (which wins over the store setting).
+
+### 2. Example `.claude/settings.local.json` Hook Blocks
+
+```json
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "loadout-os hook session-start"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ~/.claude/loadout-hook/loadout-hook.mjs"
+          },
+          {
+            "type": "command",
+            "command": "loadout-os hook session-start --user-prompt-submit"
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "loadout-os hook pre-compact"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "loadout-os hook post-write --fix"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+> **Note on shell edits:** Edits made to memory files through a shell (`Bash` / `PowerShell`) skip `PostToolUse` (`Write|Edit`). As a built-in fallback, `loadout-os hook session-start` checks whether any `<store>/*.md` file is newer than the project `index.json` and automatically refreshes the project index (or warns if validation fails).
 
 ## Install
 
@@ -89,9 +175,9 @@ Shipped. **`@mcptoolshop/loadout-os`** is published on npm (public) and folds th
 
 loadout-os runs entirely on your machine. There is no network call, no telemetry, and no account.
 
-- **Data it touches (local only):** your memory store (`MEMORY.md` + topic files), your instruction files (`CLAUDE.md` + `.claude/rules/`), the generated dispatch index next to the store, the global resolver index (`~/.ai-loadout/index.json`), and the append-only usage log (`~/.ai-loadout/usage.jsonl`).
+- **Data it touches (local only):** your memory store (`MEMORY.md` + topic files), your instruction files (`CLAUDE.md` + `.claude/rules/`), the generated dispatch index next to the store, the global resolver index (`~/.ai-loadout/index.json`), the project resolver index (`<project>/.claude/loadout/index.json`), and the append-only usage log (`~/.ai-loadout/usage.jsonl`).
 - **Data it does NOT touch:** no network egress, no telemetry, no remote services, no credentials or secrets. Nothing is read, stored, or transmitted off the local disk paths above.
-- **Permissions required:** local filesystem only. `doctor` and `report` are pure reads (they never write). The only writes are the index files, the interactive `rules split` output, and the usage log — all in the expected local locations above. The irreversible write (`refresh` publishing the live global index) is guarded by an andon halt on validation failure and a `<dest>.bak` compensator. The runtime hook is fail-silent: every error path exits `0`, so it can never block a prompt.
+- **Permissions required:** local filesystem only. `doctor` and `report` are pure reads (they never write). The only writes are the index files, the interactive `rules split` output, and the usage log — all in the expected local locations above. The irreversible write (`refresh` publishing the live global or project index) is guarded by an andon halt on validation failure and a `<dest>.bak` compensator. The prompt and session-start runtime hooks are fail-open: every error path exits `0`, so they can never block a prompt.
 
 Full threat model and reporting process: [SECURITY.md](./SECURITY.md).
 

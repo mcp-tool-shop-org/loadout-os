@@ -51,9 +51,9 @@
       "unresolvedSites": 0
     },
     {
-      "dynamicReads": 3,
-      "dynamicSpawns": 2,
-      "dynamicSpawnsInTests": 1,
+      "dynamicReads": 8,
+      "dynamicSpawns": 6,
+      "dynamicSpawnsInTests": 5,
       "dynamicWrites": 3,
       "entryPoints": [],
       "externals": 0,
@@ -67,7 +67,7 @@
           "path": "packages/cli/LICENSE"
         },
         {
-          "hash": "82cd25293ff5b89a12070cfd223916af36a7ce5432319b05ecd0245e7ecf56cc",
+          "hash": "40be13459f62fe5de644c21f5d6ae12de4f14044db52416960e889df1d6e510d",
           "path": "packages/cli/README.md"
         },
         {
@@ -75,7 +75,7 @@
           "path": "packages/cli/esbuild.config.mjs"
         },
         {
-          "hash": "0983214a1a00e9027d3dbeef074ebad4e5d50c57c5aa4825655dd598f2d775a8",
+          "hash": "925dfb65cfb2fa7a0758ed8a2326bfc26c2697b0b47327cfddb21635bfbafb75",
           "path": "packages/cli/package.json"
         },
         {
@@ -88,44 +88,49 @@
             {
               "in": "getVersion",
               "kind": "catch",
-              "line": 71
+              "line": 82
             },
             {
               "in": "dispatchMemories",
               "kind": "throw",
-              "line": 160
+              "line": 180
             },
             {
               "in": "dispatchRules",
               "kind": "throw",
-              "line": 193
+              "line": 207
+            },
+            {
+              "in": "dispatchHook",
+              "kind": "catch",
+              "line": 297
             },
             {
               "in": "dispatchHook",
               "kind": "throw",
-              "line": 251
+              "line": 358
             },
             {
               "in": "dispatch",
               "kind": "throw",
-              "line": 351
+              "line": 435
             },
             {
               "in": "dispatch",
               "kind": "throw",
-              "line": 353
+              "line": 437
             },
             {
               "in": "isEntrypoint",
               "kind": "catch",
-              "line": 365
+              "line": 449
             },
             {
               "kind": "catch",
-              "line": 373
+              "line": 457
             }
           ],
-          "hash": "38165fa8b07b0f4de255bca2a31cee1330ac79aa02c353ca78457c797619b8f2",
+          "hash": "0b39b428b0f192ad2970e8514cad28aba5c0e10753f7073f3773978e8baa269a",
           "importOrder": [
             "packages/cli/src/console.ts",
             "packages/cli/src/commands.ts",
@@ -158,7 +163,10 @@
             "kernelValidate",
             "memoriesHealth",
             "memoriesIndex",
+            "memoriesMove",
+            "memoriesPlace",
             "memoriesStats",
+            "memoriesSyncSummaries",
             "memoriesValidate",
             "resolveRulesBin",
             "rulesAnalyze",
@@ -170,38 +178,45 @@
             {
               "in": "requireFile",
               "kind": "catch",
-              "line": 98
+              "line": 101
             },
             {
               "in": "loadKernelIndex",
               "kind": "catch",
-              "line": 109
+              "line": 112
+            },
+            {
+              "in": "memoriesPlaceOrMove",
+              "kind": "catch",
+              "line": 385
             },
             {
               "in": "resolveRulesBin",
               "kind": "catch",
-              "line": 413
+              "line": 534
             },
             {
               "in": "runSplit",
               "kind": "catch",
-              "line": 597
+              "line": 682
             },
             {
               "in": "runSplit",
               "kind": "catch",
-              "line": 611
+              "line": 696
             }
           ],
-          "hash": "f0a980514e3a0529a4eca2c682f677d4407f55e4a3bc5be8965e0c4bc2af696f",
+          "hash": "4217017a348052c923b65de4d37f710c4afdccf03cd41c92c802050e14c546d8",
           "importOrder": [
             "packages/memories/src/index.ts",
             "packages/rules/src/index.ts",
             "packages/kernel/src/index.ts",
-            "packages/cli/src/console.ts"
+            "packages/cli/src/console.ts",
+            "packages/cli/src/refresh.ts"
           ],
           "importsFiles": [
             "packages/cli/src/console.ts",
+            "packages/cli/src/refresh.ts",
             "packages/kernel/src/index.ts",
             "packages/memories/src/index.ts",
             "packages/rules/src/index.ts"
@@ -267,7 +282,7 @@
               "line": 403
             }
           ],
-          "hash": "07066dc15f777f9581bb38ac0d65878a0855eedbb59276bc04615cafedca5c45",
+          "hash": "ac3230e047247469e705e28b6f27f59755b5bc76a6e1f88ec5f3150ebb68f3e6",
           "importOrder": [
             "packages/memories/src/index.ts",
             "packages/kernel/src/index.ts",
@@ -286,7 +301,7 @@
             "renderCommandHelp",
             "wantsHelp"
           ],
-          "hash": "94296c015a3e8726aca167cfe15f2d738a6441ac9612a389d40445994e79b63f",
+          "hash": "6c5d2b593a0bf25041504fc6e0d3e10f80bc90420fefcd21b6024e6824bd78c8",
           "importsFiles": [
             "packages/cli/src/console.ts"
           ],
@@ -294,25 +309,90 @@
         },
         {
           "exports": [
+            "capBoardContent",
             "defaultHookPath",
+            "isPathInsideDir",
+            "normalizeHookPath",
+            "parsePostToolUsePayload",
             "printHookTest",
-            "runHookTest"
+            "readHookStdin",
+            "runHookTest",
+            "runPostWrite",
+            "runSessionStart",
+            "writeUtf8Stdout"
           ],
           "failurePaths": [
             {
-              "in": "runHookTest",
+              "in": "readHookStdin",
               "kind": "catch",
-              "line": 127
+              "line": 73
             },
             {
               "in": "runHookTest",
               "kind": "catch",
-              "line": 148
+              "line": 142
+            },
+            {
+              "in": "runHookTest",
+              "kind": "catch",
+              "line": 163
+            },
+            {
+              "in": "isStoreNewerThanIndex",
+              "kind": "catch",
+              "line": 259
+            },
+            {
+              "in": "runSessionStart",
+              "kind": "catch",
+              "line": 363
+            },
+            {
+              "in": "runSessionStart",
+              "kind": "catch",
+              "line": 391
+            },
+            {
+              "in": "runSessionStart",
+              "kind": "catch",
+              "line": 467
+            },
+            {
+              "in": "runSessionStart",
+              "kind": "catch",
+              "line": 471
+            },
+            {
+              "in": "runSessionStart",
+              "kind": "catch",
+              "line": 497
+            },
+            {
+              "in": "parsePostToolUsePayload",
+              "kind": "catch",
+              "line": 679
+            },
+            {
+              "in": "runPostWrite",
+              "kind": "catch",
+              "line": 736
+            },
+            {
+              "in": "runPostWrite",
+              "kind": "catch",
+              "line": 763
             }
           ],
-          "hash": "3d00b32c5906754fb23c558aa12b5b76c1917b1c78ca0030d6f59989fb79cc34",
+          "hash": "2926b290a205ec24f9e27b2b6c1cd7edcb1522591976038a4f76133e54ff3922",
+          "importOrder": [
+            "packages/kernel/src/index.ts",
+            "packages/cli/src/console.ts",
+            "packages/cli/src/refresh.ts"
+          ],
           "importsFiles": [
-            "packages/cli/src/console.ts"
+            "packages/cli/src/console.ts",
+            "packages/cli/src/refresh.ts",
+            "packages/kernel/src/index.ts"
           ],
           "path": "packages/cli/src/hook.ts"
         },
@@ -343,60 +423,150 @@
           "exports": [
             "defaultDest",
             "dispatchRefresh",
+            "lockFilePathForKey",
+            "parseIdSourceFlag",
             "printRefresh",
             "printRefreshAndon",
+            "projectDest",
             "rewritePathsAbsolute",
             "runRefresh",
-            "sameResolvedPath"
+            "runSnapshotAndMirror",
+            "sameResolvedPath",
+            "withFileLock"
           ],
           "failurePaths": [
             {
-              "in": "runRefresh",
+              "in": "withFileLock",
+              "kind": "catch",
+              "line": 212
+            },
+            {
+              "in": "withFileLock",
               "kind": "throw",
               "line": 215
             },
             {
-              "in": "runRefresh",
+              "in": "withFileLock",
+              "kind": "catch",
+              "line": 224
+            },
+            {
+              "in": "withFileLock",
               "kind": "throw",
-              "line": 222
+              "line": 233
+            },
+            {
+              "in": "withFileLock",
+              "kind": "catch",
+              "line": 245
+            },
+            {
+              "in": "withFileLock",
+              "kind": "catch",
+              "line": 250
+            },
+            {
+              "in": "runGit",
+              "kind": "throw",
+              "line": 274
+            },
+            {
+              "in": "runGit",
+              "kind": "throw",
+              "line": 280
+            },
+            {
+              "in": "runSnapshotAndMirror",
+              "kind": "throw",
+              "line": 319
+            },
+            {
+              "in": "runSnapshotAndMirror",
+              "kind": "catch",
+              "line": 336
+            },
+            {
+              "in": "runSnapshotAndMirror",
+              "kind": "catch",
+              "line": 348
+            },
+            {
+              "in": "runSnapshotAndMirror",
+              "kind": "throw",
+              "line": 355
+            },
+            {
+              "in": "runSnapshotAndMirror",
+              "kind": "throw",
+              "line": 386
+            },
+            {
+              "in": "runSnapshotAndMirror",
+              "kind": "throw",
+              "line": 406
+            },
+            {
+              "in": "runSnapshotAndMirror",
+              "kind": "throw",
+              "line": 416
+            },
+            {
+              "in": "runSnapshotAndMirror",
+              "kind": "throw",
+              "line": 425
             },
             {
               "in": "runRefresh",
               "kind": "throw",
-              "line": 243
+              "line": 504
+            },
+            {
+              "in": "runRefresh",
+              "kind": "throw",
+              "line": 511
+            },
+            {
+              "in": "runRefresh",
+              "kind": "throw",
+              "line": 548
             },
             {
               "in": "runRefresh",
               "kind": "catch",
-              "line": 300
+              "line": 607
             },
             {
               "in": "runRefresh",
               "kind": "catch",
-              "line": 305
+              "line": 610
+            },
+            {
+              "in": "runRefresh",
+              "kind": "catch",
+              "line": 616
             },
             {
               "in": "runRefresh",
               "kind": "throw",
-              "line": 309
+              "line": 620
             },
             {
               "in": "runRefresh",
               "kind": "throw",
-              "line": 310
+              "line": 621
             },
             {
               "in": "dispatchRefresh",
               "kind": "catch",
-              "line": 427
+              "line": 801
             },
             {
               "in": "dispatchRefresh",
               "kind": "throw",
-              "line": 440
+              "line": 812
             }
           ],
-          "hash": "e3aa2b590e8e33bd1dffdfb33e9ed787d2e6c2125785a692f284a7b82353461b",
+          "hash": "185b140d4bd554117b8186eeda831007fbbbbb5b060f7a9ed6d05ea3a481a48d",
           "importOrder": [
             "packages/memories/src/index.ts",
             "packages/kernel/src/index.ts",
@@ -451,10 +621,13 @@
           "testFramework": "node --test"
         },
         {
-          "hash": "59950b0a8e6f5f25b136f2bde301536117b1bcadc4f84f0859b3f9ae916424e2",
+          "hash": "181e511863fdd128f3d5d03122bfecaa39e471da58f806e8ff71c0b736c73fa1",
           "importsFiles": [
             "packages/cli/src/doctor.ts",
             "packages/cli/src/tests/fixtures.ts"
+          ],
+          "names": [
+            "apps/hook/loadout-hook.mjs"
           ],
           "path": "packages/cli/src/tests/doctor.test.ts",
           "testFramework": "node --test"
@@ -472,7 +645,7 @@
           "path": "packages/cli/src/tests/fixtures.ts"
         },
         {
-          "hash": "10cef37ac90af495aad4b9bd1e21f890b8539e2d0c5d17071d279b925b9227d4",
+          "hash": "8c1184bb6d5a615e08d8e5f1ec091d68e1400731584e6361e55369605b5a8f99",
           "importsFiles": [
             "packages/cli/src/cli.ts",
             "packages/cli/src/help.ts",
@@ -482,16 +655,28 @@
           "testFramework": "node --test"
         },
         {
-          "hash": "a865f6ffab0e65841423b166ca80aeabe9fbbef153dc385e69f8a6cddda3cad0",
+          "hash": "45156f7ca281372878b258bff0550a3a6f042b795e8edd4cd11db699621852e7",
           "importsFiles": [
-            "packages/cli/src/hook.ts"
+            "packages/cli/src/hook.ts",
+            "packages/cli/src/refresh.ts"
+          ],
+          "names": [
+            "apps/hook/loadout-hook.mjs"
           ],
           "path": "packages/cli/src/tests/hook.test.ts",
           "testFramework": "node --test"
         },
         {
-          "hash": "f6090c9ccfce175de2ce0c27a3f1aa83706a877762a01f5d2b11d11556466274",
+          "hash": "3edd5fa656098a4032578d434c625439718dab67bc769d285bf248ce8dc8974e",
+          "importOrder": [
+            "packages/cli/src/refresh.ts",
+            "packages/cli/src/hook.ts",
+            "packages/cli/src/cli.ts",
+            "packages/cli/src/tests/fixtures.ts"
+          ],
           "importsFiles": [
+            "packages/cli/src/cli.ts",
+            "packages/cli/src/hook.ts",
             "packages/cli/src/refresh.ts",
             "packages/cli/src/tests/fixtures.ts"
           ],
@@ -539,11 +724,11 @@
       "origin": "authored",
       "outsidePlaces": [
         {
-          "reads": 15,
+          "reads": 37,
           "where": [
             "caller"
           ],
-          "writes": 0
+          "writes": 2
         },
         {
           "reads": 1,
@@ -554,12 +739,21 @@
           "writes": 0
         },
         {
-          "reads": 6,
+          "reads": 7,
           "where": [
             "caller",
             "home:.ai-loadout/"
           ],
-          "writes": 4
+          "writes": 5
+        },
+        {
+          "reads": 0,
+          "where": [
+            "caller",
+            "home:.ai-loadout/",
+            "home:.claude/"
+          ],
+          "writes": 2
         },
         {
           "reads": 3,
@@ -567,7 +761,7 @@
             "caller",
             "home:.claude/"
           ],
-          "writes": 1
+          "writes": 0
         },
         {
           "reads": 1,
@@ -578,15 +772,15 @@
           "writes": 0
         },
         {
-          "reads": 0,
+          "reads": 1,
           "where": [
             "temp"
           ],
-          "writes": 3
+          "writes": 5
         }
       ],
-      "outsideReads": 26,
-      "outsideWrites": 8,
+      "outsideReads": 50,
+      "outsideWrites": 14,
       "role": "code",
       "testRunners": [
         "node --test"
@@ -613,56 +807,56 @@
             {
               "in": "debug",
               "kind": "catch",
-              "line": 52
+              "line": 47
             },
             {
               "in": "readStdinSync",
               "kind": "catch",
-              "line": 58
+              "line": 53
             },
             {
               "in": "safeExit",
               "kind": "catch",
-              "line": 64
+              "line": 59
             },
             {
               "in": "main",
               "kind": "catch",
-              "line": 79
+              "line": 176
             },
             {
               "in": "main",
               "kind": "catch",
-              "line": 84
+              "line": 188
             },
             {
               "in": "main",
               "kind": "catch",
-              "line": 92
+              "line": 201
             },
             {
               "in": "main",
               "kind": "catch",
-              "line": 98
+              "line": 230
             },
             {
               "in": "main",
               "kind": "catch",
-              "line": 144
+              "line": 294
             }
           ],
-          "hash": "c4779fc1570afd1116598bc80fc973da5440ec79a21f5da889d2ce73a489453b",
+          "hash": "80c48b646f733d76d881969f7d5b9c7d43bd3cc0752482ab5fdd906550752171",
           "importsFiles": [
             "packages/kernel/src/index.ts"
           ],
           "path": "apps/hook/loadout-hook.mjs"
         },
         {
-          "hash": "af66d822ca1148dda17bee621238659ffa89f726f5bc23431570bbd5bd692c8d",
+          "hash": "f9d9165729a77641c060553adebcae79ea5e7871c23d54ce3c713f042f0aa058",
           "path": "apps/hook/package.json"
         },
         {
-          "hash": "009eaf3bfe95034360f21e876872b5e56615b3bf81e4ca147952a9350e76248a",
+          "hash": "cf694f39f32d925c0a8b9b453811e4b2dec90b7058e7bbfe39409b662e017c62",
           "names": [
             "apps/hook/loadout-hook.mjs"
           ],
@@ -684,14 +878,14 @@
           "writes": 0
         },
         {
-          "reads": 2,
+          "reads": 0,
           "where": [
             "home:.ai-loadout/"
           ],
           "writes": 2
         }
       ],
-      "outsideReads": 3,
+      "outsideReads": 1,
       "outsideWrites": 2,
       "role": "code",
       "testedBy": 0,
@@ -997,7 +1191,7 @@
           "path": "packages/kernel/site/astro.config.mjs"
         },
         {
-          "hash": "af5d4f54dca60686724d306eb58759fb25b6f5ba4d66559ab84a968112a184e5",
+          "hash": "0607a19c4f60b635244a906c7ad2424359b50e20c4a83bc140f202abce4a941e",
           "path": "packages/kernel/site/package-lock.json"
         },
         {
@@ -1434,14 +1628,14 @@
             "parseFrontmatter",
             "serializeFrontmatter"
           ],
-          "hash": "2c5bdace0b02a44d82a895f0dea5c0efc69e16bc66df773d43ae579b5823599d",
+          "hash": "eabf59a6bce226ec092bc71328f59d1a3304f7fa2b3d3922b49584303327bdfa",
           "importsFiles": [
             "packages/kernel/src/types.ts"
           ],
           "path": "packages/kernel/src/frontmatter.ts"
         },
         {
-          "hash": "90cdaf0ef774dcf60677a4ddab5e588dea998a06b901f7ffc5142027b09ee423",
+          "hash": "41c71cd50c393a59d10028ac5e57cc7a3c895f0fdb5df18c2cc2dd4d1a6fb4e2",
           "importOrder": [
             "packages/kernel/src/types.ts",
             "packages/kernel/src/frontmatter.ts",
@@ -1501,16 +1695,22 @@
           "exports": [
             "discoverLayers",
             "explainEntry",
+            "findProjectIndex",
             "resolveLoadout"
           ],
           "failurePaths": [
             {
               "in": "discoverLayers",
+              "kind": "throw",
+              "line": 168
+            },
+            {
+              "in": "discoverLayers",
               "kind": "catch",
-              "line": 131
+              "line": 171
             }
           ],
-          "hash": "d02f84724aac5e953d659fc7d1c9b1204345c35c5a95965e5def05c4e4442177",
+          "hash": "823a1b14241b8c9c2c98abc952372b388528f04f9d3a6b51f63da302dd7013bb",
           "importsFiles": [
             "packages/kernel/src/merge.ts",
             "packages/kernel/src/types.ts"
@@ -1520,7 +1720,7 @@
             {
               "calls": [
                 {
-                  "line": 158,
+                  "line": 198,
                   "name": "mergeIndexes",
                   "target": {
                     "file": "packages/kernel/src/merge.ts"
@@ -1573,7 +1773,7 @@
           "testFramework": "node --test"
         },
         {
-          "hash": "eea2aff6c66c7493c6e50ab266bf678333a6ed314746d01d16218a7e71273242",
+          "hash": "4c904f6d5e3c8e4c833312cf729c16fff9a9cedc459185c5722f1b89c5279677",
           "importsFiles": [
             "packages/kernel/src/frontmatter.ts",
             "packages/kernel/src/types.ts"
@@ -1600,7 +1800,7 @@
           "testFramework": "node --test"
         },
         {
-          "hash": "6498805c201bfb185a6d5fb69b24fc5aedc9c83fc262a161355dc10433dbcee2",
+          "hash": "bf7fbd0a76376fffd0969eef065db93ef09a593ea26962c3c8e846f260b5ad45",
           "importOrder": [
             "packages/kernel/src/resolve.ts",
             "packages/kernel/src/index.ts",
@@ -1665,7 +1865,7 @@
           "path": "packages/kernel/src/tokens.ts"
         },
         {
-          "hash": "bf7466620e4881f9cf63ca6a43bcd98b40fb032720ec3d2e7537b19162855b50",
+          "hash": "8e9efe9f276e65cf11e7690e192efab613965cb93723daee5e6fe2ccee336ca8",
           "path": "packages/kernel/src/types.ts"
         },
         {
@@ -1733,11 +1933,11 @@
       "testRunners": [
         "node --test"
       ],
-      "testedBy": 31,
+      "testedBy": 32,
       "unresolvedSites": 0
     },
     {
-      "dynamicReads": 6,
+      "dynamicReads": 14,
       "dynamicSpawns": 0,
       "dynamicSpawnsInTests": 0,
       "dynamicWrites": 0,
@@ -2012,7 +2212,7 @@
           "path": "packages/memories/site/astro.config.mjs"
         },
         {
-          "hash": "af5d4f54dca60686724d306eb58759fb25b6f5ba4d66559ab84a968112a184e5",
+          "hash": "0607a19c4f60b635244a906c7ad2424359b50e20c4a83bc140f202abce4a941e",
           "path": "packages/memories/site/package-lock.json"
         },
         {
@@ -2078,23 +2278,19 @@
           "entryRule": 4,
           "exports": [
             "analyzeMemoryMd",
+            "detectSubindex",
             "extractKeywords"
           ],
           "failurePaths": [
             {
               "in": "analyzeMemoryMd",
               "kind": "catch",
-              "line": 26
+              "line": 62
             },
             {
               "in": "analyzeMemoryMd",
               "kind": "throw",
-              "line": 28
-            },
-            {
-              "in": "analyzeMemoryMd",
-              "kind": "catch",
-              "line": 54
+              "line": 64
             },
             {
               "in": "analyzeMemoryMd",
@@ -2104,20 +2300,30 @@
             {
               "in": "analyzeMemoryMd",
               "kind": "catch",
-              "line": 110
+              "line": 145
+            },
+            {
+              "in": "analyzeMemoryMd",
+              "kind": "catch",
+              "line": 177
+            },
+            {
+              "in": "analyzeMemoryMd",
+              "kind": "catch",
+              "line": 181
             },
             {
               "in": "scanDir",
               "kind": "catch",
-              "line": 152
+              "line": 224
             },
             {
               "in": "scanDir",
               "kind": "catch",
-              "line": 170
+              "line": 242
             }
           ],
-          "hash": "b931164284b68e838263b9e7165c425b0627221adbcdce41b5fbd1b6b26dd742",
+          "hash": "dcdac4045487305f70352a84feaf035f715bfd974b79a98efadba1fcf595e6ec",
           "importsFiles": [
             "packages/kernel/src/index.ts",
             "packages/memories/src/parser.ts",
@@ -2129,28 +2335,65 @@
             {
               "calls": [
                 {
-                  "line": 33,
+                  "line": 36,
+                  "name": "parseFrontmatter",
+                  "target": {
+                    "file": "packages/kernel/src/index.ts"
+                  }
+                }
+              ],
+              "exported": true,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "detectSubindex"
+            },
+            {
+              "calls": [
+                {
+                  "line": 69,
                   "name": "parseMemoryMd",
                   "target": {
                     "file": "packages/memories/src/parser.ts"
                   }
                 },
                 {
-                  "line": 35,
+                  "line": 71,
                   "name": "estimateTokens",
                   "target": {
                     "file": "packages/kernel/src/index.ts"
                   }
                 },
                 {
-                  "line": 49,
+                  "line": 96,
                   "name": "resolveRefPath",
                   "target": {
                     "file": "packages/memories/src/paths.ts"
                   }
                 },
                 {
-                  "line": 53,
+                  "line": 36,
+                  "name": "parseFrontmatter",
+                  "target": {
+                    "file": "packages/kernel/src/index.ts"
+                  },
+                  "via": "detectSubindex"
+                },
+                {
+                  "line": 122,
+                  "name": "parseMemoryMd",
+                  "target": {
+                    "file": "packages/memories/src/parser.ts"
+                  }
+                },
+                {
+                  "line": 136,
+                  "name": "resolveRefPath",
+                  "target": {
+                    "file": "packages/memories/src/paths.ts"
+                  }
+                },
+                {
+                  "line": 144,
                   "name": "estimateTokens",
                   "target": {
                     "file": "packages/kernel/src/index.ts"
@@ -2171,20 +2414,20 @@
             {
               "in": "getVersion",
               "kind": "catch",
-              "line": 96
+              "line": 126
             },
             {
               "in": "isFile",
               "kind": "catch",
-              "line": 139
+              "line": 169
             },
             {
               "in": "runCommand",
               "kind": "catch",
-              "line": 432
+              "line": 465
             }
           ],
-          "hash": "0fc2176844b0aaed8a3725176fb9ebe863f8d9f908b655a506540d7314fbfaba",
+          "hash": "1d091877fbcdab1a70ea1dba6dbf61ba1690f07b1ac818310eb70ec7f3c3bc33",
           "importsFiles": [
             "packages/memories/src/analyze.ts",
             "packages/memories/src/index-gen.ts",
@@ -2197,7 +2440,7 @@
             {
               "calls": [
                 {
-                  "line": 190,
+                  "line": 220,
                   "name": "analyzeMemoryMd",
                   "target": {
                     "file": "packages/memories/src/analyze.ts"
@@ -2214,35 +2457,57 @@
                 {
                   "inner": [
                     {
-                      "line": 33,
+                      "line": 69,
                       "name": "parseMemoryMd",
                       "target": {
                         "file": "packages/memories/src/parser.ts"
                       }
                     },
                     {
-                      "line": 35,
+                      "line": 71,
                       "name": "estimateTokens",
                       "target": {
                         "file": "packages/kernel/src/index.ts"
                       }
                     },
                     {
-                      "line": 49,
+                      "line": 96,
                       "name": "resolveRefPath",
                       "target": {
                         "file": "packages/memories/src/paths.ts"
                       }
                     },
                     {
-                      "line": 53,
+                      "line": 36,
+                      "name": "parseFrontmatter",
+                      "target": {
+                        "file": "packages/kernel/src/index.ts"
+                      },
+                      "via": "detectSubindex"
+                    },
+                    {
+                      "line": 122,
+                      "name": "parseMemoryMd",
+                      "target": {
+                        "file": "packages/memories/src/parser.ts"
+                      }
+                    },
+                    {
+                      "line": 136,
+                      "name": "resolveRefPath",
+                      "target": {
+                        "file": "packages/memories/src/paths.ts"
+                      }
+                    },
+                    {
+                      "line": 144,
                       "name": "estimateTokens",
                       "target": {
                         "file": "packages/kernel/src/index.ts"
                       }
                     }
                   ],
-                  "line": 230,
+                  "line": 261,
                   "name": "analyzeMemoryMd",
                   "target": {
                     "file": "packages/memories/src/analyze.ts"
@@ -2251,21 +2516,44 @@
                 {
                   "inner": [
                     {
-                      "line": 34,
+                      "line": 131,
+                      "name": "parseFrontmatter",
+                      "target": {
+                        "file": "packages/kernel/src/index.ts"
+                      },
+                      "via": "resolveStoreIdSource"
+                    },
+                    {
+                      "line": 171,
                       "name": "resolveRefPath",
                       "target": {
                         "file": "packages/memories/src/paths.ts"
                       }
                     },
                     {
-                      "line": 71,
+                      "line": 204,
+                      "name": "detectSubindex",
+                      "target": {
+                        "file": "packages/memories/src/analyze.ts"
+                      }
+                    },
+                    {
+                      "line": 208,
                       "name": "parseFrontmatter",
                       "target": {
                         "file": "packages/kernel/src/index.ts"
                       }
                     },
                     {
-                      "line": 158,
+                      "line": 322,
+                      "name": "extractKeywords",
+                      "target": {
+                        "file": "packages/memories/src/analyze.ts"
+                      },
+                      "via": "entryFromFrontmatter"
+                    },
+                    {
+                      "line": 348,
                       "name": "estimateTokens",
                       "target": {
                         "file": "packages/kernel/src/index.ts"
@@ -2273,7 +2561,7 @@
                       "via": "entryFromFrontmatter"
                     },
                     {
-                      "line": 169,
+                      "line": 361,
                       "name": "extractKeywords",
                       "target": {
                         "file": "packages/memories/src/analyze.ts"
@@ -2281,7 +2569,7 @@
                       "via": "entryFromContent"
                     },
                     {
-                      "line": 182,
+                      "line": 376,
                       "name": "estimateTokens",
                       "target": {
                         "file": "packages/kernel/src/index.ts"
@@ -2289,7 +2577,7 @@
                       "via": "entryFromContent"
                     }
                   ],
-                  "line": 231,
+                  "line": 262,
                   "name": "generateIndex",
                   "target": {
                     "file": "packages/memories/src/index-gen.ts"
@@ -2298,28 +2586,57 @@
                 {
                   "inner": [
                     {
-                      "line": 94,
+                      "line": 54,
+                      "name": "parseFrontmatter",
+                      "target": {
+                        "file": "packages/kernel/src/index.ts"
+                      },
+                      "via": "resolveStoreLimitOptIn"
+                    },
+                    {
+                      "line": 231,
+                      "name": "resolveStoreIdSource",
+                      "target": {
+                        "file": "packages/memories/src/index-gen.ts"
+                      }
+                    },
+                    {
+                      "line": 233,
                       "name": "nameToId",
                       "target": {
                         "file": "packages/memories/src/index-gen.ts"
                       }
                     },
                     {
-                      "line": 97,
+                      "line": 236,
                       "name": "resolveRefPath",
                       "target": {
                         "file": "packages/memories/src/paths.ts"
                       }
                     },
                     {
-                      "line": 100,
+                      "line": 240,
                       "name": "parseFrontmatter",
                       "target": {
                         "file": "packages/kernel/src/index.ts"
                       }
+                    },
+                    {
+                      "line": 242,
+                      "name": "hasExplicitId",
+                      "target": {
+                        "file": "packages/memories/src/index-gen.ts"
+                      }
+                    },
+                    {
+                      "line": 246,
+                      "name": "nameToId",
+                      "target": {
+                        "file": "packages/memories/src/index-gen.ts"
+                      }
                     }
                   ],
-                  "line": 253,
+                  "line": 284,
                   "name": "validateMemory",
                   "target": {
                     "file": "packages/memories/src/validate.ts"
@@ -2328,14 +2645,14 @@
                 {
                   "inner": [
                     {
-                      "line": 131,
+                      "line": 294,
                       "name": "validateIndex",
                       "target": {
                         "file": "packages/kernel/src/index.ts"
                       }
                     }
                   ],
-                  "line": 260,
+                  "line": 291,
                   "name": "validateMemoryIndex",
                   "target": {
                     "file": "packages/memories/src/validate.ts"
@@ -2350,28 +2667,28 @@
             {
               "calls": [
                 {
-                  "line": 285,
+                  "line": 317,
                   "name": "analyzeMemoryMd",
                   "target": {
                     "file": "packages/memories/src/analyze.ts"
                   }
                 },
                 {
-                  "line": 286,
+                  "line": 318,
                   "name": "validateMemory",
                   "target": {
                     "file": "packages/memories/src/validate.ts"
                   }
                 },
                 {
-                  "line": 289,
+                  "line": 321,
                   "name": "generateIndex",
                   "target": {
                     "file": "packages/memories/src/index-gen.ts"
                   }
                 },
                 {
-                  "line": 290,
+                  "line": 322,
                   "name": "validateMemoryIndex",
                   "target": {
                     "file": "packages/memories/src/validate.ts"
@@ -2386,28 +2703,28 @@
             {
               "calls": [
                 {
-                  "line": 324,
+                  "line": 357,
                   "name": "analyzeMemoryMd",
                   "target": {
                     "file": "packages/memories/src/analyze.ts"
                   }
                 },
                 {
-                  "line": 325,
+                  "line": 358,
                   "name": "generateIndex",
                   "target": {
                     "file": "packages/memories/src/index-gen.ts"
                   }
                 },
                 {
-                  "line": 326,
+                  "line": 359,
                   "name": "generateStats",
                   "target": {
                     "file": "packages/memories/src/stats.ts"
                   }
                 },
                 {
-                  "line": 329,
+                  "line": 362,
                   "name": "formatStats",
                   "target": {
                     "file": "packages/memories/src/stats.ts"
@@ -2425,10 +2742,25 @@
           "entry": "generateIndex",
           "entryRule": 4,
           "exports": [
+            "extractKeywordsFromTitle",
             "generateIndex",
-            "nameToId"
+            "hasExplicitId",
+            "nameToId",
+            "resolveStoreIdSource"
           ],
-          "hash": "57806263487fbec863127443c66167be81e5cd8cc6965ff9b065aee304530607",
+          "failurePaths": [
+            {
+              "in": "resolveStoreIdSource",
+              "kind": "catch",
+              "line": 117
+            },
+            {
+              "in": "resolveStoreIdSource",
+              "kind": "catch",
+              "line": 126
+            }
+          ],
+          "hash": "ad0c0d683f1e8665c016f002092cf59ae27b5a0b92ab9dd257fcd4c155ad7fda",
           "importsFiles": [
             "packages/kernel/src/index.ts",
             "packages/memories/src/analyze.ts",
@@ -2440,21 +2772,74 @@
             {
               "calls": [
                 {
-                  "line": 34,
+                  "line": 22,
+                  "name": "extractKeywords",
+                  "target": {
+                    "file": "packages/memories/src/analyze.ts"
+                  }
+                }
+              ],
+              "exported": true,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "extractKeywordsFromTitle"
+            },
+            {
+              "calls": [
+                {
+                  "line": 131,
+                  "name": "parseFrontmatter",
+                  "target": {
+                    "file": "packages/kernel/src/index.ts"
+                  }
+                }
+              ],
+              "exported": true,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "resolveStoreIdSource"
+            },
+            {
+              "calls": [
+                {
+                  "line": 131,
+                  "name": "parseFrontmatter",
+                  "target": {
+                    "file": "packages/kernel/src/index.ts"
+                  },
+                  "via": "resolveStoreIdSource"
+                },
+                {
+                  "line": 171,
                   "name": "resolveRefPath",
                   "target": {
                     "file": "packages/memories/src/paths.ts"
                   }
                 },
                 {
-                  "line": 71,
+                  "line": 204,
+                  "name": "detectSubindex",
+                  "target": {
+                    "file": "packages/memories/src/analyze.ts"
+                  }
+                },
+                {
+                  "line": 208,
                   "name": "parseFrontmatter",
                   "target": {
                     "file": "packages/kernel/src/index.ts"
                   }
                 },
                 {
-                  "line": 158,
+                  "line": 322,
+                  "name": "extractKeywords",
+                  "target": {
+                    "file": "packages/memories/src/analyze.ts"
+                  },
+                  "via": "entryFromFrontmatter"
+                },
+                {
+                  "line": 348,
                   "name": "estimateTokens",
                   "target": {
                     "file": "packages/kernel/src/index.ts"
@@ -2462,7 +2847,7 @@
                   "via": "entryFromFrontmatter"
                 },
                 {
-                  "line": 169,
+                  "line": 361,
                   "name": "extractKeywords",
                   "target": {
                     "file": "packages/memories/src/analyze.ts"
@@ -2470,7 +2855,7 @@
                   "via": "entryFromContent"
                 },
                 {
-                  "line": 182,
+                  "line": 376,
                   "name": "estimateTokens",
                   "target": {
                     "file": "packages/kernel/src/index.ts"
@@ -2486,7 +2871,14 @@
             {
               "calls": [
                 {
-                  "line": 158,
+                  "line": 322,
+                  "name": "extractKeywords",
+                  "target": {
+                    "file": "packages/memories/src/analyze.ts"
+                  }
+                },
+                {
+                  "line": 348,
                   "name": "estimateTokens",
                   "target": {
                     "file": "packages/kernel/src/index.ts"
@@ -2501,14 +2893,14 @@
             {
               "calls": [
                 {
-                  "line": 169,
+                  "line": 361,
                   "name": "extractKeywords",
                   "target": {
                     "file": "packages/memories/src/analyze.ts"
                   }
                 },
                 {
-                  "line": 182,
+                  "line": 376,
                   "name": "estimateTokens",
                   "target": {
                     "file": "packages/kernel/src/index.ts"
@@ -2523,13 +2915,14 @@
           ]
         },
         {
-          "hash": "5cad9992a987414489c3a5833b7139f0a482b095525dbaec964d923abde14daa",
+          "hash": "f3335ba946cc37f384afae984881138d3cf3c38263044733db9590182a65a18a",
           "importOrder": [
             "packages/memories/src/types.ts",
             "packages/memories/src/parser.ts",
             "packages/memories/src/analyze.ts",
             "packages/memories/src/index-gen.ts",
             "packages/memories/src/validate.ts",
+            "packages/memories/src/sync.ts",
             "packages/memories/src/paths.ts",
             "packages/memories/src/stats.ts"
           ],
@@ -2539,6 +2932,7 @@
             "packages/memories/src/parser.ts",
             "packages/memories/src/paths.ts",
             "packages/memories/src/stats.ts",
+            "packages/memories/src/sync.ts",
             "packages/memories/src/types.ts",
             "packages/memories/src/validate.ts"
           ],
@@ -2549,7 +2943,7 @@
           "exports": [
             "parseMemoryMd"
           ],
-          "hash": "13a65539a87084920a954ea3e51f316e0e50f407d65b959a55ece0a7ab6b4a4b",
+          "hash": "ae942979385e652f6cc81f2236317028acd4e7f996b9306bd06d43a2adfb9d3b",
           "importOrder": [
             "packages/memories/src/types.ts",
             "packages/memories/src/index-gen.ts"
@@ -2577,6 +2971,71 @@
             "packages/memories/src/types.ts"
           ],
           "path": "packages/memories/src/stats.ts"
+        },
+        {
+          "exports": [
+            "placeOrMoveEntry",
+            "resolveTargetIndexFile",
+            "syncSummaries"
+          ],
+          "failurePaths": [
+            {
+              "in": "syncSummaries",
+              "kind": "catch",
+              "line": 123
+            },
+            {
+              "in": "syncSummaries",
+              "kind": "catch",
+              "line": 142
+            },
+            {
+              "in": "resolveTargetIndexFile",
+              "kind": "throw",
+              "line": 193
+            },
+            {
+              "in": "placeOrMoveEntry",
+              "kind": "throw",
+              "line": 230
+            },
+            {
+              "in": "placeOrMoveEntry",
+              "kind": "throw",
+              "line": 235
+            },
+            {
+              "in": "placeOrMoveEntry",
+              "kind": "throw",
+              "line": 240
+            },
+            {
+              "in": "placeOrMoveEntry",
+              "kind": "throw",
+              "line": 245
+            },
+            {
+              "in": "placeOrMoveEntry",
+              "kind": "catch",
+              "line": 266
+            }
+          ],
+          "hash": "dc10ce655d85c343236ae2b32565d5ff5a88fd28e592f0a7d64044c0068035b9",
+          "importOrder": [
+            "packages/kernel/src/index.ts",
+            "packages/memories/src/parser.ts",
+            "packages/memories/src/analyze.ts",
+            "packages/memories/src/paths.ts",
+            "packages/memories/src/validate.ts"
+          ],
+          "importsFiles": [
+            "packages/kernel/src/index.ts",
+            "packages/memories/src/analyze.ts",
+            "packages/memories/src/parser.ts",
+            "packages/memories/src/paths.ts",
+            "packages/memories/src/validate.ts"
+          ],
+          "path": "packages/memories/src/sync.ts"
         },
         {
           "hash": "43224c2ee8f1fe92a115e92073c1cb858cc3781a75b9fc7ecefe944dea1d69de",
@@ -2660,16 +3119,26 @@
           "testFramework": "node --test"
         },
         {
-          "hash": "13eeebb13fd791cc6f0887efe4925c3220c585cff8dfca93f24af43383f56e48",
-          "importsFiles": [
+          "hash": "e050089b1b99ebef0a8faf8268c3dfc228a76b8904824a4f0f3706798f40a7ba",
+          "importOrder": [
+            "packages/kernel/src/index.ts",
             "packages/memories/src/analyze.ts",
-            "packages/memories/src/index-gen.ts"
+            "packages/memories/src/index-gen.ts",
+            "packages/memories/src/validate.ts",
+            "packages/memories/src/sync.ts"
+          ],
+          "importsFiles": [
+            "packages/kernel/src/index.ts",
+            "packages/memories/src/analyze.ts",
+            "packages/memories/src/index-gen.ts",
+            "packages/memories/src/sync.ts",
+            "packages/memories/src/validate.ts"
           ],
           "path": "packages/memories/src/tests/index-gen.test.ts",
           "testFramework": "node --test"
         },
         {
-          "hash": "a1e0ed54e1234f3ff70d81544ab67df07808dccc0cb2861ee12ab785e4ffc4e4",
+          "hash": "2b0659a8ef4f19076f2308513f8efa15def7660058d8b4fdb54f0f2a376650d5",
           "importsFiles": [
             "packages/memories/src/parser.ts"
           ],
@@ -2687,7 +3156,7 @@
           "testFramework": "node --test"
         },
         {
-          "hash": "c6d038afb7780875ba4d028f26351177651b992589f9c455097269df4ee16d32",
+          "hash": "7da2d29df6448951f3d795aac4d6e331a6bcad559d9dcb6614efcce2957bc584",
           "importsFiles": [
             "packages/memories/src/analyze.ts",
             "packages/memories/src/index-gen.ts",
@@ -2697,7 +3166,7 @@
           "testFramework": "node --test"
         },
         {
-          "hash": "0c088cde8e4e74671ce4e563320cccdd62f0308052620b5b8030a64552294c82",
+          "hash": "3b40d237917e0786888f2149ae3a28bdce07ed8e4fe4289f2c9671d77a5e6214",
           "importsFiles": [
             "packages/kernel/src/index.ts"
           ],
@@ -2707,17 +3176,28 @@
           "entry": "validateMemory",
           "entryRule": 4,
           "exports": [
+            "summariesMatch",
             "validateMemory",
             "validateMemoryIndex"
           ],
           "failurePaths": [
             {
+              "in": "resolveStoreLimitOptIn",
+              "kind": "catch",
+              "line": 95
+            },
+            {
               "in": "validateMemory",
               "kind": "catch",
-              "line": 105
+              "line": 168
+            },
+            {
+              "in": "validateMemory",
+              "kind": "catch",
+              "line": 269
             }
           ],
-          "hash": "931e49238d27e091d98b36876eea1cb4c6c1bf95d1f7d6f6718e1422d0a51866",
+          "hash": "60cbd585be5a64d8dc92dbfc9c1622e8b82617db98d33243ab8855c40594ab75",
           "importsFiles": [
             "packages/kernel/src/index.ts",
             "packages/memories/src/index-gen.ts",
@@ -2729,24 +3209,68 @@
             {
               "calls": [
                 {
-                  "line": 94,
+                  "line": 54,
+                  "name": "parseFrontmatter",
+                  "target": {
+                    "file": "packages/kernel/src/index.ts"
+                  }
+                }
+              ],
+              "exported": false,
+              "invokedAtTopLevel": false,
+              "isDefaultExport": false,
+              "name": "resolveStoreLimitOptIn"
+            },
+            {
+              "calls": [
+                {
+                  "line": 54,
+                  "name": "parseFrontmatter",
+                  "target": {
+                    "file": "packages/kernel/src/index.ts"
+                  },
+                  "via": "resolveStoreLimitOptIn"
+                },
+                {
+                  "line": 231,
+                  "name": "resolveStoreIdSource",
+                  "target": {
+                    "file": "packages/memories/src/index-gen.ts"
+                  }
+                },
+                {
+                  "line": 233,
                   "name": "nameToId",
                   "target": {
                     "file": "packages/memories/src/index-gen.ts"
                   }
                 },
                 {
-                  "line": 97,
+                  "line": 236,
                   "name": "resolveRefPath",
                   "target": {
                     "file": "packages/memories/src/paths.ts"
                   }
                 },
                 {
-                  "line": 100,
+                  "line": 240,
                   "name": "parseFrontmatter",
                   "target": {
                     "file": "packages/kernel/src/index.ts"
+                  }
+                },
+                {
+                  "line": 242,
+                  "name": "hasExplicitId",
+                  "target": {
+                    "file": "packages/memories/src/index-gen.ts"
+                  }
+                },
+                {
+                  "line": 246,
+                  "name": "nameToId",
+                  "target": {
+                    "file": "packages/memories/src/index-gen.ts"
                   }
                 }
               ],
@@ -2758,7 +3282,7 @@
             {
               "calls": [
                 {
-                  "line": 131,
+                  "line": 294,
                   "name": "validateIndex",
                   "target": {
                     "file": "packages/kernel/src/index.ts"
@@ -2784,6 +3308,13 @@
       "name": "memories",
       "origin": "authored",
       "outsidePlaces": [
+        {
+          "reads": 16,
+          "where": [
+            "caller"
+          ],
+          "writes": 2
+        },
         {
           "reads": 2,
           "where": [
@@ -2832,13 +3363,13 @@
           "writes": 0
         }
       ],
-      "outsideReads": 7,
-      "outsideWrites": 2,
+      "outsideReads": 23,
+      "outsideWrites": 4,
       "role": "docs",
       "testRunners": [
         "node --test"
       ],
-      "testedBy": 17,
+      "testedBy": 18,
       "unresolvedSites": 0
     },
     {
@@ -2854,7 +3385,7 @@
           "path": ".gitignore"
         },
         {
-          "hash": "35fd16774e018a8839b6d2da881b86be5477a1ccda568bcab9986b850d0116d9",
+          "hash": "5d2ddbf1640f758aaf7641650430fcb0596466adefbca6d1a2d7a50268dea3df",
           "path": "CHANGELOG.md"
         },
         {
@@ -2862,35 +3393,35 @@
           "path": "LICENSE"
         },
         {
-          "hash": "ec7e8d49590f21b4e8ec8286ed9dbe20aedffaad28fb9c928358b855a2fb873e",
+          "hash": "da8ba704dcc0771de8e6e5db8d329c1545e4fae53804b963537142559a65b277",
           "path": "README.es.md"
         },
         {
-          "hash": "55f97da9b939f777593925035ff0c0641f809d20306e3c767c23d4c4eb6bd952",
+          "hash": "2de459b437d447f95f21f2e7fdab077e6ccfbd015e34dac8b94b902bc628806f",
           "path": "README.fr.md"
         },
         {
-          "hash": "ea114cdd50d89ed1912bb911423ede56b129bd526764cd63aab36a1a50515bd4",
+          "hash": "bc45adf840939af44f88f9cce05d70b89063b1fb2359498203489c0b3f114188",
           "path": "README.hi.md"
         },
         {
-          "hash": "7763155a47e7dedfd849362644999ecfbc65143c719192d4e3319a22c32fdee8",
+          "hash": "70e9bfef2a604164dc1c253ad26125662fb557cade8e6e5762f44ebce5d0bdc8",
           "path": "README.it.md"
         },
         {
-          "hash": "086aef38340acb26edd5c46736035801de0a1f807def9504fd52e403bccfd26e",
+          "hash": "a54f149c6f6d9fc6e4bc6dc4a499a847cc4e47f4aa59077c6a0319d2aca31f00",
           "path": "README.ja.md"
         },
         {
-          "hash": "1d7b700058f9f3175214ce8b2f2826052245709b4fb698f22bf2ebd1e88ffd8a",
+          "hash": "f1f23d4dffa5776d59067f153bcaf3e8a11f5e0d23874f7f39be91628fbf093b",
           "path": "README.md"
         },
         {
-          "hash": "059e28b111d1de0251dc2bc1555a352b8142771cd447a79b6d177314a0527204",
+          "hash": "7690daa87da743e2df75ee55ccca12b1cfee557cd780604441bfd73fb251e8a3",
           "path": "README.pt-BR.md"
         },
         {
-          "hash": "beb4f1de1a7210b27971138b1de36fa7294c16e006e42072dcdbda728d2119d0",
+          "hash": "3ba700b47c60b1d950fcf0460b062150925e20dfd635c3f36f1fd77138881de3",
           "path": "README.zh.md"
         },
         {
@@ -2906,7 +3437,7 @@
           "path": "SECURITY.md"
         },
         {
-          "hash": "1d19f2cda4244fe094c10a1944c367a75a2a1dc0858f3df12ba4bd5f8646fcf7",
+          "hash": "ed84c196990d688fc15c061c681f26e02701842c279d3ceedc442db55b6d82cb",
           "path": "SHIP_GATE.md"
         },
         {
@@ -2918,11 +3449,11 @@
           "path": "logo.png"
         },
         {
-          "hash": "917c2233c9e549262d010e2817fb90a70810669c6da6ef11b5e9be9cf62333e3",
+          "hash": "2e22f14a8688c8018aa27fd9f4967bc30409b1372432518f4d95e6b465d99717",
           "path": "package-lock.json"
         },
         {
-          "hash": "6b0b55ec14991e9c6c43310224ffc181e380890cab07ca70f85070e8d162667e",
+          "hash": "ab65b9e7fb211f115daf8751048a0a477baef0168928cafe732289fa9254b602",
           "path": "package.json"
         },
         {
@@ -3212,7 +3743,7 @@
           "path": "packages/rules/site/astro.config.mjs"
         },
         {
-          "hash": "af5d4f54dca60686724d306eb58759fb25b6f5ba4d66559ab84a968112a184e5",
+          "hash": "0607a19c4f60b635244a906c7ad2424359b50e20c4a83bc140f202abce4a941e",
           "path": "packages/rules/site/package-lock.json"
         },
         {
@@ -4715,7 +5246,7 @@
           "path": "site/astro.config.mjs"
         },
         {
-          "hash": "af5d4f54dca60686724d306eb58759fb25b6f5ba4d66559ab84a968112a184e5",
+          "hash": "0607a19c4f60b635244a906c7ad2424359b50e20c4a83bc140f202abce4a941e",
           "path": "site/package-lock.json"
         },
         {
@@ -4732,7 +5263,7 @@
           "path": "site/src/content.config.ts"
         },
         {
-          "hash": "bddcd72b4d70daaae2de8a6819b98f82266d44d35fb0a2dfb4ffb4175e11a25c",
+          "hash": "60aad9787475930892039cd0aa0ad200c8eaf20da60eeb18138bed22d958c64d",
           "path": "site/src/content/docs/handbook/architecture.md"
         },
         {
@@ -4752,7 +5283,7 @@
           "path": "site/src/content/docs/handbook/reference.md"
         },
         {
-          "hash": "e2dd7605706ed2c788825a6bf95086449e3eb3a0443a8647875463361f48b5d7",
+          "hash": "26766df89d5d688947be11492d41da5959e0545559bc9080e6398a6ac7424e54",
           "path": "site/src/content/docs/handbook/rituals.md"
         },
         {
@@ -4984,6 +5515,11 @@
           "files": 19
         },
         {
+          "boundary": "hook",
+          "depth": 0,
+          "files": 1
+        },
+        {
           "boundary": "kernel",
           "depth": 0,
           "files": 23
@@ -4991,7 +5527,7 @@
         {
           "boundary": "memories",
           "depth": 0,
-          "files": 17
+          "files": 18
         },
         {
           "boundary": "rules",
@@ -5006,6 +5542,11 @@
       ],
       "readers": [],
       "runs": [
+        {
+          "job": "build-and-test",
+          "path": "apps/hook/esbuild.config.mjs",
+          "runKind": "executes"
+        },
         {
           "built": true,
           "directory": true,
@@ -5145,7 +5686,7 @@
           }
         }
       ],
-      "runsCount": 18,
+      "runsCount": 19,
       "secrets": [],
       "sends": {
         "deploysPages": false,
@@ -5247,6 +5788,9 @@
         {
           "event": "workflow_dispatch"
         }
+      ],
+      "untrackedLandings": [
+        ".claude/loadout/"
       ],
       "uses": [
         "actions/checkout",
@@ -5397,6 +5941,11 @@
           "files": 20
         },
         {
+          "boundary": "hook",
+          "depth": 0,
+          "files": 1
+        },
+        {
           "boundary": "kernel",
           "depth": 0,
           "files": 23
@@ -5404,7 +5953,7 @@
         {
           "boundary": "memories",
           "depth": 0,
-          "files": 17
+          "files": 18
         },
         {
           "boundary": "rules",
@@ -5414,6 +5963,11 @@
       ],
       "readers": [],
       "runs": [
+        {
+          "job": "release",
+          "path": "apps/hook/esbuild.config.mjs",
+          "runKind": "executes"
+        },
         {
           "job": "release",
           "path": "packages/cli/esbuild.config.mjs",
@@ -5531,7 +6085,7 @@
           "runKind": "executes"
         }
       ],
-      "runsCount": 17,
+      "runsCount": 18,
       "secrets": [
         "GITHUB_TOKEN"
       ],
@@ -5608,6 +6162,9 @@
             "v*"
           ]
         }
+      ],
+      "untrackedLandings": [
+        ".claude/loadout/"
       ],
       "uses": [
         "actions/checkout",
@@ -5826,8 +6383,8 @@
   ],
   "engine": "1.24.0",
   "generatedFrom": {
-    "commit": "532deeed98d8a72bc4c8ada226db1f9024dc5dfb",
-    "tracked": 382
+    "commit": "c838284447d36e0435d2840d3bc7d11c2b186a21",
+    "tracked": 383
   },
   "landings": [
     {
@@ -5840,6 +6397,40 @@
         }
       ],
       "target": ".claude/CLAUDE.md",
+      "writers": []
+    },
+    {
+      "readers": [],
+      "target": ".claude/loadout",
+      "tracked": false,
+      "writers": [
+        {
+          "by": "packages/cli/src/refresh.ts",
+          "confidence": "ast"
+        }
+      ]
+    },
+    {
+      "readers": [
+        {
+          "by": "packages/kernel/src/resolve.ts",
+          "call": "existsSync",
+          "confidence": "ast"
+        }
+      ],
+      "target": ".claude/loadout/index.json",
+      "writers": []
+    },
+    {
+      "readers": [
+        {
+          "by": "packages/cli/src/tests/help.test.ts",
+          "call": "readFileSync",
+          "confidence": "ast",
+          "fromTests": true
+        }
+      ],
+      "target": "README.md",
       "writers": []
     },
     {
@@ -5879,6 +6470,12 @@
         {
           "by": ".github/workflows/release.yml",
           "confidence": "config"
+        },
+        {
+          "by": "packages/cli/src/tests/doctor.test.ts",
+          "call": "readFileSync",
+          "confidence": "ast",
+          "fromTests": true
         }
       ],
       "target": "package.json",
@@ -5898,6 +6495,18 @@
         }
       ],
       "target": "packages/cli",
+      "writers": []
+    },
+    {
+      "readers": [
+        {
+          "by": "packages/cli/src/tests/help.test.ts",
+          "call": "readFileSync",
+          "confidence": "ast",
+          "fromTests": true
+        }
+      ],
+      "target": "packages/cli/README.md",
       "writers": []
     },
     {
@@ -5924,6 +6533,18 @@
         }
       ],
       "target": "packages/cli/src/cli.ts",
+      "writers": []
+    },
+    {
+      "readers": [
+        {
+          "by": "packages/cli/src/tests/refresh.test.ts",
+          "call": "readFileSync",
+          "confidence": "ast",
+          "fromTests": true
+        }
+      ],
+      "target": "packages/cli/src/refresh.ts",
       "writers": []
     },
     {

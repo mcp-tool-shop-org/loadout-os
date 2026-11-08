@@ -17,7 +17,7 @@ import { analyzeMemoryMd } from "./analyze.js";
 import { generateIndex } from "./index-gen.js";
 import { validateMemory, validateMemoryIndex } from "./validate.js";
 import { generateStats, formatStats } from "./stats.js";
-import type { ValidationIssue } from "./types.js";
+import type { IdSource, ValidationIssue } from "./types.js";
 
 /**
  * FT-MR4: roll up the validateMemory issue list into the four headline counts
@@ -65,6 +65,10 @@ function hasFlag(args: string[], flag: string): boolean {
 }
 
 function flagValue(args: string[], flag: string): string | undefined {
+  const eqPrefix = `--${flag}=`;
+  for (const a of args) {
+    if (a.startsWith(eqPrefix)) return a.slice(eqPrefix.length);
+  }
   const idx = args.indexOf(`--${flag}`);
   if (idx === -1 || idx + 1 >= args.length) return undefined;
   const next = args[idx + 1];
@@ -83,8 +87,34 @@ function flagValue(args: string[], flag: string): string | undefined {
   return next;
 }
 
+function parseIdSourceFlag(args: string[]): IdSource | undefined {
+  const raw = flagValue(args, "id-source");
+  if (raw === undefined) return undefined;
+  const val = raw.trim().toLowerCase();
+  if (val === "title" || val === "name") return val;
+  fail(
+    "INVALID_FLAG_VALUE",
+    `Invalid --id-source "${raw}": expected "title" or "name"`,
+    "Use --id-source title or --id-source name",
+  );
+}
+
+const VALUE_FLAGS = new Set(["out", "id-source"]);
+
 function positionalArgs(args: string[]): string[] {
-  return args.filter((a) => !a.startsWith("--"));
+  const out: string[] = [];
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (a.startsWith("--")) {
+      const flagName = a.slice(2);
+      if (VALUE_FLAGS.has(flagName) && i + 1 < args.length && !args[i + 1].startsWith("--")) {
+        i++;
+      }
+      continue;
+    }
+    out.push(a);
+  }
+  return out;
 }
 
 // ── Version ───────────────────────────────────────────────────
@@ -223,12 +253,13 @@ async function cmdAnalyze(args: string[]) {
 async function cmdIndex(args: string[]) {
   const filePath = resolveMemoryMd(args);
   const lazyLoad = hasFlag(args, "lazy");
+  const idSource = parseIdSourceFlag(args);
   const outPath = flagValue(args, "out") ?? join(dirname(filePath), "memory", "index.json");
 
   log(`\n${BOLD}Generating index${RESET} from ${filePath}\n`);
 
   const analysis = analyzeMemoryMd(filePath);
-  const index = generateIndex(analysis, { lazyLoad });
+  const index = generateIndex(analysis, { lazyLoad, idSource });
 
   // Write index
   mkdirSync(dirname(outPath), { recursive: true });
@@ -250,7 +281,7 @@ async function cmdIndex(args: string[]) {
   // never showed the missing/orphan/duplicate/id-too-long picture — pairing it
   // with the diagnostics channel here means a single `index` run tells the user
   // whether the memory store is healthy, pointing them at `validate` for detail.
-  const memoryIssues = validateMemory(analysis);
+  const memoryIssues = validateMemory(analysis, { idSource });
   const c = healthCounts(memoryIssues);
   info(
     `${c.missing} missing · ${c.orphan} orphan · ${c.duplicate} duplicate · ${c.idTooLong} id-too-long — run \`validate\` for detail`,
@@ -279,14 +310,15 @@ async function cmdIndex(args: string[]) {
 
 async function cmdValidate(args: string[]) {
   const filePath = resolveMemoryMd(args);
+  const idSource = parseIdSourceFlag(args);
 
   log(`\n${BOLD}Validating${RESET} ${filePath}\n`);
 
   const analysis = analyzeMemoryMd(filePath);
-  const memoryIssues = validateMemory(analysis);
+  const memoryIssues = validateMemory(analysis, { idSource });
 
   // Also generate and validate the index
-  const index = generateIndex(analysis);
+  const index = generateIndex(analysis, { idSource });
   const indexIssues = validateMemoryIndex(index);
 
   const allIssues = [...memoryIssues, ...indexIssues];
@@ -320,9 +352,10 @@ async function cmdValidate(args: string[]) {
 
 async function cmdStats(args: string[]) {
   const filePath = resolveMemoryMd(args);
+  const idSource = parseIdSourceFlag(args);
 
   const analysis = analyzeMemoryMd(filePath);
-  const index = generateIndex(analysis);
+  const index = generateIndex(analysis, { idSource });
   const stats = generateStats(analysis, index);
 
   log("");

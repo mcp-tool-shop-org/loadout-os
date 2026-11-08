@@ -6,6 +6,7 @@
   "description": "UserPromptSubmit hook that injects pointers to relevant memory entries from ~/.ai-loadout/index.json",
   "main": "loadout-hook.mjs",
   "scripts": {
+    "build": "node esbuild.config.mjs",
     "test": "node --check loadout-hook.mjs",
     "bundle": "node esbuild.config.mjs",
     "smoke": "pwsh -NoProfile -File smoke-test.ps1"

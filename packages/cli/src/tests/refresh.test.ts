@@ -13,17 +13,25 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, existsSync, writeFileSync, statSync } from "node:fs";
-import { isAbsolute, resolve } from "node:path";
+import { spawn, spawnSync } from "node:child_process";
+import { readFileSync, existsSync, writeFileSync, statSync, mkdirSync, openSync, closeSync, unlinkSync } from "node:fs";
+import { dirname, isAbsolute, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
+import * as refreshMod from "../refresh.js";
 import {
   runRefresh,
   printRefresh,
   defaultDest,
+  projectDest,
   sameResolvedPath,
+  withFileLock,
+  lockFilePathForKey,
   RefreshError,
   type RefreshResult,
 } from "../refresh.js";
+import { runPostWrite } from "../hook.js";
+import { dispatch } from "../cli.js";
 import { makeRefreshSandbox } from "./fixtures.js";
 
 /** The canonical live dest with its drive letter lower-cased (win32 only). */
@@ -250,7 +258,7 @@ test("refresh: store present but MEMORY.md missing exits 2", () => {
 // resolver index. It's now contrastive: live-dest confirms the live write;
 // custom-dest says the live index was untouched. Neither prints the stale note.
 
-test("printRefresh: a live-dest run confirms the change is live and drops the stale note", () => {
+test("printRefresh: a live-dest run confirms the live write and drops the stale note", () => {
   const out = captureLog(() => printRefresh(okResult(resolve(defaultDest()))));
   assert.match(out, /the change is live now/i, "live-dest run must confirm the live write");
   assert.doesNotMatch(
@@ -304,3 +312,532 @@ test(
     assert.doesNotMatch(out, /deferred|coordinator-supervised/i);
   },
 );
+
+// ── Part B: --project, --snapshot-repo, --mirror-repo, --fix, and locking ──
+
+test("refresh --project <root>: writes <root>/.claude/loadout/index.json with source and leaves global index untouched (F-16, F-23)", () => {
+  const sb = makeRefreshSandbox({ valid: true });
+  try {
+    const projRoot = join(sb.dir, "my-project");
+    mkdirSync(projRoot, { recursive: true });
+
+    const result = runRefresh({ store: sb.storeDir, project: projRoot });
+    const expectedDest = projectDest(projRoot);
+    assert.equal(result.dest, expectedDest);
+    assert.equal(result.wrote, true);
+    assert.ok(existsSync(expectedDest), "project index must be written");
+    assert.equal(existsSync(sb.destPath), false, "custom/global dest must remain untouched");
+
+    const written = JSON.parse(readFileSync(expectedDest, "utf-8"));
+    assert.equal(written.source, sb.memoryMd, "project index must record source MEMORY.md (F-23)");
+
+    // Second run backs up existing project index to .bak (F-16)
+    const second = runRefresh({ store: sb.storeDir, project: projRoot });
+    assert.equal(second.backupPath, `${expectedDest}.bak`);
+    assert.ok(existsSync(`${expectedDest}.bak`));
+  } finally {
+    sb.cleanup();
+  }
+});
+
+test("refresh --snapshot-repo and --mirror-repo: commits store .md files, pushes to bare mirror (-b main), treats no-change as success, and fails non-zero on git error (F-10, F-21, F-31)", () => {
+  const sb = makeRefreshSandbox({ valid: true });
+  try {
+    const projRoot = join(sb.dir, "proj");
+    const snapDir = join(sb.dir, "snap-repo");
+    const mirrorDir = join(sb.dir, "mirror.git");
+
+    // 1. First run initializes snapshot repo + bare mirror (-b main) and commits + pushes
+    const r1 = runRefresh({
+      store: sb.storeDir,
+      project: projRoot,
+      snapshotRepo: snapDir,
+      mirrorRepo: mirrorDir,
+    });
+    assert.equal(r1.snapshot?.committed, true);
+    assert.equal(r1.snapshot?.mirrored, true);
+    assert.ok(existsSync(join(snapDir, "MEMORY.md")), "MEMORY.md copied to snapshot repo");
+    assert.ok(existsSync(join(mirrorDir, "HEAD")), "bare mirror initialized");
+    const mirrorHead = readFileSync(join(mirrorDir, "HEAD"), "utf-8");
+    assert.match(mirrorHead, /refs\/heads\/main/, "bare mirror HEAD must point to main (F-31)");
+
+    // 2. Second run with no changes succeeds with committed: false, noChange: true
+    const r2 = runRefresh({
+      store: sb.storeDir,
+      project: projRoot,
+      snapshotRepo: snapDir,
+      mirrorRepo: mirrorDir,
+    });
+    assert.equal(r2.snapshot?.committed, false);
+    assert.equal(r2.snapshot?.noChange, true);
+    assert.equal(r2.snapshot?.mirrored, true);
+
+    // 3. Broken mirror path (file instead of directory) fails non-zero (F-10 / F-21)
+    const badMirror = join(sb.dir, "not-a-repo-file");
+    writeFileSync(badMirror, "corrupt", "utf-8");
+    // Modify a store file so it tries to commit and push to the bad mirror
+    writeFileSync(join(sb.storeDir, "topic-a.md"), "# Topic A\nUpdated body.\n", "utf-8");
+    assert.throws(
+      () =>
+        runRefresh({
+          store: sb.storeDir,
+          project: projRoot,
+          snapshotRepo: snapDir,
+          mirrorRepo: badMirror,
+        }),
+      (err: unknown) => {
+        assert.ok(err instanceof RefreshError);
+        assert.equal(err.exitCode, 1);
+        return true;
+      },
+    );
+  } finally {
+    sb.cleanup();
+  }
+});
+
+test("withFileLock: serializes access and cleans up the lock file (F-07)", () => {
+  const sb = makeRefreshSandbox({ valid: true });
+  try {
+    const lockKey = join(sb.dir, "refresh-target");
+    const actualLockPath = lockFilePathForKey(lockKey);
+    const value = withFileLock(lockKey, () => {
+      assert.ok(existsSync(actualLockPath), "lock file must exist while inside critical section");
+      return 42;
+    });
+    assert.equal(value, 42);
+    assert.equal(existsSync(actualLockPath), false, "lock file must be cleaned up after completion");
+  } finally {
+    sb.cleanup();
+  }
+});
+
+
+test("CLI dispatch: exercises refresh --project/--fix, memories sync-summaries/place/move, and hook session-start/pre-compact/post-write in-process", () => {
+  const sb = makeRefreshSandbox({ valid: true });
+  try {
+    const projRoot = join(sb.dir, "cli-proj");
+    mkdirSync(projRoot, { recursive: true });
+
+    // Create sub-indexes and a topic with frontmatter + board
+    writeFileSync(
+      join(sb.storeDir, "index-projects.md"),
+      "# Projects\n- [Topic A](topic-a.md) — Stale summary\n",
+      "utf-8",
+    );
+    writeFileSync(join(sb.storeDir, "index-archive.md"), "# Archive\n", "utf-8");
+    writeFileSync(
+      join(sb.storeDir, "topic-a.md"),
+      [
+        "---",
+        "name: Topic A",
+        "description: Authoritative Topic A summary",
+        "---",
+        "# Topic A",
+        "Body.",
+        "",
+      ].join("\n"),
+      "utf-8",
+    );
+    writeFileSync(
+      join(sb.storeDir, "BOARD.md"),
+      [
+        "---",
+        "name: Active Board",
+        "description: Session board",
+        "priority: core",
+        "metadata:",
+        "  loadout_inject: session-start",
+        "  stale_after_min: 60",
+        "---",
+        "# Active Board",
+        "Current state.",
+        "",
+      ].join("\n"),
+      "utf-8",
+    );
+    writeFileSync(
+      sb.memoryMd,
+      [
+        "# Memory",
+        "- [Board](BOARD.md) — Session board",
+        "- [Projects](index-projects.md) — Projects sub-index",
+        "- [Archive](index-archive.md) — Archive sub-index",
+        "",
+      ].join("\n"),
+      "utf-8",
+    );
+
+    // 1. memories sync-summaries without --fix throws STALE_SUMMARIES
+    assert.throws(() =>
+      captureLog(() => dispatch(["memories", "sync-summaries", sb.memoryMd])),
+    );
+    assert.throws(() =>
+      captureLog(() => dispatch(["memories", "sync-summaries", sb.memoryMd, "--json"])),
+    );
+
+    // 2. memories sync-summaries --fix updates the drifted summary
+    const syncOut = captureLog(() =>
+      dispatch(["memories", "sync-summaries", sb.memoryMd, "--fix"]),
+    );
+    assert.match(syncOut, /synced/);
+    const syncCleanOut = captureLog(() =>
+      dispatch(["memories", "sync-summaries", sb.memoryMd]),
+    );
+    assert.match(syncCleanOut, /match their frontmatter/);
+    const syncJsonOut = captureLog(() =>
+      dispatch(["memories", "sync-summaries", sb.memoryMd, "--fix", "--json"]),
+    );
+    assert.ok(JSON.parse(syncJsonOut));
+
+    // 3. memories place and move (human and --json)
+    const placeOut = captureLog(() =>
+      dispatch(["memories", "place", join(sb.storeDir, "topic-a.md"), "projects", "--store", sb.storeDir]),
+    );
+    assert.match(placeOut, /Placed topic-a\.md/);
+    const moveJsonOut = captureLog(() =>
+      dispatch([
+        "memories",
+        "move",
+        join(sb.storeDir, "topic-a.md"),
+        "--into",
+        "archive",
+        "--store",
+        sb.storeDir,
+        "--json",
+      ]),
+    );
+    assert.equal(JSON.parse(moveJsonOut).targetIndex, "index-archive.md");
+
+    // Missing arg on place throws
+    assert.throws(() => dispatch(["memories", "place", "only-one-arg"]));
+
+    // 4. dispatch refresh --store --project --fix
+    const refOut = captureLog(() =>
+      dispatch(["refresh", "--store", sb.storeDir, "--project", projRoot, "--fix"]),
+    );
+    assert.match(refOut, /refreshed the PROJECT resolver index/i);
+
+    // Also exercise printRefresh with snapshot + dry-run + backup branches
+    const snapPrintOut = captureLog(() =>
+      printRefresh({
+        ...okResult(projectDest(projRoot)),
+        project: projRoot,
+        backupPath: `${projectDest(projRoot)}.bak`,
+        snapshot: {
+          committed: true,
+          noChange: false,
+          sha: "deadbeef",
+          mirrored: true,
+          message: "Committed and mirrored",
+        },
+      }),
+    );
+    assert.match(snapPrintOut, /Committed and mirrored/);
+
+    const dryPrintOut = captureLog(() =>
+      printRefresh({
+        ...okResult(projectDest(projRoot)),
+        project: projRoot,
+        dryRun: true,
+        wrote: false,
+        snapshot: {
+          committed: false,
+          noChange: true,
+          mirrored: false,
+          message: "No change",
+        },
+      }),
+    );
+    assert.match(dryPrintOut, /--dry-run/);
+
+    // Exercise human-readable (non-JSON) CLI outputs in commands.ts / report.ts / doctor.ts
+    captureLog(() => dispatch(["memories", "index", sb.memoryMd, "--lazy"]));
+    captureLog(() => dispatch(["memories", "validate", sb.memoryMd, "--max-lines", "200", "--max-bytes", "30000"]));
+    captureLog(() => dispatch(["memories", "stats", sb.memoryMd]));
+    captureLog(() => dispatch(["memories", "health", sb.memoryMd]));
+    captureLog(() => dispatch(["resolve", "--project", projRoot]));
+    captureLog(() => dispatch(["explain", "active-board", "--project", projRoot]));
+    captureLog(() => dispatch(["validate", projectDest(projRoot)]));
+    captureLog(() => dispatch(["overlaps", projectDest(projRoot)]));
+    captureLog(() => dispatch(["budget", projectDest(projRoot)]));
+
+    // 5. dispatch hook session-start & pre-compact (--json)
+    const ssJson = captureLog(() =>
+      dispatch(["hook", "session-start", "--project", projRoot, "--max-lines", "50", "--max-bytes", "5000", "--json"]),
+    );
+    assert.equal(JSON.parse(ssJson).injectedFiles.length, 1);
+
+    const pcJson = captureLog(() =>
+      dispatch(["hook", "pre-compact", "--project", projRoot, "--stale-after-min", "60", "--json"]),
+    );
+    assert.equal(JSON.parse(pcJson).warnings.length, 0);
+
+    // 6. dispatch hook post-write (clean and error)
+    dispatch(["hook", "post-write", "--project", projRoot, "--file", join(sb.storeDir, "BOARD.md")]);
+    assert.equal(process.exitCode ?? 0, 0);
+
+    // 7. Exercise doctor and report human output on scratch fixtures
+    const usageJsonl = join(sb.storeDir, "usage.jsonl");
+    writeFileSync(
+      usageJsonl,
+      JSON.stringify({
+        ts: "2026-11-08T00:00:00.000Z",
+        sessionId: "s1",
+        taskHash: "t1",
+        entryId: "active-board",
+        mode: "lazy",
+        score: 0.9,
+        reason: "keywords: board",
+        tokensEst: 20,
+        layer: "project",
+      }) + "\n",
+      "utf-8",
+    );
+    captureLog(() => dispatch(["usage", usageJsonl]));
+    captureLog(() => dispatch(["dead", projectDest(projRoot), "--usage", usageJsonl]));
+    captureLog(() => dispatch(["report", "--index", projectDest(projRoot), "--jsonl", usageJsonl]));
+    captureLog(() =>
+      dispatch([
+        "doctor",
+        "--store",
+        sb.storeDir,
+        "--index",
+        projectDest(projRoot),
+        "--jsonl",
+        usageJsonl,
+        "--settings",
+        join(sb.storeDir, "missing-settings.json"),
+      ]),
+    );
+  } finally {
+    process.exitCode = 0;
+    sb.cleanup();
+  }
+});
+
+test("Q3-4: LOCK_WAIT_MS is at least DEFAULT_GIT_TIMEOUT_MS, and a second post-write waits rather than fails while the first holds the lock for a long git step", async () => {
+  const sb = makeRefreshSandbox({ valid: true });
+  try {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const refreshSrc = readFileSync(resolve(here, "..", "..", "src", "refresh.ts"), "utf-8");
+    const mWait = refreshSrc.match(/LOCK_WAIT_MS\s*=\s*([0-9_]+|DEFAULT_GIT_TIMEOUT_MS[^\n;]*)/);
+    assert.ok(mWait, "LOCK_WAIT_MS must be defined in refresh.ts");
+    const modAny = refreshMod as Record<string, unknown>;
+    const gitTimeout = typeof modAny.DEFAULT_GIT_TIMEOUT_MS === "number" ? modAny.DEFAULT_GIT_TIMEOUT_MS : 30_000;
+    const lockWait = typeof modAny.LOCK_WAIT_MS === "number" ? modAny.LOCK_WAIT_MS : 15_000;
+    assert.ok(
+      lockWait >= gitTimeout,
+      `LOCK_WAIT_MS (${lockWait}) must be >= DEFAULT_GIT_TIMEOUT_MS (${gitTimeout})`,
+    );
+
+    // Simulate a first post-write holding the project index lock during a git step,
+    // while a second post-write arrives and waits until the lock is released rather than failing.
+    const projRoot = join(sb.dir, "concurrent-proj");
+    mkdirSync(projRoot, { recursive: true });
+    runRefresh({ store: sb.storeDir, project: projRoot });
+
+    const dest = projectDest(projRoot);
+    const lockPath = lockFilePathForKey(dest);
+    const fd = openSync(lockPath, "wx");
+    writeFileSync(fd, `${process.pid}\n${Date.now()}\n`, "utf-8");
+
+    // Release the lock from a child process after 350ms while the parent is blocked in runPostWrite's Atomics.wait loop
+    const releaser = spawn(
+      process.execPath,
+      [
+        "-e",
+        'setTimeout(() => { try { require("node:fs").unlinkSync(process.argv[1]); } catch {} }, 350);',
+        lockPath,
+      ],
+      { stdio: "ignore" },
+    );
+    closeSync(fd);
+
+    const t0 = Date.now();
+    const res = runPostWrite({
+      project: projRoot,
+      store: sb.storeDir,
+      filePath: join(sb.storeDir, "topic-a.md"),
+    });
+    const elapsed = Date.now() - t0;
+    await new Promise<void>((r) => releaser.on("close", () => r()));
+
+    assert.equal(res.matchedStore, true);
+    assert.equal(res.exitCode, 0, "second post-write must wait and succeed (exit 0) after first releases lock");
+    assert.ok(elapsed >= 200, `expected second post-write to wait for lock release, elapsed=${elapsed}ms`);
+  } finally {
+    sb.cleanup();
+  }
+});
+
+test("Q2-6 / follow-up 1: runRefresh writes <dest>.tmp.<pid> and renameSyncs over <dest>, leaving old global index intact on mid-write crash", () => {
+  const sb = makeRefreshSandbox({ valid: true });
+  try {
+    // 1. Seed initial valid global index
+    const first = runRefresh({ store: sb.storeDir, dest: sb.destPath });
+    assert.equal(first.wrote, true);
+    const initialDestContent = readFileSync(sb.destPath, "utf-8");
+    const initialParsed = JSON.parse(initialDestContent);
+    assert.equal(initialParsed.entries.length, 1);
+
+    // 2. Verify refresh.ts uses <dest>.tmp.<pid> and renameSync(tmpDest, dest)
+    const here = dirname(fileURLToPath(import.meta.url));
+    const refreshSrc = readFileSync(resolve(here, "..", "..", "src", "refresh.ts"), "utf-8");
+    assert.match(
+      refreshSrc,
+      /`\$\{dest\}\.tmp\.\$\{process\.pid\}`/,
+      "refresh.ts must stage index to `${dest}.tmp.${process.pid}`",
+    );
+    assert.match(
+      refreshSrc,
+      /renameSync\(tmpDest,\s*dest\)/,
+      "refresh.ts must atomically renameSync(tmpDest, dest)",
+    );
+
+    // 3. Simulate a crash mid-write in a child process (after writing truncated bytes to <dest>.tmp.<pid>, before renameSync)
+    writeFileSync(
+      join(sb.storeDir, "MEMORY.md"),
+      readFileSync(join(sb.storeDir, "MEMORY.md"), "utf-8") +
+        "- [Topic C](topic-c.md) — Added before crash\n",
+      "utf-8",
+    );
+    writeFileSync(
+      join(sb.storeDir, "topic-c.md"),
+      `---\nname: Topic C\ndescription: Added before crash\ntype: project\n---\n\nBody of topic C.\n`,
+      "utf-8",
+    );
+
+    const refreshJsUrl = new URL("../refresh.js", import.meta.url).href;
+    const crashScript = [
+      'import { createRequire, syncBuiltinESMExports } from "node:module";',
+      "const require = createRequire(import.meta.url);",
+      'const fs = require("node:fs");',
+      "const origWriteFileSync = fs.writeFileSync;",
+      "const [targetDest, refreshUrl, targetStore] = process.argv.slice(1);",
+      "fs.writeFileSync = function(file, data, options) {",
+      '  if (typeof file === "string" && file === `${targetDest}.tmp.${process.pid}`) {',
+      "    origWriteFileSync.call(this, file, String(data).slice(0, 24), options);",
+      "    process.exit(137);",
+      "  }",
+      "  return origWriteFileSync.call(this, file, data, options);",
+      "};",
+      "syncBuiltinESMExports();",
+      "const { runRefresh } = await import(refreshUrl);",
+      "runRefresh({ store: targetStore, dest: targetDest });",
+    ].join("\n");
+    const child = spawnSync(
+      process.execPath,
+      ["--input-type=module", "-e", crashScript, sb.destPath, refreshJsUrl, sb.storeDir],
+      { encoding: "utf-8" },
+    );
+    assert.equal(child.status, 137, `expected simulated crash exit 137, got ${child.status}: ${child.stderr}`);
+
+    // The truncated <dest>.tmp.<pid> was written by the crashed child, but <dest> must still be intact!
+    const afterCrashContent = readFileSync(sb.destPath, "utf-8");
+    assert.equal(afterCrashContent, initialDestContent, "old global index must be 100% intact after mid-write crash");
+    assert.doesNotThrow(() => JSON.parse(afterCrashContent), "old global index must still be valid JSON");
+  } finally {
+    sb.cleanup();
+  }
+});
+
+test("Publisher ruling B (CLI): refresh and memories commands honor idSource defaults (global=title, --project=name), per-store config, --id-source override, and explicit frontmatter id:", () => {
+  const sb = makeRefreshSandbox({ valid: true });
+  try {
+    const projRoot = join(sb.dir, "proj-ruling-b");
+    mkdirSync(projRoot, { recursive: true });
+
+    // Topic 1: frontmatter `name:` without explicit `id:`, bullet title differs from frontmatter `name:`
+    writeFileSync(
+      join(sb.storeDir, "user_profile.md"),
+      [
+        "---",
+        "name: Mike User Profile Studio Model",
+        "description: User profile and studio model",
+        "---",
+        "# User Profile",
+        "",
+      ].join("\n"),
+      "utf-8",
+    );
+
+    // Topic 2: explicit frontmatter `id:`
+    writeFileSync(
+      join(sb.storeDir, "ollama-sizing.md"),
+      [
+        "---",
+        "id: ollama-model-sizing",
+        "name: Ollama Local Model Sizing Reference",
+        "description: Sizing reference",
+        "---",
+        "# Ollama Sizing",
+        "",
+      ].join("\n"),
+      "utf-8",
+    );
+
+    writeFileSync(
+      sb.memoryMd,
+      [
+        "# Memory",
+        "- [Mike](user_profile.md) — User profile",
+        "- [Ollama Bullet](ollama-sizing.md) — Sizing reference",
+        "",
+      ].join("\n"),
+      "utf-8",
+    );
+
+    // 1. Default global/--dest refresh -> idSource: "title" ("mike"), explicit id: wins ("ollama-model-sizing")
+    runRefresh({ store: sb.storeDir, dest: sb.destPath });
+    const globalWritten = JSON.parse(readFileSync(sb.destPath, "utf-8"));
+    assert.deepEqual(
+      globalWritten.entries.map((e: { id: string }) => e.id),
+      ["mike", "ollama-model-sizing"],
+    );
+
+    // 2. Default --project refresh -> idSource: "name" ("mike-user-profile-studio-model"), explicit id: still wins ("ollama-model-sizing")
+    runRefresh({ store: sb.storeDir, project: projRoot });
+    const projWritten = JSON.parse(readFileSync(projectDest(projRoot), "utf-8"));
+    assert.deepEqual(
+      projWritten.entries.map((e: { id: string }) => e.id),
+      ["mike-user-profile-studio-model", "ollama-model-sizing"],
+    );
+
+    // 3. CLI flag `--id-source` on `refresh` and `memories index` beats store `.loadout.json` setting
+    writeFileSync(join(sb.storeDir, ".loadout.json"), JSON.stringify({ idSource: "name" }), "utf-8");
+
+    // Store config says "name", so global refresh without flag uses "name"
+    dispatch(["refresh", "--store", sb.storeDir, "--dest", sb.destPath]);
+    const cfgNameWritten = JSON.parse(readFileSync(sb.destPath, "utf-8"));
+    assert.equal(cfgNameWritten.entries[0].id, "mike-user-profile-studio-model");
+
+    // CLI flag `--id-source title` beats store config `"name"` on `refresh`
+    captureLog(() =>
+      dispatch(["refresh", "--store", sb.storeDir, "--dest", sb.destPath, "--id-source", "title"]),
+    );
+    const flagTitleWritten = JSON.parse(readFileSync(sb.destPath, "utf-8"));
+    assert.equal(flagTitleWritten.entries[0].id, "mike");
+
+    // CLI flag `--id-source title` on `memories index` and `memories validate` beats store config `"name"`
+    const memIdxJson = captureLog(() =>
+      dispatch(["memories", "index", sb.memoryMd, "--id-source", "title", "--json"]),
+    );
+    assert.equal(JSON.parse(memIdxJson).index.entries[0].id, "mike");
+    assert.equal(JSON.parse(memIdxJson).index.entries[1].id, "ollama-model-sizing");
+
+    const memValJson = captureLog(() =>
+      dispatch(["memories", "validate", sb.memoryMd, "--id-source", "name", "--json"]),
+    );
+    assert.equal(JSON.parse(memValJson).valid, true);
+
+    // Invalid --id-source throws INVALID_FLAG_VALUE
+    assert.throws(
+      () => dispatch(["memories", "index", sb.memoryMd, "--id-source", "bogus"]),
+      (err: unknown) => (err as { code?: string }).code === "INVALID_FLAG_VALUE",
+    );
+  } finally {
+    sb.cleanup();
+  }
+});
+

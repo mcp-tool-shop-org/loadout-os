@@ -42,6 +42,77 @@ describe("parseFrontmatter", () => {
     assert.equal(frontmatter, null);
   });
 
+  it("falls back to kebab-case name when id is omitted and parses description and metadata (F-03)", () => {
+    const content = [
+      "---",
+      "name: udlab: understanding-dataset-lab (PRIVATE)",
+      "description: Authoritative summary from topic frontmatter",
+      "type: project",
+      "priority: core",
+      "metadata:",
+      "  loadout_role: subindex",
+      "  loadout_inject: session-start",
+      "  loadout_default_priority: manual",
+      "  stale_after_min: 60",
+      "  active: true",
+      "---",
+      "Body text",
+    ].join("\n");
+    const { frontmatter } = parseFrontmatter(content);
+    assert.ok(frontmatter, "frontmatter with name instead of id must parse");
+    assert.equal(frontmatter.id, "udlab-understanding-dataset-lab-private");
+    assert.equal(frontmatter.name, "udlab: understanding-dataset-lab (PRIVATE)");
+    assert.equal(frontmatter.description, "Authoritative summary from topic frontmatter");
+    assert.equal(frontmatter.priority, "core");
+    assert.deepEqual(frontmatter.metadata, {
+      loadout_role: "subindex",
+      loadout_inject: "session-start",
+      loadout_default_priority: "manual",
+      stale_after_min: 60,
+      active: true,
+    });
+
+    // Also cover BOM prefix, quoted scalars, top-level metadata keys, and unclosed delimiter
+    const unclosed = parseFrontmatter("---\nid: unclosed\nbody");
+    assert.equal(unclosed.frontmatter, null);
+
+    const quotedAndTopMeta = parseFrontmatter(
+      [
+        "\ufeff---",
+        'id: "quoted-id"',
+        "name: 'Single Quoted'",
+        'description: "Escaped \\"quote\\" description"',
+        "loadout_role: subindex",
+        "stale_after_min: 45",
+        "loadout_inject: true",
+        "keywords:",
+        "  - 'kw-one'",
+        '  - "kw-two"',
+        "---",
+        "Body",
+      ].join("\n"),
+    );
+    assert.ok(quotedAndTopMeta.frontmatter);
+    assert.equal(quotedAndTopMeta.frontmatter.id, "quoted-id");
+    assert.equal(quotedAndTopMeta.frontmatter.name, "Single Quoted");
+    assert.equal(quotedAndTopMeta.frontmatter.metadata?.loadout_role, "subindex");
+    assert.equal(quotedAndTopMeta.frontmatter.metadata?.stale_after_min, 45);
+    assert.equal(quotedAndTopMeta.frontmatter.metadata?.loadout_inject, true);
+
+    // Q5-1(a): slugifyName must strip apostrophes the way nameToId does
+    const withApostrophes = parseFrontmatter(
+      [
+        "---",
+        "name: Read the Tool's Own Record — Operator\u2019s Guide",
+        "description: Apostrophe test",
+        "---",
+        "Body",
+      ].join("\n"),
+    );
+    assert.ok(withApostrophes.frontmatter);
+    assert.equal(withApostrophes.frontmatter.id, "read-the-tools-own-record-operators-guide");
+  });
+
   it("defaults invalid priority to domain", () => {
     const content = "---\nid: t\nkeywords: [x]\npriority: bogus\n---\nBody";
     const { frontmatter } = parseFrontmatter(content);
@@ -106,19 +177,25 @@ describe("serializeFrontmatter", () => {
   it("round-trips correctly", () => {
     const original = {
       id: "github-actions",
+      name: "GitHub Actions",
+      description: "CI workflow rules",
       keywords: ["ci", "workflow"],
       patterns: ["ci_pipeline"],
       priority: "domain" as const,
       triggers: { task: true, plan: true, edit: false },
+      metadata: { loadout_inject: "session-start", stale_after_min: 60 },
     };
     const serialized = serializeFrontmatter(original);
     const { frontmatter } = parseFrontmatter(serialized + "\n\nBody");
     assert.ok(frontmatter);
     assert.equal(frontmatter.id, original.id);
+    assert.equal(frontmatter.name, original.name);
+    assert.equal(frontmatter.description, original.description);
     assert.deepEqual(frontmatter.keywords, original.keywords);
     assert.deepEqual(frontmatter.patterns, original.patterns);
     assert.equal(frontmatter.priority, original.priority);
     assert.deepEqual(frontmatter.triggers, original.triggers);
+    assert.deepEqual(frontmatter.metadata, original.metadata);
   });
 
   it("omits empty patterns", () => {

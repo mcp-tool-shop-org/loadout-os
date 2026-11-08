@@ -35,6 +35,8 @@ import {
   validateMemoryIndex,
   generateStats,
   formatStats,
+  syncSummaries,
+  placeOrMoveEntry,
 } from "@mcptoolshop/claude-memories";
 
 // rules
@@ -83,6 +85,7 @@ import {
   flagValue as flag,
   positionalArgs,
 } from "./console.js";
+import { parseIdSourceFlag } from "./refresh.js";
 
 // ── Shared loaders ─────────────────────────────────────────────
 
@@ -124,16 +127,34 @@ function loadKernelIndex(path: string): LoadoutIndex {
 }
 
 // ══════════════════════════════════════════════════════════════
-// memories <index|validate|stats|health>
+// memories <index|validate|stats|health|sync-summaries|place|move>
 // ══════════════════════════════════════════════════════════════
 
+const MEMORIES_VALUE_FLAGS = new Set(["max-lines", "max-bytes", "id-source", "store", "into"]);
+
+function memoriesPositionalArgs(args: string[]): string[] {
+  const out: string[] = [];
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (a.startsWith("--")) {
+      const flagName = a.slice(2);
+      if (MEMORIES_VALUE_FLAGS.has(flagName) && i + 1 < args.length && !args[i + 1].startsWith("--")) {
+        i++;
+      }
+      continue;
+    }
+    out.push(a);
+  }
+  return out;
+}
+
 function memoriesPath(args: string[]): string {
-  const pos = positionalArgs(args);
+  const pos = memoriesPositionalArgs(args);
   if (pos.length === 0) {
     fail(
       "MISSING_ARG",
       "A path to MEMORY.md is required",
-      "Usage: loadout-os memories <index|validate|stats|health> <MEMORY.md>",
+      "Usage: loadout-os memories <index|validate|stats|health|sync-summaries> <MEMORY.md>",
     );
   }
   return requireFile(pos[0], "MEMORY.md");
@@ -143,9 +164,10 @@ export function memoriesIndex(args: string[]): void {
   const file = memoriesPath(args);
   const json = hasFlag(args, "json");
   const lazyLoad = hasFlag(args, "lazy");
+  const idSource = parseIdSourceFlag(args);
 
   const analysis = analyzeMemoryMd(file);
-  const index = generateMemoryIndex(analysis, { lazyLoad });
+  const index = generateMemoryIndex(analysis, { lazyLoad, idSource });
   const issues = validateMemoryIndex(index);
 
   if (json) {
@@ -173,10 +195,19 @@ export function memoriesIndex(args: string[]): void {
 export function memoriesValidate(args: string[]): void {
   const file = memoriesPath(args);
   const json = hasFlag(args, "json");
+  const idSource = parseIdSourceFlag(args);
+  const maxLinesStr = flag(args, "max-lines");
+  const maxBytesStr = flag(args, "max-bytes");
+  const maxLines = maxLinesStr !== undefined ? Number(maxLinesStr) : undefined;
+  const maxBytes = maxBytesStr !== undefined ? Number(maxBytesStr) : undefined;
 
   const analysis = analyzeMemoryMd(file);
-  const memoryIssues = validateMemory(analysis);
-  const index = generateMemoryIndex(analysis);
+  const memoryIssues = validateMemory(analysis, {
+    ...(Number.isFinite(maxLines) ? { maxLines } : {}),
+    ...(Number.isFinite(maxBytes) ? { maxBytes } : {}),
+    ...(idSource ? { idSource } : {}),
+  });
+  const index = generateMemoryIndex(analysis, { idSource });
   const indexIssues = validateMemoryIndex(index);
   const all = [...memoryIssues, ...indexIssues];
   const errors = all.filter((i) => i.severity === "error");
@@ -217,8 +248,9 @@ export function memoriesValidate(args: string[]): void {
 export function memoriesStats(args: string[]): void {
   const file = memoriesPath(args);
   const json = hasFlag(args, "json");
+  const idSource = parseIdSourceFlag(args);
   const analysis = analyzeMemoryMd(file);
-  const index = generateMemoryIndex(analysis);
+  const index = generateMemoryIndex(analysis, { idSource });
   const stats = generateStats(analysis, index);
   if (json) {
     log(JSON.stringify(stats, null, 2));
@@ -230,10 +262,11 @@ export function memoriesStats(args: string[]): void {
 }
 
 export function memoriesHealth(args: string[]): void {
+  parseIdSourceFlag(args);
   const json = hasFlag(args, "json");
   const nodeMajor = parseInt(process.version.slice(1), 10);
   const nodeOk = nodeMajor >= 20;
-  const pos = positionalArgs(args);
+  const pos = memoriesPositionalArgs(args);
 
   const checked: { label: string; path: string; found: boolean }[] = [];
   if (pos.length > 0) {
@@ -264,6 +297,107 @@ export function memoriesHealth(args: string[]): void {
   if (!found) warn("No MEMORY.md detected. Provide a path when running commands.");
   log("");
   if (!nodeOk) fail("NODE_TOO_OLD", `Node ${process.version} < 20`, undefined, 1);
+}
+
+export function memoriesSyncSummaries(args: string[]): void {
+  parseIdSourceFlag(args);
+  const file = memoriesPath(args);
+  const fix = hasFlag(args, "fix");
+  const json = hasFlag(args, "json");
+
+  const result = syncSummaries(file, { fix });
+
+  if (json) {
+    log(JSON.stringify(result, null, 2));
+    if (!fix && result.changes.length > 0) {
+      fail("STALE_SUMMARIES", `${result.changes.length} stale summary line(s)`, undefined, 1);
+    }
+    return;
+  }
+
+  log(`\n${BOLD}loadout-os memories sync-summaries${RESET} ${DIM}(${file})${RESET}\n`);
+  if (result.changes.length === 0) {
+    ok("All index bullet summaries match their frontmatter descriptions.");
+    log("");
+    return;
+  }
+
+  for (const c of result.changes) {
+    if (fix) {
+      ok(`${c.indexFile}:${c.line} synced (${c.refPath})`);
+    } else {
+      warn(`${c.indexFile}:${c.line} stale summary for ${c.refPath}`);
+    }
+  }
+  log("");
+  if (!fix) {
+    fail(
+      "STALE_SUMMARIES",
+      `${result.changes.length} stale summary line(s) found`,
+      "Re-run with --fix to rewrite index bullets from frontmatter descriptions.",
+      1,
+    );
+  }
+}
+
+function memoriesPlaceOrMove(args: string[], action: "place" | "move"): void {
+  parseIdSourceFlag(args);
+  const json = hasFlag(args, "json");
+  const storeOpt = flag(args, "store");
+  const intoOpt = flag(args, "into");
+
+  const pos = memoriesPositionalArgs(args);
+
+  if (pos.length < 1 || (!intoOpt && pos.length < 2)) {
+    fail(
+      "MISSING_ARG",
+      `Usage: loadout-os memories ${action} <file> <index> [--store <dir>]`,
+      `Provide the topic file and target index (e.g. 'main' or 'index-archive.md').`,
+    );
+  }
+
+  const rawTopic = pos[0];
+  const targetIndex = intoOpt ?? pos[1];
+  const resolvedTopicMaybe = resolve(rawTopic);
+  const storeDir = storeOpt
+    ? resolve(storeOpt)
+    : existsSync(resolvedTopicMaybe)
+      ? dirname(resolvedTopicMaybe)
+      : process.cwd();
+
+  try {
+    const res = placeOrMoveEntry({
+      storeDir,
+      topicFile: rawTopic,
+      targetIndex,
+      action,
+    });
+    if (json) {
+      log(JSON.stringify(res, null, 2));
+      return;
+    }
+    log(`\n${BOLD}loadout-os memories ${action}${RESET}\n`);
+    if (res.removedFrom.length > 0) {
+      info(`Removed previous reference from: ${res.removedFrom.join(", ")}`);
+    }
+    ok(`${action === "move" ? "Moved" : "Placed"} ${res.topicFile} → ${res.targetIndex}`);
+    log(`  ${DIM}${res.bullet}${RESET}\n`);
+  } catch (err) {
+    fail(
+      "PLACE_MOVE_FAILED",
+      err instanceof Error ? err.message : String(err),
+      undefined,
+      1,
+    );
+  }
+}
+
+export function memoriesPlace(args: string[]): void {
+  memoriesPlaceOrMove(args, "place");
+}
+
+export function memoriesMove(args: string[]): void {
+  memoriesPlaceOrMove(args, "move");
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -385,19 +519,6 @@ export function rulesStats(args: string[]): void {
   log("");
 }
 
-/**
- * Resolve the absolute path to the `claude-rules` bin.
- *
- * NOTE: `rules split` no longer spawns this bin — it runs IN-PROCESS (see
- * `rulesSplit`/`runSplit`) so the bundled global install is self-contained.
- * This resolver + `buildSplitArgv` are retained as a workspace-only escape
- * hatch (the bin exists when running from the monorepo) and because the split
- * test suite asserts on them. Resolution is via the package's exported
- * package.json — the only subpath the package's `exports` map exposes — then
- * `bin.claude-rules` joined against the package dir. Returns null when the
- * package (or its built bin) is absent — which is the normal case in a bundled
- * global install, where there is no node_modules `@mcptoolshop/*` at all.
- */
 export function resolveRulesBin(): string | null {
   try {
     const req = createRequire(import.meta.url);
@@ -415,17 +536,10 @@ export function resolveRulesBin(): string | null {
   }
 }
 
-/**
- * Build the argv for the subprocess passthrough: `node <rules-bin> split <args>`.
- * Pure + exported so a test can assert the argv is constructed correctly
- * (right bin, the literal "split", forwarded user args) WITHOUT spawning the
- * interactive readline prompt.
- */
 export function buildSplitArgv(rulesBin: string, args: string[]): string[] {
   return [rulesBin, "split", ...args];
 }
 
-/** Readline Y/n/skip confirm. Isolated so the split loop reads cleanly. */
 function confirm(question: string): Promise<string> {
   const rl = createInterface({ input: process.stdin, output: process.stdout });
   return new Promise((res) => {
@@ -436,31 +550,6 @@ function confirm(question: string): Promise<string> {
   });
 }
 
-/**
- * `rules split` — runs the CLAUDE.md → topic-files extraction IN-PROCESS.
- *
- * Why in-process (not a subprocess passthrough): the published loadout-os is a
- * single self-contained bundle with NO `@mcptoolshop/*` packages on disk, so
- * there is no `claude-rules` bin to spawn in a global install. We instead drive
- * the split with the rules library's exported pure generators
- * (`analyzeFile` → `generateRuleFile`/`generateIndex`/`generateClaudeMd`) and a
- * `node:readline` confirm loop — the same flow the standalone bin runs, but
- * bundled into our process. This keeps the one-process / one-arg-parser /
- * one-error-shape contract and works identically whether installed globally or
- * run from the workspace.
- *
- * Flags forwarded: [CLAUDE.md] --rules-dir <dir> --lazy --dry-run --yes --signals <p> --memory.
- *
- * Standards compliance (workflow-standards.md):
- *   NAMED_COMPENSATORS 3 — every accepted write is staged in a temp dir first;
- *     CLAUDE.md is backed up to CLAUDE.md.bak before being overwritten (the
- *     named undo: `mv CLAUDE.md.bak CLAUDE.md`). On any staged-copy failure we
- *     stop and leave originals intact. --dry-run performs zero writes.
- *   UNCERTAINTY_GATED_HUMANS 3 — a Y/n/skip checkpoint gates EACH extraction
- *     (skipped under --yes/--dry-run by explicit user intent).
- *   EXTERNAL_VERIFIER 2 — extraction logic is the rules library's, not
- *     re-implemented here; we only render + confirm + write.
- */
 export function rulesSplit(args: string[]): void {
   void runSplit(args).catch((err) => {
     fail("RULES_SPLIT_FAILED", `split failed: ${(err as Error).message}`);
@@ -468,9 +557,6 @@ export function rulesSplit(args: string[]): void {
 }
 
 async function runSplit(args: string[]): Promise<void> {
-  // positionalArgs() here filters out --flags but NOT space-separated flag
-  // VALUES; resolveClaudeMd only reads index 0, and our surfaces always put the
-  // CLAUDE.md path FIRST (before any flag), so pos[0] is unambiguous.
   const filePath = resolveClaudeMd(positionalArgs(args));
   const lazyLoad = hasFlag(args, "lazy");
   const rulesDir = flag(args, "rules-dir") ?? (lazyLoad ? ".claude/loadout" : ".claude/rules");
@@ -583,7 +669,6 @@ async function runSplit(args: string[]): Promise<void> {
     for (let i = 0; i < writes.length; i++) {
       writeFileSync(join(stagingDir, `file-${i}`), writes[i].content, "utf8");
     }
-    // COMPENSATOR: back up CLAUDE.md before overwrite (undo: mv CLAUDE.md.bak CLAUDE.md).
     const backupPath = resolve(dirname(filePath), "CLAUDE.md.bak");
     copyFileSync(filePath, backupPath);
     info(`Backed up ${relative(process.cwd(), filePath)} → CLAUDE.md.bak`);

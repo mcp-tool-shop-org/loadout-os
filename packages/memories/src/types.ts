@@ -22,6 +22,9 @@ export { DEFAULT_TRIGGERS } from "@mcptoolshop/ai-loadout";
 
 // ── Memory-specific types ──────────────────────────────────────
 
+/** Source for entry IDs when a topic file's frontmatter has no explicit `id:` field. */
+export type IdSource = "title" | "name";
+
 /** A detected section in MEMORY.md */
 export interface MemorySection {
   heading: string;       // e.g. "Active", "Products", "Workflows"
@@ -31,12 +34,15 @@ export interface MemorySection {
   endLine: number;
 }
 
-/** A single reference parsed from MEMORY.md */
+/** A single reference parsed from MEMORY.md or a linked sub-index */
 export interface MemoryRef {
   name: string;          // e.g. "AI Loadout"
   description: string;   // e.g. "routing core for agent knowledge packs (v1.0.3)"
   path: string;          // e.g. "memory/ai-loadout.md"
-  line: number;          // source line in MEMORY.md
+  line: number;          // source line in MEMORY.md or sub-index
+  subindex?: boolean;    // true when parsed from a sub-index file rather than MEMORY.md
+  subindexPath?: string; // relative path of the sub-index file
+  defaultPriority?: import("@mcptoolshop/ai-loadout").Priority; // sub-index default priority (e.g. manual for archive)
 }
 
 /**
@@ -64,7 +70,8 @@ export interface MemoryAnalysis {
   filePath: string;
   sections: MemorySection[];
   refs: MemoryRef[];
-  orphanFiles: string[];     // topic files not referenced in MEMORY.md (derived view of diagnostics)
+  subindexFiles?: string[];  // sub-index files linked from MEMORY.md (not emitted as entries)
+  orphanFiles: string[];     // topic files not referenced in MEMORY.md or sub-indexes (derived view of diagnostics)
   missingFiles: string[];    // referenced paths that don't exist on disk (derived view of diagnostics)
   diagnostics: Diagnostic[]; // FT-MR3: structured signals (back-compat superset of the flat arrays)
   totalTokens: number;

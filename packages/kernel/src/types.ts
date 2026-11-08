@@ -23,6 +23,8 @@ export interface LoadoutEntry {
   triggers: Triggers;
   tokens_est: number;    // estimated tokens (chars / 4)
   lines: number;         // line count of the payload file
+  metadata?: Record<string, string | number | boolean>; // optional arbitrary frontmatter metadata
+  subindex?: boolean;    // true when sourced from a linked sub-index rather than top-level MEMORY.md
 }
 
 // ── Budget model ───────────────────────────────────────────────
@@ -41,6 +43,7 @@ export type LoadMode = "eager" | "lazy" | "manual";
 export interface LoadoutIndex {
   version: string;
   generated: string;    // ISO 8601
+  source?: string;      // optional path to source MEMORY.md / store
   entries: LoadoutEntry[];
   budget: Budget;
   lazyLoad?: boolean;   // when true, payloads are not pre-loaded
@@ -49,10 +52,13 @@ export interface LoadoutIndex {
 // ── Frontmatter parsed from a payload file ─────────────────────
 export interface Frontmatter {
   id: string;
+  name?: string;
+  description?: string;
   keywords: string[];
   patterns: string[];
   priority: Priority;
   triggers: Triggers;
+  metadata?: Record<string, string | number | boolean>;
 }
 
 // ── Score components (matcher transparency) ────────────────────
@@ -87,6 +93,7 @@ export interface UsageEvent {
   mode: LoadMode;         // eager, lazy, or manual
   tokensEst: number;      // estimated token cost
   sourceLayer?: string;   // which hierarchy layer (future: global/org/project/task)
+  layer?: "global" | "project"; // which layer supplied this entry in hook execution
 }
 
 // ── Merge semantics ───────────────────────────────────────────

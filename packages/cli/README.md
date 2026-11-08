@@ -9,9 +9,9 @@ to be a multi-step manual sequence.
 It wraps:
 
 - **kernel** — [`@mcptoolshop/ai-loadout`](../kernel) — the knowledge router (resolve / match / budget / usage analysis)
-- **memories** — [`@mcptoolshop/claude-memories`](../memories) — MEMORY.md → dispatch index
+- **memories** — [`@mcptoolshop/claude-memories`](../memories) — MEMORY.md + sub-indexes → dispatch index
 - **rules** — [`@mcptoolshop/claude-rules`](../rules) — CLAUDE.md section analysis + rule-file linting
-- the **runtime hook** — [`apps/hook/loadout-hook.mjs`](../../apps/hook) — the `UserPromptSubmit` pointer-injector
+- the **runtime hooks** — [`apps/hook/loadout-hook.mjs`](../../apps/hook) + `loadout-os hook <session-start|pre-compact|post-write>`
 
 Every wrapped surface calls the library export directly (one process, one arg
 parser, one structured-error shape) — `loadout-os` does not shell out to the
@@ -22,10 +22,13 @@ legacy `ai-loadout` / `claude-memories` / `claude-rules` bins.
 ### Namespaces (wrapped library surfaces)
 
 ```
-loadout-os memories index    <MEMORY.md> [--lazy] [--json]
-loadout-os memories validate <MEMORY.md> [--json]
-loadout-os memories stats    <MEMORY.md> [--json]
-loadout-os memories health   [path] [--json]
+loadout-os memories index          <MEMORY.md> [--id-source title|name] [--lazy] [--json]
+loadout-os memories validate       <MEMORY.md> [--id-source title|name] [--max-lines <n>] [--max-bytes <n>] [--json]
+loadout-os memories stats          <MEMORY.md> [--id-source title|name] [--json]
+loadout-os memories health         [path] [--json]
+loadout-os memories sync-summaries <MEMORY.md> [--fix] [--json]
+loadout-os memories place          <topic.md> <index> [--store <dir>] [--into <index>] [--json]
+loadout-os memories move           <topic.md> <index> [--store <dir>] [--into <index>] [--json]
 
 loadout-os rules analyze  <CLAUDE.md> [--rules-dir <dir>] [--json]
 loadout-os rules validate [--rules-dir <dir>] [--lazy] [--repo-root <dir>] [--json]
@@ -49,13 +52,16 @@ loadout-os validate <index>         # validate index STRUCTURE (kernel)
 > kernel's index-structure validator. The store/rules linters are namespaced —
 > `memories validate <MEMORY.md>` and `rules validate` — so all three coexist.
 
-### Rituals
+### Rituals & Hooks
 
 ```
 loadout-os doctor [--json]                    # read-only health screen
 loadout-os report [--index <p>] [--jsonl <p>] # observability over usage.jsonl
 loadout-os hook test [--prompt "<text>"]      # drive the runtime hook on a sample prompt
-loadout-os refresh [--store <d>] [--dest <p>] [--dry-run]   # index → validate → publish
+loadout-os hook session-start [--project <r>] [--user-prompt-submit]
+loadout-os hook pre-compact   [--project <r>]
+loadout-os hook post-write    [--project <r>] [--snapshot-repo <d>] [--mirror-repo <b>] [--fix]
+loadout-os refresh [--store <d>] [--dest <p>] [--project <r>] [--id-source title|name] [--snapshot-repo <d>] [--mirror-repo <b>] [--fix] [--dry-run]
 ```
 
 - **`doctor`** — one read-only screen: store `MEMORY.md` validates, the global
@@ -69,11 +75,23 @@ loadout-os refresh [--store <d>] [--dest <p>] [--dry-run]   # index → validate
   machine-readable shape. Exit 2 when an input is missing. **Read-only.**
 - **`hook test`** — runs the real `loadout-hook.mjs` against a sample prompt in an
   isolated HOME so the live `usage.jsonl` is never written.
+- **`hook session-start`** — `SessionStart` hook that prints every `core` entry
+  marked `metadata.loadout_inject: session-start` in full as UTF-8 under a file
+  header, enforces line/byte caps with a visible truncation note, checks
+  `metadata.stale_after_min`, and auto-refreshes if any `<store>/*.md` is newer
+  than the project `index.json` (catching shell edits that skip `PostToolUse`).
+  Pass `--user-prompt-submit` to emit only the stale warning.
+- **`hook pre-compact`** — `PreCompact` hook that warns on stdout when the
+  session-start board is older than `stale_after_min` before compaction.
+- **`hook post-write`** — `PostToolUse` hook for `Write`/`Edit`: validates and
+  refreshes the project index when the edited file is inside the memory store
+  (resolved via `index.source`). Exits `2` on any failure (for `asyncRewake`)
+  and `0` silently otherwise.
 - **`refresh`** — folds the Index Freshness Ritual into one command: regenerate the
   store index → validate (andon halt on any error) → rewrite relative paths to
-  absolute + publish to `~/.ai-loadout/index.json`. The irreversible write is guarded
-  by a `.bak` named compensator (restored on failure, undo line printed); `--dry-run`
-  previews without writing. Exit `1` on validation/write failure, `2` on a missing store.
+  absolute + publish to `~/.ai-loadout/index.json` (or `<project>/.claude/loadout/index.json`
+  when `--project <root>` is passed), serialized under an OS file lock. Supports
+  optional `--snapshot-repo <dir>` and `--mirror-repo <bare>` git snapshots.
 
 ## Build & test
 
@@ -87,5 +105,5 @@ npm run verify   # tsc --noEmit && node --test dist/tests/*.test.js
 
 Importing the package is side-effect-free — the dispatcher only runs when the
 file is the process entrypoint. Composable exports: `dispatch`, `runDoctor` /
-`buildReport` / `runHookTest` (and their `print*` renderers + `default*Paths`
-helpers).
+`buildReport` / `runHookTest` / `runSessionStart` / `runPostWrite` (and their
+`print*` renderers + `default*Paths` helpers).
