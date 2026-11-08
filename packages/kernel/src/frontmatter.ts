@@ -12,12 +12,23 @@ import { DEFAULT_TRIGGERS } from "./types.js";
 const VALID_PRIORITIES = new Set<string>(["core", "domain", "manual"]);
 
 function slugifyName(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, "")
-    .trim()
-    .replace(/\s+/g, "-")
-    .replace(/-+/g, "-");
+  const parts: string[] = [];
+  let current = "";
+  const lower = name.toLowerCase();
+  for (let i = 0; i < lower.length; i++) {
+    const code = lower.charCodeAt(i);
+    const isAlphaNum = (code >= 97 && code <= 122) || (code >= 48 && code <= 57);
+    if (isAlphaNum) {
+      current += lower[i];
+    } else if (current.length > 0) {
+      parts.push(current);
+      current = "";
+    }
+  }
+  if (current.length > 0) {
+    parts.push(current);
+  }
+  return parts.join("-");
 }
 
 function unquoteScalar(rawVal: string): string {

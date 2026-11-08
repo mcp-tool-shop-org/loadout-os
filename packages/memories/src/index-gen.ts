@@ -139,6 +139,26 @@ function truncateSummary(summary: string): string {
   return summary.slice(0, MAX_SUMMARY);
 }
 
+function toUnderscorePattern(text: string): string {
+  const parts: string[] = [];
+  let current = "";
+  const lower = text.toLowerCase();
+  for (let i = 0; i < lower.length; i++) {
+    const code = lower.charCodeAt(i);
+    const isAlphaNum = (code >= 97 && code <= 122) || (code >= 48 && code <= 57);
+    if (isAlphaNum) {
+      current += lower[i];
+    } else if (current.length > 0) {
+      parts.push(current);
+      current = "";
+    }
+  }
+  if (current.length > 0) {
+    parts.push(current);
+  }
+  return parts.join("_");
+}
+
 /**
  * Build distinct patterns from the file stem and entry id so 1–2 exact technical
  * tokens (e.g. "udlab", "whea", "buttondown") gain patternBonus (+0.2) and clear
@@ -146,14 +166,9 @@ function truncateSummary(summary: string): string {
  */
 function deriveStemPatterns(id: string, storePath: string, existingPatterns: string[]): string[] {
   if (existingPatterns.length > 0) return existingPatterns;
-  const stem = basename(storePath).replace(/\.md$/i, "").toLowerCase();
-  const stemPattern = stem
-    .replace(/[^a-z0-9]+/g, "_")
-    .replace(/^_+|_+$/g, "");
-  const idPattern = id
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "_")
-    .replace(/^_+|_+$/g, "");
+  const stem = basename(storePath).replace(/\.md$/i, "");
+  const stemPattern = toUnderscorePattern(stem);
+  const idPattern = toUnderscorePattern(id);
   const out = new Set<string>();
   if (stemPattern && stemPattern.length > 2) out.add(stemPattern);
   if (idPattern && idPattern.length > 2) out.add(idPattern);

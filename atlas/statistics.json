@@ -44,12 +44,12 @@
         "importsAndCoChanges": [],
         "importsOnly": []
       },
-      "cohesion": null,
+      "cohesion": 1,
       "cohesionDropped": false,
       "confidence": "low",
       "highWater": null,
       "name": "cli",
-      "qualifyingSourceCommits": 10,
+      "qualifyingSourceCommits": 11,
       "rebaseline": null
     },
     {
@@ -99,12 +99,12 @@
           "cli"
         ]
       },
-      "cohesion": null,
+      "cohesion": 1,
       "cohesionDropped": false,
       "confidence": "low",
       "highWater": null,
       "name": "memories",
-      "qualifyingSourceCommits": 8,
+      "qualifyingSourceCommits": 9,
       "rebaseline": null
     },
     {
@@ -187,8 +187,8 @@
         "path": ".gitignore"
       },
       {
-        "commits": 5,
-        "lines": 150,
+        "commits": 6,
+        "lines": 198,
         "path": "CHANGELOG.md"
       },
       {
@@ -222,8 +222,8 @@
         "path": "README.ja.md"
       },
       {
-        "commits": 11,
-        "lines": 170,
+        "commits": 12,
+        "lines": 277,
         "path": "README.md"
       },
       {
@@ -272,13 +272,13 @@
         "path": "apps/hook/package.json"
       },
       {
-        "commits": 3,
-        "lines": 160,
+        "commits": 4,
+        "lines": 202,
         "path": "apps/hook/smoke-test.ps1"
       },
       {
-        "commits": 4,
-        "lines": 320,
+        "commits": 5,
+        "lines": 350,
         "path": "atlas/README.md"
       },
       {
@@ -287,18 +287,18 @@
         "path": "atlas/boundaries.yaml"
       },
       {
-        "commits": 4,
-        "lines": 1422,
+        "commits": 5,
+        "lines": 1528,
         "path": "atlas/page.json"
       },
       {
-        "commits": 4,
-        "lines": 4490,
+        "commits": 5,
+        "lines": 4699,
         "path": "atlas/statistics.json"
       },
       {
-        "commits": 4,
-        "lines": 20504,
+        "commits": 5,
+        "lines": 21198,
         "path": "atlas/structure.json"
       },
       {
@@ -332,8 +332,8 @@
         "path": "packages/cli/LICENSE"
       },
       {
-        "commits": 3,
-        "lines": 101,
+        "commits": 4,
+        "lines": 145,
         "path": "packages/cli/README.md"
       },
       {
@@ -372,8 +372,8 @@
         "path": "packages/cli/src/help.ts"
       },
       {
-        "commits": 4,
-        "lines": 777,
+        "commits": 5,
+        "lines": 779,
         "path": "packages/cli/src/hook.ts"
       },
       {
@@ -417,13 +417,13 @@
         "path": "packages/cli/src/tests/help.test.ts"
       },
       {
-        "commits": 4,
-        "lines": 1147,
+        "commits": 5,
+        "lines": 1176,
         "path": "packages/cli/src/tests/hook.test.ts"
       },
       {
-        "commits": 3,
-        "lines": 418,
+        "commits": 4,
+        "lines": 589,
         "path": "packages/cli/src/tests/refresh.test.ts"
       },
       {
@@ -1537,8 +1537,8 @@
         "path": "packages/memories/src/tests/health.test.ts"
       },
       {
-        "commits": 5,
-        "lines": 527,
+        "commits": 6,
+        "lines": 570,
         "path": "packages/memories/src/tests/index-gen.test.ts"
       },
       {
@@ -2097,8 +2097,8 @@
         "path": "site/src/content.config.ts"
       },
       {
-        "commits": 2,
-        "lines": 76,
+        "commits": 3,
+        "lines": 146,
         "path": "site/src/content/docs/handbook/architecture.md"
       },
       {
@@ -2122,8 +2122,8 @@
         "path": "site/src/content/docs/handbook/reference.md"
       },
       {
-        "commits": 1,
-        "lines": 74,
+        "commits": 2,
+        "lines": 188,
         "path": "site/src/content/docs/handbook/rituals.md"
       },
       {
@@ -2162,11 +2162,26 @@
     "level": "low",
     "reason": "fewer than 25 source files reach 10 revisions in the window"
   },
-  "generatedAt": "2026-11-08T12:52:27.028Z",
+  "generatedAt": "2026-11-08T13:05:05.600Z",
   "generatedFrom": {
-    "commit": "f2fd5992daa9f3521f9e1f648968f03e6e5f8b08"
+    "commit": "e522fa11bf75804124da8a0a41fec27cf0f5ff59"
   },
-  "pairs": [],
+  "pairs": [
+    {
+      "a": "packages/cli/src/hook.ts",
+      "b": "packages/cli/src/tests/hook.test.ts",
+      "either": 6,
+      "shared": 4,
+      "strength": 0.666667
+    },
+    {
+      "a": "packages/memories/src/index-gen.ts",
+      "b": "packages/memories/src/tests/index-gen.test.ts",
+      "either": 6,
+      "shared": 4,
+      "strength": 0.666667
+    }
+  ],
   "parameters": {
     "appliedChangesetLimit": 50,
     "changeset": 50,
@@ -2177,16 +2192,16 @@
     "floor": "fallen",
     "floorHeld": false,
     "floorTrigger": "revision-depth",
-    "headDate": "2026-11-08T07:08:44-05:00",
+    "headDate": "2026-11-08T07:53:52-05:00",
     "inScopeFiles": 388,
     "pinnedStart": null,
     "priorFloor": "fallen",
-    "qualifyingCommits": 44,
+    "qualifyingCommits": 45,
     "qualifyingMinimum": 30,
     "revisions": 5,
     "shared": 10,
     "sharedFloorUsed": 3,
-    "since": "2026-05-12T12:08:44.000Z",
+    "since": "2026-05-12T12:53:52.000Z",
     "sourceExtensions": [
       ".js",
       ".mjs",

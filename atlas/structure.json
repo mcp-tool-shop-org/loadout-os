@@ -367,20 +367,20 @@
             {
               "in": "parsePostToolUsePayload",
               "kind": "catch",
-              "line": 628
+              "line": 638
             },
             {
               "in": "runPostWrite",
               "kind": "catch",
-              "line": 683
+              "line": 693
             },
             {
               "in": "runPostWrite",
               "kind": "catch",
-              "line": 710
+              "line": 720
             }
           ],
-          "hash": "9290436b4b54d620283e26715ab05e1371b610e7bbcb40e35f96fb46bf6cc364",
+          "hash": "ac467d3e270706b11306963683e030675b50256915de8dc3078b3ebb0666b592",
           "importOrder": [
             "packages/kernel/src/index.ts",
             "packages/cli/src/console.ts",
@@ -660,7 +660,7 @@
           "testFramework": "node --test"
         },
         {
-          "hash": "1a891504ca38589b6a6287bc0e785e296477c30fb4c04640d9456edc6dd33667",
+          "hash": "ebd9b7e48f2cfccf3a7d0fde6e8ce90548d15adb6f73ecf906708ddebc20e829",
           "importOrder": [
             "packages/cli/src/refresh.ts",
             "packages/cli/src/cli.ts",
@@ -1619,7 +1619,7 @@
             "parseFrontmatter",
             "serializeFrontmatter"
           ],
-          "hash": "38e4fae6f5d3403c6c4e244fdf872a08e9e81c680b45cbab2d79bd0fc577547e",
+          "hash": "96c7fdf2af65c241dbf6fcc859ab6f596e34244d84e2bb0f96f351b5e1c9d519",
           "importsFiles": [
             "packages/kernel/src/types.ts"
           ],
@@ -1764,7 +1764,7 @@
           "testFramework": "node --test"
         },
         {
-          "hash": "0c07e2f75736bd9067a3e691aa5156cfe813f390643970d0cef1faa4ef53f108",
+          "hash": "aa035f4d94a6aa36617856a7641b41d56ecccbb0062abeb714952a5798e66c60",
           "importsFiles": [
             "packages/kernel/src/frontmatter.ts",
             "packages/kernel/src/types.ts"
@@ -2528,7 +2528,7 @@
                       }
                     },
                     {
-                      "line": 176,
+                      "line": 191,
                       "name": "extractKeywords",
                       "target": {
                         "file": "packages/memories/src/analyze.ts"
@@ -2536,7 +2536,7 @@
                       "via": "entryFromFrontmatter"
                     },
                     {
-                      "line": 202,
+                      "line": 217,
                       "name": "estimateTokens",
                       "target": {
                         "file": "packages/kernel/src/index.ts"
@@ -2544,7 +2544,7 @@
                       "via": "entryFromFrontmatter"
                     },
                     {
-                      "line": 215,
+                      "line": 230,
                       "name": "extractKeywords",
                       "target": {
                         "file": "packages/memories/src/analyze.ts"
@@ -2552,7 +2552,7 @@
                       "via": "entryFromContent"
                     },
                     {
-                      "line": 230,
+                      "line": 245,
                       "name": "estimateTokens",
                       "target": {
                         "file": "packages/kernel/src/index.ts"
@@ -2700,7 +2700,7 @@
             "generateIndex",
             "nameToId"
           ],
-          "hash": "5af93e80b5baaca3fe22c72931b2fab51e0e4610bca02b5fc827d98f98bdebca",
+          "hash": "adbe9f88e67d1999c4226e5d961f159fc4d40b91446f7ad41a0451b61ed522dc",
           "importsFiles": [
             "packages/kernel/src/index.ts",
             "packages/memories/src/analyze.ts",
@@ -2748,7 +2748,7 @@
                   }
                 },
                 {
-                  "line": 176,
+                  "line": 191,
                   "name": "extractKeywords",
                   "target": {
                     "file": "packages/memories/src/analyze.ts"
@@ -2756,7 +2756,7 @@
                   "via": "entryFromFrontmatter"
                 },
                 {
-                  "line": 202,
+                  "line": 217,
                   "name": "estimateTokens",
                   "target": {
                     "file": "packages/kernel/src/index.ts"
@@ -2764,7 +2764,7 @@
                   "via": "entryFromFrontmatter"
                 },
                 {
-                  "line": 215,
+                  "line": 230,
                   "name": "extractKeywords",
                   "target": {
                     "file": "packages/memories/src/analyze.ts"
@@ -2772,7 +2772,7 @@
                   "via": "entryFromContent"
                 },
                 {
-                  "line": 230,
+                  "line": 245,
                   "name": "estimateTokens",
                   "target": {
                     "file": "packages/kernel/src/index.ts"
@@ -2788,14 +2788,14 @@
             {
               "calls": [
                 {
-                  "line": 176,
+                  "line": 191,
                   "name": "extractKeywords",
                   "target": {
                     "file": "packages/memories/src/analyze.ts"
                   }
                 },
                 {
-                  "line": 202,
+                  "line": 217,
                   "name": "estimateTokens",
                   "target": {
                     "file": "packages/kernel/src/index.ts"
@@ -2810,14 +2810,14 @@
             {
               "calls": [
                 {
-                  "line": 215,
+                  "line": 230,
                   "name": "extractKeywords",
                   "target": {
                     "file": "packages/memories/src/analyze.ts"
                   }
                 },
                 {
-                  "line": 230,
+                  "line": 245,
                   "name": "estimateTokens",
                   "target": {
                     "file": "packages/kernel/src/index.ts"
@@ -2899,45 +2899,45 @@
             {
               "in": "syncSummaries",
               "kind": "catch",
-              "line": 109
+              "line": 123
             },
             {
               "in": "syncSummaries",
               "kind": "catch",
-              "line": 128
+              "line": 142
             },
             {
               "in": "resolveTargetIndexFile",
               "kind": "throw",
-              "line": 179
+              "line": 193
             },
             {
               "in": "placeOrMoveEntry",
               "kind": "throw",
-              "line": 216
+              "line": 230
             },
             {
               "in": "placeOrMoveEntry",
               "kind": "throw",
-              "line": 221
+              "line": 235
             },
             {
               "in": "placeOrMoveEntry",
               "kind": "throw",
-              "line": 226
+              "line": 240
             },
             {
               "in": "placeOrMoveEntry",
               "kind": "throw",
-              "line": 231
+              "line": 245
             },
             {
               "in": "placeOrMoveEntry",
               "kind": "catch",
-              "line": 252
+              "line": 266
             }
           ],
-          "hash": "48e9349e9b64b40275f3f0977e78db1d53294d7af3d6b107ac4149d03eeb4bbd",
+          "hash": "dc10ce655d85c343236ae2b32565d5ff5a88fd28e592f0a7d64044c0068035b9",
           "importOrder": [
             "packages/kernel/src/index.ts",
             "packages/memories/src/parser.ts",
@@ -3317,11 +3317,11 @@
           "path": "logo.png"
         },
         {
-          "hash": "7d23797e79f4e361d95c914260b7768ec9dec94aed0c700538ea29a1121178b6",
+          "hash": "2e22f14a8688c8018aa27fd9f4967bc30409b1372432518f4d95e6b465d99717",
           "path": "package-lock.json"
         },
         {
-          "hash": "6b0b55ec14991e9c6c43310224ffc181e380890cab07ca70f85070e8d162667e",
+          "hash": "0c6481ba7c3bc5be7405ddccd7b08876b0368aa88d7876a77ea2ce0b59ccf448",
           "path": "package.json"
         },
         {
@@ -6225,7 +6225,7 @@
   ],
   "engine": "1.24.0",
   "generatedFrom": {
-    "commit": "f2fd5992daa9f3521f9e1f648968f03e6e5f8b08",
+    "commit": "e522fa11bf75804124da8a0a41fec27cf0f5ff59",
     "tracked": 383
   },
   "landings": [

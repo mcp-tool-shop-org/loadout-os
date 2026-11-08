@@ -71,6 +71,33 @@ describe("parseFrontmatter", () => {
       stale_after_min: 60,
       active: true,
     });
+
+    // Also cover BOM prefix, quoted scalars, top-level metadata keys, and unclosed delimiter
+    const unclosed = parseFrontmatter("---\nid: unclosed\nbody");
+    assert.equal(unclosed.frontmatter, null);
+
+    const quotedAndTopMeta = parseFrontmatter(
+      [
+        "\ufeff---",
+        'id: "quoted-id"',
+        "name: 'Single Quoted'",
+        'description: "Escaped \\"quote\\" description"',
+        "loadout_role: subindex",
+        "stale_after_min: 45",
+        "loadout_inject: true",
+        "keywords:",
+        "  - 'kw-one'",
+        '  - "kw-two"',
+        "---",
+        "Body",
+      ].join("\n"),
+    );
+    assert.ok(quotedAndTopMeta.frontmatter);
+    assert.equal(quotedAndTopMeta.frontmatter.id, "quoted-id");
+    assert.equal(quotedAndTopMeta.frontmatter.name, "Single Quoted");
+    assert.equal(quotedAndTopMeta.frontmatter.metadata?.loadout_role, "subindex");
+    assert.equal(quotedAndTopMeta.frontmatter.metadata?.stale_after_min, 45);
+    assert.equal(quotedAndTopMeta.frontmatter.metadata?.loadout_inject, true);
   });
 
   it("defaults invalid priority to domain", () => {

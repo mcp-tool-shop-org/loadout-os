@@ -1,15 +1,14 @@
 # loadout-os: how it works
 
-Mapped at 2026-11-08 from commit f2fd599 by Atlas 1.24.0.
+Mapped at 2026-11-08 from commit e522fa1 by Atlas 1.24.0.
 
 ## What this is
 
 9 parts, mostly Markdown (236 files); code in TypeScript (85), CSS (8), JavaScript (7), Astro (4) and PowerShell (1). Work enters through 6 doors; the busiest is CI, which reaches 5 parts. It publishes @mcptoolshop/loadout-os to npm. It deploys a site to GitHub Pages. People run ai-loadout, claude-memories, claude-rules and loadout-os.
 
-## What changed since 2026-09-30 (532deee)
+## What changed since 2026-11-08 (f2fd599)
 
-- .claude/loadout/index.json is now read by packages/kernel/src/resolve.ts.
-- 1 file added and 44 changed content, across 7 parts.
+Nothing structural changed since 2026-11-08; 8 files changed content.
 
 ## What comes in
 
@@ -52,7 +51,9 @@ CI writes nothing this map can see.
 
 ## What tends to change together
 
-No two source files changed together often enough to name.
+No two source files, other than a file and its own test, changed together often enough to name.
+
+2 files changed together with their own tests, as expected.
 
 Window: 180 days; a pair counts from 3 shared commits, since 0 source files reach 10 revisions; the floor rises to 10 when 25 do.
 

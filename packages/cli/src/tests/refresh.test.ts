@@ -572,6 +572,40 @@ test("CLI dispatch: exercises refresh --project/--fix, memories sync-summaries/p
     // 6. dispatch hook post-write (clean and error)
     dispatch(["hook", "post-write", "--project", projRoot, "--file", join(sb.storeDir, "BOARD.md")]);
     assert.equal(process.exitCode ?? 0, 0);
+
+    // 7. Exercise doctor and report human output on scratch fixtures
+    const usageJsonl = join(sb.storeDir, "usage.jsonl");
+    writeFileSync(
+      usageJsonl,
+      JSON.stringify({
+        ts: "2026-11-08T00:00:00.000Z",
+        sessionId: "s1",
+        taskHash: "t1",
+        entryId: "active-board",
+        mode: "lazy",
+        score: 0.9,
+        reason: "keywords: board",
+        tokensEst: 20,
+        layer: "project",
+      }) + "\n",
+      "utf-8",
+    );
+    captureLog(() => dispatch(["usage", usageJsonl]));
+    captureLog(() => dispatch(["dead", projectDest(projRoot), "--usage", usageJsonl]));
+    captureLog(() => dispatch(["report", "--index", projectDest(projRoot), "--jsonl", usageJsonl]));
+    captureLog(() =>
+      dispatch([
+        "doctor",
+        "--store",
+        sb.storeDir,
+        "--index",
+        projectDest(projRoot),
+        "--jsonl",
+        usageJsonl,
+        "--settings",
+        join(sb.storeDir, "missing-settings.json"),
+      ]),
+    );
   } finally {
     process.exitCode = 0;
     sb.cleanup();

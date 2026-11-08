@@ -48,17 +48,31 @@ export interface SyncSummariesResult {
  */
 function rewriteRefLine(line: string, newDesc: string): string {
   // Markdown link format: `- [Title](file.md) — desc`
-  const linkRe = /^([-*]\s+(?:\*\*)?(?:[^\[\]\w\s*]{1,4}\s*)?\[[^\]]+\]\([^)\s]+?\.md(?:#[^)\s]*)?\)(?:\*\*)?)(.*)$/;
-  const linkMatch = line.match(linkRe);
-  if (linkMatch) {
-    return `${linkMatch[1]} — ${newDesc}`;
+  const openBracket = line.indexOf("[");
+  const midLink = openBracket !== -1 ? line.indexOf("](", openBracket + 1) : -1;
+  if (midLink !== -1) {
+    const closeParen = line.indexOf(")", midLink + 2);
+    if (closeParen !== -1 && line.slice(midLink + 2, closeParen).toLowerCase().includes(".md")) {
+      let splitPos = closeParen + 1;
+      if (line.startsWith("**", splitPos)) {
+        splitPos += 2;
+      }
+      return `${line.slice(0, splitPos)} — ${newDesc}`;
+    }
   }
 
   // Arrow format: `- Name — old desc → \`path\`` or `Name — old desc → path`
-  const arrowRe = /^((?:[-*]\s+)?)(.+?)(\s+→\s+`?[^\s`]+`?\s*)$/;
-  const arrowMatch = line.match(arrowRe);
-  if (arrowMatch) {
-    const [, prefix, nameDesc, suffix] = arrowMatch;
+  const arrowIdx = line.lastIndexOf("→");
+  if (arrowIdx !== -1) {
+    let prefixEnd = 0;
+    const trimmedStart = line.trimStart();
+    const indentLen = line.length - trimmedStart.length;
+    if (trimmedStart.startsWith("- ") || trimmedStart.startsWith("* ")) {
+      prefixEnd = indentLen + 2;
+    }
+    const prefix = line.slice(0, prefixEnd);
+    const nameDesc = line.slice(prefixEnd, arrowIdx).trimEnd();
+    const suffix = " " + line.slice(arrowIdx);
     const emIdx = nameDesc.indexOf("—");
     const hhIdx = nameDesc.indexOf("--");
     const nameOnly = emIdx !== -1
@@ -289,7 +303,7 @@ export function placeOrMoveEntry(opts: {
   const bullet = `- [${title}](${fileName}) — ${clippedDesc}`;
 
   const targetContent = readFileSync(targetAbs, "utf-8");
-  const trimmedTarget = targetContent.replace(/\s+$/, "");
+  const trimmedTarget = targetContent.trimEnd();
   const updatedTarget = trimmedTarget ? `${trimmedTarget}\n${bullet}\n` : `${bullet}\n`;
   writeAtomic(targetAbs, updatedTarget);
 

@@ -545,7 +545,12 @@ export function runSessionStart(opts: SessionStartOptions = {}): SessionStartRes
     outParts.push(sections.join("\n"));
   }
 
-  const output = outParts.length > 0 ? outParts.join("\n\n").replace(/\n*$/, "\n") : "";
+  const joinedOut = outParts.join("\n\n");
+  let endIdx = joinedOut.length;
+  while (endIdx > 0 && joinedOut.charCodeAt(endIdx - 1) === 10) {
+    endIdx--;
+  }
+  const output = outParts.length > 0 ? joinedOut.slice(0, endIdx) + "\n" : "";
   return {
     output,
     warnings,
@@ -591,7 +596,12 @@ export interface PostWriteResult {
  */
 export function isPathInsideDir(filePath: string, dirPath: string): boolean {
   const normFile = resolve(filePath).replace(/\\/g, "/");
-  const normDir = resolve(dirPath).replace(/\\/g, "/").replace(/\/+$/, "");
+  const rawDir = resolve(dirPath).replace(/\\/g, "/");
+  let dirEnd = rawDir.length;
+  while (dirEnd > 0 && rawDir.charCodeAt(dirEnd - 1) === 47) {
+    dirEnd--;
+  }
+  const normDir = rawDir.slice(0, dirEnd);
   const cmpFile = process.platform === "win32" ? normFile.toLowerCase() : normFile;
   const cmpDir = process.platform === "win32" ? normDir.toLowerCase() : normDir;
   return cmpFile === cmpDir || cmpFile.startsWith(cmpDir + "/");
