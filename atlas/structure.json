@@ -52,8 +52,8 @@
     },
     {
       "dynamicReads": 8,
-      "dynamicSpawns": 5,
-      "dynamicSpawnsInTests": 4,
+      "dynamicSpawns": 6,
+      "dynamicSpawnsInTests": 5,
       "dynamicWrites": 3,
       "entryPoints": [],
       "externals": 0,
@@ -664,7 +664,7 @@
           "testFramework": "node --test"
         },
         {
-          "hash": "b2333dffb4c8fe0b742a426d4262ee9fc2f4a7c014a444831f2951358eedaf2c",
+          "hash": "979048a85ee354e9f386c4e4fecbf7cf8c4af0e0b6091f9e771466efc27bf31f",
           "importOrder": [
             "packages/cli/src/refresh.ts",
             "packages/cli/src/hook.ts",
@@ -3295,7 +3295,7 @@
           "path": ".gitignore"
         },
         {
-          "hash": "f3a1f073e80086e7d307a66750d93bae082b92746771d31f4faf0fea0016451c",
+          "hash": "9d4e177804cb645721b68f971be0c4c28ea9a8a2738c718e290f12939f927315",
           "path": "CHANGELOG.md"
         },
         {
@@ -6293,7 +6293,7 @@
   ],
   "engine": "1.24.0",
   "generatedFrom": {
-    "commit": "fa95b532f33c7815c06f5b26a1ff771d8a8b2d00",
+    "commit": "0c72069390ac4a3810ff55ee50c3c40b1932f7fc",
     "tracked": 383
   },
   "landings": [

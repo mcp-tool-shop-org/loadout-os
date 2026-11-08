@@ -647,7 +647,8 @@ test("Q3-4: LOCK_WAIT_MS is at least DEFAULT_GIT_TIMEOUT_MS, and a second post-w
       process.execPath,
       [
         "-e",
-        `setTimeout(() => { try { require("node:fs").unlinkSync(${JSON.stringify(lockPath)}); } catch {} }, 350);`,
+        'setTimeout(() => { try { require("node:fs").unlinkSync(process.argv[1]); } catch {} }, 350);',
+        lockPath,
       ],
       { stdio: "ignore" },
     );
@@ -708,26 +709,28 @@ test("Q2-6 / follow-up 1: runRefresh writes <dest>.tmp.<pid> and renameSyncs ove
     );
 
     const refreshJsUrl = new URL("../refresh.js", import.meta.url).href;
-    const crashScript = `
-      import { createRequire, syncBuiltinESMExports } from "node:module";
-      const require = createRequire(import.meta.url);
-      const fs = require("node:fs");
-      const origWriteFileSync = fs.writeFileSync;
-      const targetDest = ${JSON.stringify(sb.destPath)};
-      fs.writeFileSync = function(file, data, options) {
-        if (typeof file === "string" && file === \`\${targetDest}.tmp.\${process.pid}\`) {
-          origWriteFileSync.call(this, file, String(data).slice(0, 24), options);
-          process.exit(137);
-        }
-        return origWriteFileSync.call(this, file, data, options);
-      };
-      syncBuiltinESMExports();
-      const { runRefresh } = await import(${JSON.stringify(refreshJsUrl)});
-      runRefresh({ store: ${JSON.stringify(sb.storeDir)}, dest: targetDest });
-    `;
-    const child = spawnSync(process.execPath, ["--input-type=module", "-e", crashScript], {
-      encoding: "utf-8",
-    });
+    const crashScript = [
+      'import { createRequire, syncBuiltinESMExports } from "node:module";',
+      "const require = createRequire(import.meta.url);",
+      'const fs = require("node:fs");',
+      "const origWriteFileSync = fs.writeFileSync;",
+      "const [targetDest, refreshUrl, targetStore] = process.argv.slice(1);",
+      "fs.writeFileSync = function(file, data, options) {",
+      '  if (typeof file === "string" && file === `${targetDest}.tmp.${process.pid}`) {',
+      "    origWriteFileSync.call(this, file, String(data).slice(0, 24), options);",
+      "    process.exit(137);",
+      "  }",
+      "  return origWriteFileSync.call(this, file, data, options);",
+      "};",
+      "syncBuiltinESMExports();",
+      "const { runRefresh } = await import(refreshUrl);",
+      "runRefresh({ store: targetStore, dest: targetDest });",
+    ].join("\n");
+    const child = spawnSync(
+      process.execPath,
+      ["--input-type=module", "-e", crashScript, sb.destPath, refreshJsUrl, sb.storeDir],
+      { encoding: "utf-8" },
+    );
     assert.equal(child.status, 137, `expected simulated crash exit 137, got ${child.status}: ${child.stderr}`);
 
     // The truncated <dest>.tmp.<pid> was written by the crashed child, but <dest> must still be intact!

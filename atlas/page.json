@@ -61,21 +61,21 @@
   "changes": {
     "fileCounts": {
       "added": 0,
-      "changed": 1,
+      "changed": 2,
       "moved": 0,
-      "parts": 1,
+      "parts": 2,
       "removed": 0
     },
     "items": [
       {
         "kind": "counts",
-        "sentence": "Nothing structural changed since 2026-11-08; 1 file changed content.",
+        "sentence": "Nothing structural changed since 2026-11-08; 2 files changed content.",
         "subjects": []
       }
     ],
     "since": {
-      "commit": "6ddc3772f65288e2f7c3536eded5ec2d25223978",
-      "generatedAt": "2026-11-08T16:53:02.329Z"
+      "commit": "fa95b532f33c7815c06f5b26a1ff771d8a8b2d00",
+      "generatedAt": "2026-11-08T16:56:16.454Z"
     },
     "unchanged": true
   },
@@ -147,7 +147,7 @@
     "Window: 180 days; a pair counts from 3 shared commits, since 0 source files reach 10 revisions; the floor rises to 10 when 25 do."
   ],
   "changesTogetherWithTests": 4,
-  "commit": "fa95b532f33c7815c06f5b26a1ff771d8a8b2d00",
+  "commit": "0c72069390ac4a3810ff55ee50c3c40b1932f7fc",
   "defaultBranch": "main",
   "derived": "9 parts, mostly Markdown (236 files); code in TypeScript (85), CSS (8), JavaScript (7), Astro (4) and PowerShell (1). Work enters through 6 doors; the busiest is CI, which reaches 6 parts. It publishes @mcptoolshop/loadout-os to npm. It deploys a site to GitHub Pages. People run ai-loadout, claude-memories, claude-rules and loadout-os.",
   "doors": [
@@ -533,7 +533,7 @@
   ],
   "engine": "1.24.0",
   "generated": [],
-  "generatedAt": "2026-11-08T16:56:16.454Z",
+  "generatedAt": "2026-11-08T17:01:02.777Z",
   "limits": [
     "6 writes and 23 reads use paths built at run time and are not named here.",
     "1 write goes to places this repository does not track, so it is not listed as generated.",
@@ -545,7 +545,7 @@
     "1 write and 2 reads go to the directory the command is run in (.claude/, MEMORY.md/ and memory/), the home directory (.claude/) or a path their caller passes, not to this repository.",
     "2 writes and 1 read go to the home directory (.ai-loadout/), not to this repository.",
     "1 write goes to the directory the command is run in (.claude/ and memory/) or a path its caller passes, not to this repository.",
-    "6 commands are built at run time and not followed, 5 of them in tests.",
+    "7 commands are built at run time and not followed, 6 of them in tests.",
     "Statistics confidence is low: fewer than 25 source files reach 10 revisions in the window."
   ],
   "mainDoor": ".github/workflows/ci.yml",

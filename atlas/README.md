@@ -1,14 +1,14 @@
 # loadout-os: how it works
 
-Mapped at 2026-11-08 from commit fa95b53 by Atlas 1.24.0.
+Mapped at 2026-11-08 from commit 0c72069 by Atlas 1.24.0.
 
 ## What this is
 
 9 parts, mostly Markdown (236 files); code in TypeScript (85), CSS (8), JavaScript (7), Astro (4) and PowerShell (1). Work enters through 6 doors; the busiest is CI, which reaches 6 parts. It publishes @mcptoolshop/loadout-os to npm. It deploys a site to GitHub Pages. People run ai-loadout, claude-memories, claude-rules and loadout-os.
 
-## What changed since 2026-11-08 (6ddc377)
+## What changed since 2026-11-08 (fa95b53)
 
-Nothing structural changed since 2026-11-08; 1 file changed content.
+Nothing structural changed since 2026-11-08; 2 files changed content.
 
 ## What comes in
 
@@ -111,7 +111,7 @@ Read those in order to follow one pull request end to end.
 - 1 write and 2 reads go to the directory the command is run in (.claude/, MEMORY.md/ and memory/), the home directory (.claude/) or a path their caller passes, not to this repository.
 - 2 writes and 1 read go to the home directory (.ai-loadout/), not to this repository.
 - 1 write goes to the directory the command is run in (.claude/ and memory/) or a path its caller passes, not to this repository.
-- 6 commands are built at run time and not followed, 5 of them in tests.
+- 7 commands are built at run time and not followed, 6 of them in tests.
 - Statistics confidence is low: fewer than 25 source files reach 10 revisions in the window.
 
 Regenerate with `npx --yes @dogfood-lab/atlas map`.

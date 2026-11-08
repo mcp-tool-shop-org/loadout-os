@@ -49,7 +49,7 @@
       "confidence": "low",
       "highWater": null,
       "name": "cli",
-      "qualifyingSourceCommits": 13,
+      "qualifyingSourceCommits": 14,
       "rebaseline": null
     },
     {
@@ -187,8 +187,8 @@
         "path": ".gitignore"
       },
       {
-        "commits": 7,
-        "lines": 236,
+        "commits": 8,
+        "lines": 242,
         "path": "CHANGELOG.md"
       },
       {
@@ -277,8 +277,8 @@
         "path": "apps/hook/smoke-test.ps1"
       },
       {
-        "commits": 7,
-        "lines": 396,
+        "commits": 8,
+        "lines": 417,
         "path": "atlas/README.md"
       },
       {
@@ -287,18 +287,18 @@
         "path": "atlas/boundaries.yaml"
       },
       {
-        "commits": 7,
-        "lines": 1664,
+        "commits": 8,
+        "lines": 1793,
         "path": "atlas/page.json"
       },
       {
-        "commits": 7,
-        "lines": 4862,
+        "commits": 8,
+        "lines": 5062,
         "path": "atlas/statistics.json"
       },
       {
-        "commits": 7,
-        "lines": 21557,
+        "commits": 8,
+        "lines": 21561,
         "path": "atlas/structure.json"
       },
       {
@@ -372,8 +372,8 @@
         "path": "packages/cli/src/help.ts"
       },
       {
-        "commits": 7,
-        "lines": 862,
+        "commits": 8,
+        "lines": 878,
         "path": "packages/cli/src/hook.ts"
       },
       {
@@ -2162,51 +2162,51 @@
     "level": "low",
     "reason": "fewer than 25 source files reach 10 revisions in the window"
   },
-  "generatedAt": "2026-11-08T16:56:16.454Z",
+  "generatedAt": "2026-11-08T17:01:02.777Z",
   "generatedFrom": {
-    "commit": "fa95b532f33c7815c06f5b26a1ff771d8a8b2d00"
+    "commit": "0c72069390ac4a3810ff55ee50c3c40b1932f7fc"
   },
   "pairs": [
     {
       "a": "atlas/README.md",
       "b": "atlas/page.json",
-      "either": 5,
-      "shared": 5,
+      "either": 6,
+      "shared": 6,
       "strength": 1
     },
     {
       "a": "atlas/README.md",
       "b": "atlas/statistics.json",
-      "either": 5,
-      "shared": 5,
+      "either": 6,
+      "shared": 6,
       "strength": 1
     },
     {
       "a": "atlas/README.md",
       "b": "atlas/structure.json",
-      "either": 5,
-      "shared": 5,
+      "either": 6,
+      "shared": 6,
       "strength": 1
     },
     {
       "a": "atlas/page.json",
       "b": "atlas/statistics.json",
-      "either": 5,
-      "shared": 5,
+      "either": 6,
+      "shared": 6,
       "strength": 1
     },
     {
       "a": "atlas/page.json",
       "b": "atlas/structure.json",
-      "either": 5,
-      "shared": 5,
+      "either": 6,
+      "shared": 6,
       "strength": 1
     },
     {
       "a": "atlas/statistics.json",
       "b": "atlas/structure.json",
-      "either": 5,
-      "shared": 5,
+      "either": 6,
+      "shared": 6,
       "strength": 1
     },
     {
@@ -2233,9 +2233,9 @@
     {
       "a": "packages/cli/src/hook.ts",
       "b": "packages/cli/src/tests/hook.test.ts",
-      "either": 8,
+      "either": 9,
       "shared": 5,
-      "strength": 0.625
+      "strength": 0.555556
     },
     {
       "a": "packages/cli/src/refresh.ts",
@@ -2276,16 +2276,16 @@
     "floor": "fallen",
     "floorHeld": false,
     "floorTrigger": "revision-depth",
-    "headDate": "2026-11-08T11:54:23-05:00",
+    "headDate": "2026-11-08T11:58:22-05:00",
     "inScopeFiles": 388,
     "pinnedStart": null,
     "priorFloor": "fallen",
-    "qualifyingCommits": 47,
+    "qualifyingCommits": 49,
     "qualifyingMinimum": 30,
     "revisions": 5,
     "shared": 10,
     "sharedFloorUsed": 3,
-    "since": "2026-05-12T16:54:23.000Z",
+    "since": "2026-05-12T16:58:22.000Z",
     "sourceExtensions": [
       ".js",
       ".mjs",
