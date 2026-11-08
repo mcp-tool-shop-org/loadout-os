@@ -158,9 +158,9 @@ ship together under `loadout-os`.
   instead of the unbundled `apps/hook/loadout-hook.mjs` entry file.
 - **CLI `--help` and README synopses for `memories sync-summaries`, `place`, and `move`**
   (Q7-2) — aligned `packages/cli/src/help.ts`, `packages/cli/src/cli.ts`, `README.md`, and
-  `packages/cli/README.md` with `packages/cli/src/commands.ts` (`sync-summaries [<dir>]
-  [--write]`, `place <topic.md> --index <sub-index.md> [--store <dir>]`, and `move <topic.md>
-  --from <a.md> --to <b.md> [--store <dir>] [--priority <p>]`).
+  `packages/cli/README.md` with `packages/cli/src/commands.ts` (`sync-summaries <MEMORY.md>
+  [--fix] [--json]`, `place <topic.md> <index> [--store <dir>] [--into <index>] [--json]`,
+  and `move <topic.md> <index> [--store <dir>] [--into <index>] [--json]`).
 - **Windows path normalization in `hook post-write`** (Q3-1) — `normalizeHookPath`,
   `isPathInsideDir`, and `runPostWrite` in `packages/cli/src/hook.ts` now resolve relative
   `tool_input.file_path` values against `payload.cwd` (`startDir`), expand `~/...` and MSYS
