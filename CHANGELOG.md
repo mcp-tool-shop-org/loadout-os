@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-11-08
+
+### Fixed
+
+- **Nested frontmatter keys are read** (#19). Claude Code rewrites a memory file's frontmatter when its tools edit it,
+  and can move top-level keys under `metadata:`. 1.1.0 read `priority` and `id` only at the top level, so a board
+  marked `priority: core` that ended up as `metadata.priority: core` silently became a `domain` entry and stopped
+  being injected at session start. Both keys are now read from `metadata:` when they are not at the top level; the
+  top level wins when both are present.
+- **Link bullets with an arrow in their hook text are indexed** (#20). A bullet such as
+  `- [Title](file.md) — teach → apply → verify` went down the arrow-format branch, which took the word after the
+  last arrow as a topic path and halted the refresh with `MISSING_TOPIC_FILE`. A bullet that starts with a link now
+  uses the link branch; the arrow branch applies only to the backticked-target form. Link bullets with no dash or
+  colon after the link (for example `- [Loop](loop.md) (11-08) teach loop`) are indexed as they were in 1.1.0.
+
+Index output on existing stores is unchanged: three real stores (266, 168 and 577 entries) produce the same entries
+and fields as 1.1.0.
+
 ## [1.1.0] - 2026-11-08
 
 Per-project memory: a project layer in the hook, sub-indexes, a session-start board, and post-write checks. Entry ids are unchanged for existing stores.
