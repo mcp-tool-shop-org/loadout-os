@@ -11,8 +11,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { validateIndex as validateLoadoutIndex, parseFrontmatter } from "@mcptoolshop/ai-loadout";
 import type { ValidationIssue } from "@mcptoolshop/ai-loadout";
-import type { MemoryAnalysis, MemoryIndex } from "./types.js";
-import { nameToId } from "./index-gen.js";
+import type { IdSource, MemoryAnalysis, MemoryIndex } from "./types.js";
+import { hasExplicitId, nameToId, resolveStoreIdSource } from "./index-gen.js";
 import { resolveRefPath } from "./paths.js";
 
 /** ROADMAP Phase 2 (MEM-004): derived ids longer than this are flagged. */
@@ -33,6 +33,10 @@ export interface ValidateMemoryOptions {
   maxBytes?: number;
   /** Whether exceeding MEMORY.md limits is an error rather than a warning (default: false unless store or caller opts in). */
   enforceLimits?: boolean;
+  /** Explicit ID source override (`"title"` or `"name"`). Wins over store setting and mode default. */
+  idSource?: IdSource;
+  /** True when validating a project store (`--project`), shifting the default `idSource` from `"title"` to `"name"`. */
+  projectMode?: boolean;
 }
 
 /**
@@ -224,6 +228,7 @@ export function validateMemory(
   // Over-long ids (MEM-004 / MEM-B08) & summary drift check (F-02 / F-09: STALE_INDEX_SUMMARY)
   const fileDir = dirname(resolve(analysis.filePath));
   const parentDir = dirname(fileDir);
+  const effectiveIdSource = resolveStoreIdSource(analysis.filePath, opts);
   for (const ref of analysis.refs) {
     let effectiveId = nameToId(ref.name);
     let source = "Derived";
@@ -234,8 +239,13 @@ export function validateMemory(
         const content = readFileSync(resolved, "utf-8");
         const { frontmatter } = parseFrontmatter(content);
         if (frontmatter && typeof frontmatter.id === "string" && frontmatter.id.length > 0) {
-          effectiveId = frontmatter.id;
-          source = "Frontmatter";
+          if (hasExplicitId(content) || effectiveIdSource === "name") {
+            effectiveId = frontmatter.id;
+            source = "Frontmatter";
+          } else {
+            effectiveId = nameToId(ref.name) || frontmatter.id;
+            source = "Derived";
+          }
         }
         // F-02 / F-09: Check whether the index bullet summary differs from the topic file's frontmatter description
         if (

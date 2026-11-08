@@ -43,9 +43,10 @@ interface HelpEntry {
 export const COMMAND_HELP: Record<string, HelpEntry> = {
   // ── memories namespace ───────────────────────────────────────
   "memories index": {
-    synopsis: "loadout-os memories index <MEMORY.md> [--lazy] [--json]",
+    synopsis: "loadout-os memories index <MEMORY.md> [--id-source title|name] [--lazy] [--json]",
     args: [["<MEMORY.md>", "path to the store's MEMORY.md (required, first)"]],
     flags: [
+      ["--id-source <mode>", "entry id source when frontmatter has no explicit id: 'title' or 'name' (overrides store setting)"],
       ["--lazy", "generate a lazy-load index (on-demand topic loading)"],
       ["--json", "machine-readable output"],
     ],
@@ -53,9 +54,10 @@ export const COMMAND_HELP: Record<string, HelpEntry> = {
     exits: [["0", "index generated"], ["1", "MEMORY.md missing / unreadable"]],
   },
   "memories validate": {
-    synopsis: "loadout-os memories validate <MEMORY.md> [--max-lines <n>] [--max-bytes <n>] [--json]",
+    synopsis: "loadout-os memories validate <MEMORY.md> [--id-source title|name] [--max-lines <n>] [--max-bytes <n>] [--json]",
     args: [["<MEMORY.md>", "path to MEMORY.md to lint (required, first)"]],
     flags: [
+      ["--id-source <mode>", "entry id source when frontmatter has no explicit id: 'title' or 'name' (overrides store setting)"],
       ["--max-lines <n>", "MEMORY.md line cap (default 180; passing opts in to error on MEMORY_LIMIT_EXCEEDED)"],
       ["--max-bytes <n>", "MEMORY.md byte cap (default 24000; passing opts in to error on MEMORY_LIMIT_EXCEEDED)"],
       ["--json", "machine-readable output"],
@@ -65,9 +67,12 @@ export const COMMAND_HELP: Record<string, HelpEntry> = {
     exits: [["0", "no errors (warnings allowed)"], ["1", "≥1 error-severity issue"]],
   },
   "memories stats": {
-    synopsis: "loadout-os memories stats <MEMORY.md> [--json]",
+    synopsis: "loadout-os memories stats <MEMORY.md> [--id-source title|name] [--json]",
     args: [["<MEMORY.md>", "path to MEMORY.md (required, first)"]],
-    flags: [["--json", "machine-readable output"]],
+    flags: [
+      ["--id-source <mode>", "entry id source when frontmatter has no explicit id: 'title' or 'name'"],
+      ["--json", "machine-readable output"],
+    ],
     example: "loadout-os memories stats ./MEMORY.md --json",
     exits: [["0", "stats printed"], ["1", "MEMORY.md missing"]],
   },
@@ -311,11 +316,12 @@ export const COMMAND_HELP: Record<string, HelpEntry> = {
     ],
   },
   refresh: {
-    synopsis: "loadout-os refresh [--store <dir>] [--dest <path>] [--project <root>] [--snapshot-repo <dir>] [--mirror-repo <bare>] [--fix] [--dry-run]",
+    synopsis: "loadout-os refresh [--store <dir>] [--dest <path>] [--project <root>] [--id-source title|name] [--snapshot-repo <dir>] [--mirror-repo <bare>] [--fix] [--dry-run]",
     flags: [
       ["--store <dir>", "memory store dir (default canonical store)"],
       ["--dest <path>", "index file to write (default ~/.ai-loadout/index.json)"],
       ["--project <root>", "write project index to <root>/.claude/loadout/index.json"],
+      ["--id-source <mode>", "entry id source when frontmatter has no explicit id: 'title' or 'name' (overrides store setting)"],
       ["--snapshot-repo <dir>", "git working copy to snapshot store .md files into"],
       ["--mirror-repo <bare>", "bare git repo to push snapshot commits to"],
       ["--fix", "synchronize drifted index bullet summaries from topic frontmatter before validating"],

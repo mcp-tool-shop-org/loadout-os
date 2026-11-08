@@ -130,9 +130,9 @@ function memoriesHelp(): string {
   return `
 ${BOLD}loadout-os memories${RESET} — wraps @mcptoolshop/claude-memories
 
-  loadout-os memories index <MEMORY.md> [--lazy] [--json]
-  loadout-os memories validate <MEMORY.md> [--max-lines <n>] [--max-bytes <n>] [--json]
-  loadout-os memories stats <MEMORY.md> [--json]
+  loadout-os memories index <MEMORY.md> [--id-source title|name] [--lazy] [--json]
+  loadout-os memories validate <MEMORY.md> [--id-source title|name] [--max-lines <n>] [--max-bytes <n>] [--json]
+  loadout-os memories stats <MEMORY.md> [--id-source title|name] [--json]
   loadout-os memories health [path] [--json]
   loadout-os memories sync-summaries <MEMORY.md> [--fix] [--json]
   loadout-os memories place <topic.md> <index> [--store <dir>] [--into <index>] [--json]

@@ -22,6 +22,9 @@ export { DEFAULT_TRIGGERS } from "@mcptoolshop/ai-loadout";
 
 // ── Memory-specific types ──────────────────────────────────────
 
+/** Source for entry IDs when a topic file's frontmatter has no explicit `id:` field. */
+export type IdSource = "title" | "name";
+
 /** A detected section in MEMORY.md */
 export interface MemorySection {
   heading: string;       // e.g. "Active", "Products", "Workflows"

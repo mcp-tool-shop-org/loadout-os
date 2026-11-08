@@ -158,6 +158,42 @@ describe("validateMemory", () => {
       rmSync(tmp, { recursive: true, force: true });
     }
   });
+
+  it("ID_TOO_LONG respects idSource ('title' vs 'name') when frontmatter has no explicit id: (Publisher ruling B)", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "loadout-val-idsource-"));
+    try {
+      const longName = "This Is A Very Long Frontmatter Name That Exceeds Sixty Characters In Length";
+      writeFileSync(
+        join(tmp, "topic.md"),
+        [
+          "---",
+          `name: ${longName}`,
+          "description: Short summary",
+          "---",
+          "# Topic",
+          "",
+        ].join("\n"),
+        "utf-8",
+      );
+      const memPath = join(tmp, "MEMORY.md");
+      writeFileSync(
+        memPath,
+        "# Memory\n- [Short Title](topic.md) — Short summary\n",
+        "utf-8",
+      );
+
+      const analysis = analyzeMemoryMd(memPath);
+      // Under idSource="title" (global default), effectiveId is "short-title" (<= 60 chars) -> 0 ID_TOO_LONG
+      const titleIssues = validateMemory(analysis, { idSource: "title" });
+      assert.ok(!titleIssues.some((i) => i.code === "ID_TOO_LONG"));
+
+      // Under idSource="name" (or projectMode: true), effectiveId is > 60 chars -> flags ID_TOO_LONG
+      const nameIssues = validateMemory(analysis, { idSource: "name" });
+      assert.ok(nameIssues.some((i) => i.code === "ID_TOO_LONG"));
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("validateMemoryIndex", () => {

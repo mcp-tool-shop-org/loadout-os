@@ -33,9 +33,9 @@ Plus three rituals that keep the system honest: **`refresh`** (regenerate → va
 
 ```
 # Memory store adapter
-loadout-os memories index          <MEMORY.md> [--lazy] [--json]
-loadout-os memories validate       <MEMORY.md> [--max-lines <n>] [--max-bytes <n>] [--json]
-loadout-os memories stats          <MEMORY.md> [--json]
+loadout-os memories index          <MEMORY.md> [--id-source title|name] [--lazy] [--json]
+loadout-os memories validate       <MEMORY.md> [--id-source title|name] [--max-lines <n>] [--max-bytes <n>] [--json]
+loadout-os memories stats          <MEMORY.md> [--id-source title|name] [--json]
 loadout-os memories health         [path] [--json]
 loadout-os memories sync-summaries <MEMORY.md> [--fix] [--json]
 loadout-os memories place          <topic.md> <index> [--store <dir>] [--into <index>] [--json]
@@ -63,7 +63,7 @@ loadout-os hook test [--prompt "<text>"]      # drive the runtime hook on a samp
 loadout-os hook session-start [--project <r>] [--user-prompt-submit]
 loadout-os hook pre-compact   [--project <r>]
 loadout-os hook post-write    [--project <r>] [--snapshot-repo <d>] [--mirror-repo <b>] [--fix]
-loadout-os refresh [--store <d>] [--dest <p>] [--project <r>] [--snapshot-repo <d>] [--mirror-repo <b>] [--fix] [--dry-run]
+loadout-os refresh [--store <d>] [--dest <p>] [--project <r>] [--id-source title|name] [--snapshot-repo <d>] [--mirror-repo <b>] [--fix] [--dry-run]
 ```
 
 > **Name collision, resolved by namespacing.** The flat `validate <index>` is the kernel's index-structure validator. The store and rules linters are namespaced — `memories validate <MEMORY.md>` and `rules validate` — so all three coexist. Run `loadout-os <command> --help` for per-command synopsis, arguments, and exit codes.
@@ -90,6 +90,7 @@ metadata:
 - Sub-indexes (`index-*.md` or files with `metadata.loadout_role: subindex`) are expanded one level into the dispatch index with `subindex: true`.
 - `index-archive.md` (or a sub-index with `metadata.loadout_default_priority: manual`) defaults its entries to `priority: "manual"` unless a topic file explicitly sets `priority:` in frontmatter.
 - `core` entries with `metadata.loadout_inject: session-start` are injected in full at `SessionStart` (and excluded from per-prompt pointer slots so they never starve routed entries).
+- **Entry ID source (`idSource: "title" | "name"`):** An explicit frontmatter `id:` always wins. When `id:` is omitted, global / `--dest` stores default to `title` (kebab-cased bullet title in `MEMORY.md`, preserving `v1.0.4` entry IDs), while `--project` stores default to `name` (kebab-cased frontmatter `name:`). Override per store via `<store>/.loadout.json` (`{ "idSource": "title" | "name" }`) or `MEMORY.md` frontmatter (`metadata.id_source: title | name`), or per invocation via `--id-source title|name` on `refresh` and `memories` commands (which wins over the store setting).
 
 ### 2. Example `.claude/settings.local.json` Hook Blocks
 

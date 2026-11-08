@@ -174,6 +174,15 @@ ship together under `loadout-os`.
   `packages/cli/src/refresh.ts` now writes `<dest>.tmp.<pid>` (and
   `<storeIndexPath>.tmp.<pid>`) and commits via `renameSync` instead of `copyFileSync`,
   preventing a crash mid-write from leaving a truncated global or project `index.json`.
+- **Entry ID source (`idSource: "title" | "name"`, Publisher ruling B)** — when a topic
+  file's frontmatter has no explicit `id:`, global / `--dest` stores now default to
+  `idSource: "title"` (`nameToId(ref.name)` from the first bullet's title in `MEMORY.md`,
+  preserving 100% of existing `v1.0.4` entry IDs on the global store and avoiding orphaned
+  `usage.jsonl` history), while `--project` stores default to `idSource: "name"` (kebab-cased
+  frontmatter `name:`). `idSource` can be configured per store in `<store>/.loadout.json`
+  (`{ "idSource": "title" | "name" }`) or `MEMORY.md` frontmatter (`metadata.id_source:
+  title | name`), or overridden per invocation via `--id-source title|name` on `refresh`
+  and `memories` commands. An explicit frontmatter `id:` always wins over both sources.
 
 ### Changed
 

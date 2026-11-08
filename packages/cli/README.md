@@ -22,9 +22,9 @@ legacy `ai-loadout` / `claude-memories` / `claude-rules` bins.
 ### Namespaces (wrapped library surfaces)
 
 ```
-loadout-os memories index          <MEMORY.md> [--lazy] [--json]
-loadout-os memories validate       <MEMORY.md> [--max-lines <n>] [--max-bytes <n>] [--json]
-loadout-os memories stats          <MEMORY.md> [--json]
+loadout-os memories index          <MEMORY.md> [--id-source title|name] [--lazy] [--json]
+loadout-os memories validate       <MEMORY.md> [--id-source title|name] [--max-lines <n>] [--max-bytes <n>] [--json]
+loadout-os memories stats          <MEMORY.md> [--id-source title|name] [--json]
 loadout-os memories health         [path] [--json]
 loadout-os memories sync-summaries <MEMORY.md> [--fix] [--json]
 loadout-os memories place          <topic.md> <index> [--store <dir>] [--into <index>] [--json]
@@ -61,7 +61,7 @@ loadout-os hook test [--prompt "<text>"]      # drive the runtime hook on a samp
 loadout-os hook session-start [--project <r>] [--user-prompt-submit]
 loadout-os hook pre-compact   [--project <r>]
 loadout-os hook post-write    [--project <r>] [--snapshot-repo <d>] [--mirror-repo <b>] [--fix]
-loadout-os refresh [--store <d>] [--dest <p>] [--project <r>] [--snapshot-repo <d>] [--mirror-repo <b>] [--fix] [--dry-run]
+loadout-os refresh [--store <d>] [--dest <p>] [--project <r>] [--id-source title|name] [--snapshot-repo <d>] [--mirror-repo <b>] [--fix] [--dry-run]
 ```
 
 - **`doctor`** — one read-only screen: store `MEMORY.md` validates, the global

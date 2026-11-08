@@ -5,12 +5,12 @@
  * from the parsed memory references and their topic files.
  */
 
-import { readFileSync } from "node:fs";
-import { basename, dirname, relative, resolve, sep } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { estimateTokens, parseFrontmatter } from "@mcptoolshop/ai-loadout";
 import type { LoadoutEntry, Budget, Frontmatter, Priority } from "@mcptoolshop/ai-loadout";
 import { DEFAULT_TRIGGERS } from "@mcptoolshop/ai-loadout";
-import type { MemoryAnalysis, MemoryIndex, MemoryRef } from "./types.js";
+import type { IdSource, MemoryAnalysis, MemoryIndex, MemoryRef } from "./types.js";
 import { extractKeywords, detectSubindex } from "./analyze.js";
 import { resolveRefPath } from "./paths.js";
 
@@ -38,19 +38,120 @@ function hasExplicitPriority(content: string): boolean {
 }
 
 /**
+ * Check if the raw YAML frontmatter block explicitly declared a non-empty `id:` line.
+ */
+export function hasExplicitId(content: string): boolean {
+  const normalized = content.startsWith("\ufeff") ? content.slice(1) : content;
+  const lines = normalized.split("\n");
+  if (lines[0]?.trim() !== "---") return false;
+  for (let i = 1; i < lines.length; i++) {
+    const t = lines[i].trim();
+    if (t === "---") break;
+    const m = t.match(/^id\s*:\s*(.*)$/);
+    if (m) {
+      const val = m[1].trim().replace(/^["']|["']$/g, "").trim();
+      if (val.length > 0) return true;
+    }
+  }
+  return false;
+}
+
+function normalizeIdSource(val: unknown): IdSource | undefined {
+  if (typeof val !== "string") return undefined;
+  const v = val.trim().toLowerCase();
+  if (v === "title" || v === "name") return v;
+  return undefined;
+}
+
+function parseRawMemoryIdSource(rawMemory: string): IdSource | undefined {
+  const normalized = rawMemory.startsWith("\ufeff") ? rawMemory.slice(1) : rawMemory;
+  const lines = normalized.split("\n");
+  if (lines[0]?.trim() !== "---") return undefined;
+  for (let i = 1; i < lines.length; i++) {
+    const t = lines[i].trim();
+    if (t === "---") break;
+    const m = t.match(/^(?:idSource|id_source)\s*:\s*(.*)$/);
+    if (m) {
+      const rawVal = m[1].trim().replace(/^["']|["']$/g, "").trim();
+      const parsed = normalizeIdSource(rawVal);
+      if (parsed) return parsed;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Resolve the effective `idSource` (`"title"` or `"name"`) for a memory store (Publisher ruling B):
+ * 1. Explicit CLI/caller `opts.idSource` (`--id-source title|name`) wins over the store setting.
+ * 2. Per-store setting in `<store>/.loadout.json` (`idSource` / `id_source`) or `MEMORY.md`
+ *    frontmatter (`metadata.id_source` / `metadata.idSource` / `idSource` / `id_source`).
+ * 3. Default: `"name"` in project mode (`opts.projectMode`), `"title"` otherwise (global / `--dest`).
+ */
+export function resolveStoreIdSource(
+  memoryFilePath: string,
+  opts: { idSource?: IdSource; projectMode?: boolean } = {},
+  rawMemoryOverride?: string,
+): IdSource {
+  if (opts.idSource === "title" || opts.idSource === "name") {
+    return opts.idSource;
+  }
+
+  const storeDir = dirname(resolve(memoryFilePath));
+  const cfgPath = join(storeDir, ".loadout.json");
+  if (existsSync(cfgPath)) {
+    try {
+      const cfg = JSON.parse(readFileSync(cfgPath, "utf-8")) as Record<string, unknown>;
+      const fromCfg = normalizeIdSource(cfg.idSource ?? cfg.id_source);
+      if (fromCfg) return fromCfg;
+    } catch {
+      // Ignore malformed optional store config
+    }
+  }
+
+  let rawMemory = rawMemoryOverride;
+  if (rawMemory === undefined) {
+    try {
+      rawMemory = readFileSync(memoryFilePath, "utf-8");
+    } catch {
+      rawMemory = "";
+    }
+  }
+  if (rawMemory) {
+    const { frontmatter } = parseFrontmatter(rawMemory);
+    const meta = frontmatter?.metadata;
+    const fromFm = normalizeIdSource(meta?.id_source ?? meta?.idSource);
+    if (fromFm) return fromFm;
+    const fromRaw = parseRawMemoryIdSource(rawMemory);
+    if (fromRaw) return fromRaw;
+  }
+
+  return opts.projectMode ? "name" : "title";
+}
+
+export interface GenerateIndexOptions {
+  lazyLoad?: boolean;
+  /** Explicit ID source override (`"title"` or `"name"`). Wins over store setting and mode default. */
+  idSource?: IdSource;
+  /** True when generating a project store index (`--project`), shifting the default `idSource` from `"title"` to `"name"`. */
+  projectMode?: boolean;
+}
+
+/**
  * Generate a memory dispatch index from analysis results.
  *
  * For each referenced topic file:
  * 1. If it is a sub-index (`index-*.md` or `metadata.loadout_role: subindex`), skip emitting it as an entry.
- * 2. If it has frontmatter, use that (source of truth; summary from `fm.description` when present — F-02).
+ * 2. If it has frontmatter, use that (source of truth; summary from `fm.description` when present — F-02;
+ *    `id` from explicit `id:`, else `fm.id` when `idSource === "name"`, else `nameToId(ref.name)` when `idSource === "title"`).
  * 3. Otherwise, auto-generate entry from name + content keywords + file-stem tokens.
  */
 export function generateIndex(
   analysis: MemoryAnalysis,
-  opts: { lazyLoad?: boolean } = {},
+  opts: GenerateIndexOptions = {},
 ): MemoryIndex {
   const fileDir = dirname(resolve(analysis.filePath));
   const parentDir = dirname(fileDir);
+  const effectiveIdSource = resolveStoreIdSource(analysis.filePath, opts);
   const entries: LoadoutEntry[] = [];
   const seenStorePaths = new Set<string>();
 
@@ -97,7 +198,7 @@ export function generateIndex(
 
     if (frontmatter) {
       // Frontmatter is source of truth
-      entries.push(entryFromFrontmatter(frontmatter, ref, content, storePath));
+      entries.push(entryFromFrontmatter(frontmatter, ref, content, storePath, effectiveIdSource));
     } else {
       // Auto-generate from name + content + file-stem
       entries.push(entryFromContent(ref, content, storePath));
@@ -190,8 +291,17 @@ function entryFromFrontmatter(
   ref: MemoryRef,
   content: string,
   storePath: string,
+  idSource: IdSource,
 ): LoadoutEntry {
   const lines = content.split("\n").length;
+
+  // Publisher ruling B: an explicit frontmatter `id:` always wins over both idSource values.
+  // Otherwise, use `nameToId(ref.name)` when idSource === "title", and `fm.id` (from `name:`) when idSource === "name".
+  const id = hasExplicitId(content)
+    ? fm.id
+    : idSource === "title"
+      ? nameToId(ref.name) || fm.id
+      : fm.id;
 
   // F-03 / F-04: when frontmatter has no explicit `keywords:` (such as Claude Code
   // memory files with `name:` and `description:`), extract keywords from the title,
@@ -202,7 +312,7 @@ function entryFromFrontmatter(
 
   const patterns = fm.patterns.length > 0
     ? fm.patterns
-    : deriveStemPatterns(fm.id, storePath, fm.patterns);
+    : deriveStemPatterns(id, storePath, fm.patterns);
 
   // Amendment 4 (Archive = manual): entries listed in a sub-index whose frontmatter
   // sets `metadata.loadout_default_priority: manual` get `priority: "manual"` unless
@@ -217,7 +327,7 @@ function entryFromFrontmatter(
   const rawSummary = fm.description || ref.description || `Memory: ${ref.name}`;
 
   return {
-    id: fm.id,
+    id,
     path: storePath,
     keywords,
     patterns,

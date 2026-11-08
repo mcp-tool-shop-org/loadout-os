@@ -36,6 +36,7 @@ import {
   validateMemory,
   validateMemoryIndex,
   syncSummaries,
+  type IdSource,
   type MemoryIndex,
   type ValidateMemoryOptions,
 } from "@mcptoolshop/claude-memories";
@@ -117,6 +118,8 @@ export interface RefreshOptions {
   maxLines?: number;
   /** Configurable MEMORY.md byte limit (default 24,000). */
   maxBytes?: number;
+  /** Explicit ID source override (`"title"` or `"name"`). Wins over store setting and mode default. */
+  idSource?: IdSource;
   /** Subprocess timeout in milliseconds for git commands (default 30,000). */
   gitTimeoutMs?: number;
 }
@@ -518,12 +521,19 @@ export function runRefresh(opts: RefreshOptions): RefreshResult {
     }
 
     // ── (a) index the store ──────────────────────────────────────
+    const projectMode = !!project;
     const analysis = analyzeMemoryMd(memoryMd);
-    const storeIndex = generateMemoryIndex(analysis);
+    const storeIndex = generateMemoryIndex(analysis, {
+      idSource: opts.idSource,
+      projectMode,
+    });
     const storeIndexPath = project ? dest : join(store, "index.json");
 
     // ── (b) validate — ANDON HALT on any error-severity issue ────
-    const valOpts: ValidateMemoryOptions = {};
+    const valOpts: ValidateMemoryOptions = {
+      idSource: opts.idSource,
+      projectMode,
+    };
     if (opts.maxLines !== undefined) valOpts.maxLines = opts.maxLines;
     if (opts.maxBytes !== undefined) valOpts.maxBytes = opts.maxBytes;
 
@@ -739,6 +749,22 @@ export function printRefreshAndon(issues: ValidationIssue[]): void {
 }
 
 /**
+ * Parse and validate `--id-source title|name` from CLI args.
+ */
+export function parseIdSourceFlag(args: string[]): IdSource | undefined {
+  const raw = flagValue(args, "id-source");
+  if (raw === undefined) return undefined;
+  const val = raw.trim().toLowerCase();
+  if (val === "title" || val === "name") return val;
+  fail(
+    "INVALID_FLAG_VALUE",
+    `Invalid --id-source "${raw}": expected "title" or "name".`,
+    "Use '--id-source title' or '--id-source name'.",
+    1,
+  );
+}
+
+/**
  * Dispatcher wiring: parse flags, run refresh, render, map exit codes.
  *   0 success · 1 andon validation error OR write/git failure · 2 store/MEMORY.md missing or timeout
  */
@@ -751,6 +777,7 @@ export function dispatchRefresh(args: string[]): void {
   const snapshotRepo = flagValue(args, "snapshot-repo");
   const mirrorRepo = flagValue(args, "mirror-repo");
   const note = flagValue(args, "note");
+  const idSource = parseIdSourceFlag(args);
   const maxLinesStr = flagValue(args, "max-lines");
   const maxBytesStr = flagValue(args, "max-bytes");
   const maxLines = maxLinesStr !== undefined ? Number(maxLinesStr) : undefined;
@@ -766,6 +793,7 @@ export function dispatchRefresh(args: string[]): void {
       snapshotRepo,
       mirrorRepo,
       note,
+      idSource,
       maxLines: Number.isFinite(maxLines) ? maxLines : undefined,
       maxBytes: Number.isFinite(maxBytes) ? maxBytes : undefined,
     });

@@ -649,4 +649,225 @@ describe("sub-index expansion, frontmatter summary authority, and keyword extrac
       rmSync(tmp, { recursive: true, force: true });
     }
   });
+
+  it("idSource='title' (global default) derives entry ids from first bullet title when frontmatter has no explicit id: (Publisher ruling B)", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "loadout-idsource-title-"));
+    try {
+      writeFileSync(
+        join(tmp, "user_profile.md"),
+        [
+          "---",
+          "name: Mike User Profile Studio Model",
+          "description: User profile and studio model",
+          "---",
+          "# User Profile",
+          "",
+        ].join("\n"),
+        "utf-8",
+      );
+      writeFileSync(
+        join(tmp, "forkctl.md"),
+        [
+          "---",
+          "name: Forkctl Automation CLI",
+          "description: Forkctl automation tool",
+          "---",
+          "# Forkctl",
+          "",
+        ].join("\n"),
+        "utf-8",
+      );
+      const memPath = join(tmp, "MEMORY.md");
+      writeFileSync(
+        memPath,
+        [
+          "# Memory",
+          "- [Mike](user_profile.md) — User profile",
+          "- [forkctl](forkctl.md) — First forkctl bullet",
+          "- [forkable v1.0.0 ship](forkctl.md) — Duplicate forkctl bullet",
+          "",
+        ].join("\n"),
+        "utf-8",
+      );
+
+      const analysis = analyzeMemoryMd(memPath);
+      // Default without options is idSource: "title"
+      const defaultIndex = generateIndex(analysis);
+      assert.equal(defaultIndex.entries.length, 2);
+      assert.equal(defaultIndex.entries[0].id, "mike");
+      assert.equal(defaultIndex.entries[1].id, "forkctl");
+
+      // Explicit idSource: "title" produces the same result
+      const explicitTitleIndex = generateIndex(analysis, { idSource: "title" });
+      assert.equal(explicitTitleIndex.entries[0].id, "mike");
+      assert.equal(explicitTitleIndex.entries[1].id, "forkctl");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("idSource='name' derives entry ids from frontmatter name: when frontmatter has no explicit id: (Publisher ruling B)", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "loadout-idsource-name-"));
+    try {
+      writeFileSync(
+        join(tmp, "user_profile.md"),
+        [
+          "---",
+          "name: Mike User Profile Studio Model",
+          "description: User profile and studio model",
+          "---",
+          "# User Profile",
+          "",
+        ].join("\n"),
+        "utf-8",
+      );
+      const memPath = join(tmp, "MEMORY.md");
+      writeFileSync(
+        memPath,
+        "# Memory\n- [Mike](user_profile.md) — User profile\n",
+        "utf-8",
+      );
+
+      const analysis = analyzeMemoryMd(memPath);
+      const nameIndex = generateIndex(analysis, { idSource: "name" });
+      assert.equal(nameIndex.entries.length, 1);
+      assert.equal(nameIndex.entries[0].id, "mike-user-profile-studio-model");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("explicit idSource option (--id-source) beats the per-store setting in .loadout.json and MEMORY.md frontmatter (Publisher ruling B)", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "loadout-idsource-override-"));
+    try {
+      writeFileSync(
+        join(tmp, "user_profile.md"),
+        [
+          "---",
+          "name: Mike User Profile Studio Model",
+          "description: User profile and studio model",
+          "---",
+          "# User Profile",
+          "",
+        ].join("\n"),
+        "utf-8",
+      );
+      const memPath = join(tmp, "MEMORY.md");
+      writeFileSync(
+        memPath,
+        [
+          "---",
+          "name: Memory Index",
+          "metadata:",
+          "  id_source: name",
+          "---",
+          "# Memory",
+          "- [Mike](user_profile.md) — User profile",
+          "",
+        ].join("\n"),
+        "utf-8",
+      );
+
+      // 1. Store frontmatter sets id_source: name -> produces name-derived id when no flag passed
+      const analysis = analyzeMemoryMd(memPath);
+      assert.equal(generateIndex(analysis).entries[0].id, "mike-user-profile-studio-model");
+
+      // 2. Explicit idSource: "title" beats MEMORY.md frontmatter id_source: name
+      assert.equal(generateIndex(analysis, { idSource: "title" }).entries[0].id, "mike");
+
+      // 3. Store .loadout.json sets idSource: "title", explicit idSource: "name" beats it (and vice versa)
+      writeFileSync(join(tmp, ".loadout.json"), JSON.stringify({ idSource: "name" }), "utf-8");
+      assert.equal(generateIndex(analysis).entries[0].id, "mike-user-profile-studio-model");
+      assert.equal(generateIndex(analysis, { idSource: "title" }).entries[0].id, "mike");
+
+      writeFileSync(join(tmp, ".loadout.json"), JSON.stringify({ idSource: "title" }), "utf-8");
+      assert.equal(generateIndex(analysis, { projectMode: true }).entries[0].id, "mike");
+      assert.equal(generateIndex(analysis, { projectMode: true, idSource: "name" }).entries[0].id, "mike-user-profile-studio-model");
+
+      // 4. Top-level `id_source: name` in MEMORY.md frontmatter without `name:`/`id:` (raw fallback)
+      writeFileSync(join(tmp, ".loadout.json"), "{ invalid json", "utf-8");
+      writeFileSync(
+        memPath,
+        [
+          "---",
+          "id_source: name",
+          "---",
+          "# Memory",
+          "- [Mike](user_profile.md) — User profile",
+          "",
+        ].join("\n"),
+        "utf-8",
+      );
+      const rawAnalysis = analyzeMemoryMd(memPath);
+      assert.equal(generateIndex(rawAnalysis).entries[0].id, "mike-user-profile-studio-model");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("explicit frontmatter id: always beats both idSource='title' and idSource='name' (Publisher ruling B)", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "loadout-idsource-explicit-id-"));
+    try {
+      writeFileSync(
+        join(tmp, "ollama-sizing.md"),
+        [
+          "---",
+          "id: ollama-model-sizing",
+          "name: Ollama Local Model Sizing Reference",
+          "description: Sizing reference for Ollama models",
+          "---",
+          "# Ollama Sizing",
+          "",
+        ].join("\n"),
+        "utf-8",
+      );
+      const memPath = join(tmp, "MEMORY.md");
+      writeFileSync(
+        memPath,
+        "# Memory\n- [Ollama Bullet Title](ollama-sizing.md) — Sizing guide\n",
+        "utf-8",
+      );
+
+      const analysis = analyzeMemoryMd(memPath);
+      assert.equal(generateIndex(analysis, { idSource: "title" }).entries[0].id, "ollama-model-sizing");
+      assert.equal(generateIndex(analysis, { idSource: "name" }).entries[0].id, "ollama-model-sizing");
+      assert.equal(generateIndex(analysis, { projectMode: false }).entries[0].id, "ollama-model-sizing");
+      assert.equal(generateIndex(analysis, { projectMode: true }).entries[0].id, "ollama-model-sizing");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("projectMode defaults to idSource='name' while non-project mode defaults to idSource='title' (Publisher ruling B)", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "loadout-idsource-proj-default-"));
+    try {
+      writeFileSync(
+        join(tmp, "hardware-omen-45l.md"),
+        [
+          "---",
+          "name: Omen 45L Gaming Desktop",
+          "description: Hardware specs for Omen 45L",
+          "---",
+          "# Omen 45L",
+          "",
+        ].join("\n"),
+        "utf-8",
+      );
+      const memPath = join(tmp, "MEMORY.md");
+      writeFileSync(
+        memPath,
+        "# Memory\n- [Omen 45L 5080 Rig](hardware-omen-45l.md) — Hardware specs\n",
+        "utf-8",
+      );
+
+      const analysis = analyzeMemoryMd(memPath);
+      const globalDefault = generateIndex(analysis, { projectMode: false });
+      const projectDefault = generateIndex(analysis, { projectMode: true });
+
+      assert.equal(globalDefault.entries[0].id, "omen-45l-5080-rig");
+      assert.equal(projectDefault.entries[0].id, "omen-45l-gaming-desktop");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
 });

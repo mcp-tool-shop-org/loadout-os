@@ -1,5 +1,6 @@
 // ── Types ──────────────────────────────────────────────────────
 export type {
+  IdSource,
   MemorySection,
   MemoryRef,
   MemoryAnalysis,
@@ -30,7 +31,14 @@ export { parseMemoryMd } from "./parser.js";
 export { analyzeMemoryMd, extractKeywords, detectSubindex } from "./analyze.js";
 
 // ── Index Generator ───────────────────────────────────────────
-export { generateIndex, extractKeywordsFromTitle, nameToId } from "./index-gen.js";
+export {
+  generateIndex,
+  extractKeywordsFromTitle,
+  nameToId,
+  hasExplicitId,
+  resolveStoreIdSource,
+} from "./index-gen.js";
+export type { GenerateIndexOptions } from "./index-gen.js";
 
 // ── Validator ─────────────────────────────────────────────────
 export {

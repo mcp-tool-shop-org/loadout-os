@@ -742,3 +742,102 @@ test("Q2-6 / follow-up 1: runRefresh writes <dest>.tmp.<pid> and renameSyncs ove
   }
 });
 
+test("Publisher ruling B (CLI): refresh and memories commands honor idSource defaults (global=title, --project=name), per-store config, --id-source override, and explicit frontmatter id:", () => {
+  const sb = makeRefreshSandbox({ valid: true });
+  try {
+    const projRoot = join(sb.dir, "proj-ruling-b");
+    mkdirSync(projRoot, { recursive: true });
+
+    // Topic 1: frontmatter `name:` without explicit `id:`, bullet title differs from frontmatter `name:`
+    writeFileSync(
+      join(sb.storeDir, "user_profile.md"),
+      [
+        "---",
+        "name: Mike User Profile Studio Model",
+        "description: User profile and studio model",
+        "---",
+        "# User Profile",
+        "",
+      ].join("\n"),
+      "utf-8",
+    );
+
+    // Topic 2: explicit frontmatter `id:`
+    writeFileSync(
+      join(sb.storeDir, "ollama-sizing.md"),
+      [
+        "---",
+        "id: ollama-model-sizing",
+        "name: Ollama Local Model Sizing Reference",
+        "description: Sizing reference",
+        "---",
+        "# Ollama Sizing",
+        "",
+      ].join("\n"),
+      "utf-8",
+    );
+
+    writeFileSync(
+      sb.memoryMd,
+      [
+        "# Memory",
+        "- [Mike](user_profile.md) — User profile",
+        "- [Ollama Bullet](ollama-sizing.md) — Sizing reference",
+        "",
+      ].join("\n"),
+      "utf-8",
+    );
+
+    // 1. Default global/--dest refresh -> idSource: "title" ("mike"), explicit id: wins ("ollama-model-sizing")
+    runRefresh({ store: sb.storeDir, dest: sb.destPath });
+    const globalWritten = JSON.parse(readFileSync(sb.destPath, "utf-8"));
+    assert.deepEqual(
+      globalWritten.entries.map((e: { id: string }) => e.id),
+      ["mike", "ollama-model-sizing"],
+    );
+
+    // 2. Default --project refresh -> idSource: "name" ("mike-user-profile-studio-model"), explicit id: still wins ("ollama-model-sizing")
+    runRefresh({ store: sb.storeDir, project: projRoot });
+    const projWritten = JSON.parse(readFileSync(projectDest(projRoot), "utf-8"));
+    assert.deepEqual(
+      projWritten.entries.map((e: { id: string }) => e.id),
+      ["mike-user-profile-studio-model", "ollama-model-sizing"],
+    );
+
+    // 3. CLI flag `--id-source` on `refresh` and `memories index` beats store `.loadout.json` setting
+    writeFileSync(join(sb.storeDir, ".loadout.json"), JSON.stringify({ idSource: "name" }), "utf-8");
+
+    // Store config says "name", so global refresh without flag uses "name"
+    dispatch(["refresh", "--store", sb.storeDir, "--dest", sb.destPath]);
+    const cfgNameWritten = JSON.parse(readFileSync(sb.destPath, "utf-8"));
+    assert.equal(cfgNameWritten.entries[0].id, "mike-user-profile-studio-model");
+
+    // CLI flag `--id-source title` beats store config `"name"` on `refresh`
+    captureLog(() =>
+      dispatch(["refresh", "--store", sb.storeDir, "--dest", sb.destPath, "--id-source", "title"]),
+    );
+    const flagTitleWritten = JSON.parse(readFileSync(sb.destPath, "utf-8"));
+    assert.equal(flagTitleWritten.entries[0].id, "mike");
+
+    // CLI flag `--id-source title` on `memories index` and `memories validate` beats store config `"name"`
+    const memIdxJson = captureLog(() =>
+      dispatch(["memories", "index", sb.memoryMd, "--id-source", "title", "--json"]),
+    );
+    assert.equal(JSON.parse(memIdxJson).index.entries[0].id, "mike");
+    assert.equal(JSON.parse(memIdxJson).index.entries[1].id, "ollama-model-sizing");
+
+    const memValJson = captureLog(() =>
+      dispatch(["memories", "validate", sb.memoryMd, "--id-source", "name", "--json"]),
+    );
+    assert.equal(JSON.parse(memValJson).valid, true);
+
+    // Invalid --id-source throws INVALID_FLAG_VALUE
+    assert.throws(
+      () => dispatch(["memories", "index", sb.memoryMd, "--id-source", "bogus"]),
+      (err: unknown) => (err as { code?: string }).code === "INVALID_FLAG_VALUE",
+    );
+  } finally {
+    sb.cleanup();
+  }
+});
+

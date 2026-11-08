@@ -1,14 +1,14 @@
 # loadout-os: how it works
 
-Mapped at 2026-11-08 from commit 0c72069 by Atlas 1.24.0.
+Mapped at 2026-11-08 from commit 97f2e9e by Atlas 1.24.0.
 
 ## What this is
 
 9 parts, mostly Markdown (236 files); code in TypeScript (85), CSS (8), JavaScript (7), Astro (4) and PowerShell (1). Work enters through 6 doors; the busiest is CI, which reaches 6 parts. It publishes @mcptoolshop/loadout-os to npm. It deploys a site to GitHub Pages. People run ai-loadout, claude-memories, claude-rules and loadout-os.
 
-## What changed since 2026-11-08 (fa95b53)
+## What changed since 2026-11-08 (0c72069)
 
-Nothing structural changed since 2026-11-08; 2 files changed content.
+Nothing structural changed since 2026-11-08; 15 files changed content.
 
 ## What comes in
 
@@ -103,7 +103,7 @@ Read those in order to follow one pull request end to end.
 
 - 6 writes and 23 reads use paths built at run time and are not named here.
 - 1 write goes to places this repository does not track, so it is not listed as generated.
-- 5 writes and 54 reads go to a path their caller passes, not to this repository.
+- 5 writes and 57 reads go to a path their caller passes, not to this repository.
 - 2 writes and 26 reads go to the directory the command is run in, not to this repository.
 - 7 writes and 13 reads go to the home directory (.ai-loadout/ and .claude/) or a path their caller passes, not to this repository.
 - 6 writes and 1 read go to a temporary directory, not to this repository.

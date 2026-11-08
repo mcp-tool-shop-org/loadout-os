@@ -85,6 +85,7 @@ import {
   flagValue as flag,
   positionalArgs,
 } from "./console.js";
+import { parseIdSourceFlag } from "./refresh.js";
 
 // ── Shared loaders ─────────────────────────────────────────────
 
@@ -129,8 +130,26 @@ function loadKernelIndex(path: string): LoadoutIndex {
 // memories <index|validate|stats|health|sync-summaries|place|move>
 // ══════════════════════════════════════════════════════════════
 
+const MEMORIES_VALUE_FLAGS = new Set(["max-lines", "max-bytes", "id-source", "store", "into"]);
+
+function memoriesPositionalArgs(args: string[]): string[] {
+  const out: string[] = [];
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (a.startsWith("--")) {
+      const flagName = a.slice(2);
+      if (MEMORIES_VALUE_FLAGS.has(flagName) && i + 1 < args.length && !args[i + 1].startsWith("--")) {
+        i++;
+      }
+      continue;
+    }
+    out.push(a);
+  }
+  return out;
+}
+
 function memoriesPath(args: string[]): string {
-  const pos = positionalArgs(args);
+  const pos = memoriesPositionalArgs(args);
   if (pos.length === 0) {
     fail(
       "MISSING_ARG",
@@ -145,9 +164,10 @@ export function memoriesIndex(args: string[]): void {
   const file = memoriesPath(args);
   const json = hasFlag(args, "json");
   const lazyLoad = hasFlag(args, "lazy");
+  const idSource = parseIdSourceFlag(args);
 
   const analysis = analyzeMemoryMd(file);
-  const index = generateMemoryIndex(analysis, { lazyLoad });
+  const index = generateMemoryIndex(analysis, { lazyLoad, idSource });
   const issues = validateMemoryIndex(index);
 
   if (json) {
@@ -175,6 +195,7 @@ export function memoriesIndex(args: string[]): void {
 export function memoriesValidate(args: string[]): void {
   const file = memoriesPath(args);
   const json = hasFlag(args, "json");
+  const idSource = parseIdSourceFlag(args);
   const maxLinesStr = flag(args, "max-lines");
   const maxBytesStr = flag(args, "max-bytes");
   const maxLines = maxLinesStr !== undefined ? Number(maxLinesStr) : undefined;
@@ -184,8 +205,9 @@ export function memoriesValidate(args: string[]): void {
   const memoryIssues = validateMemory(analysis, {
     ...(Number.isFinite(maxLines) ? { maxLines } : {}),
     ...(Number.isFinite(maxBytes) ? { maxBytes } : {}),
+    ...(idSource ? { idSource } : {}),
   });
-  const index = generateMemoryIndex(analysis);
+  const index = generateMemoryIndex(analysis, { idSource });
   const indexIssues = validateMemoryIndex(index);
   const all = [...memoryIssues, ...indexIssues];
   const errors = all.filter((i) => i.severity === "error");
@@ -226,8 +248,9 @@ export function memoriesValidate(args: string[]): void {
 export function memoriesStats(args: string[]): void {
   const file = memoriesPath(args);
   const json = hasFlag(args, "json");
+  const idSource = parseIdSourceFlag(args);
   const analysis = analyzeMemoryMd(file);
-  const index = generateMemoryIndex(analysis);
+  const index = generateMemoryIndex(analysis, { idSource });
   const stats = generateStats(analysis, index);
   if (json) {
     log(JSON.stringify(stats, null, 2));
@@ -239,10 +262,11 @@ export function memoriesStats(args: string[]): void {
 }
 
 export function memoriesHealth(args: string[]): void {
+  parseIdSourceFlag(args);
   const json = hasFlag(args, "json");
   const nodeMajor = parseInt(process.version.slice(1), 10);
   const nodeOk = nodeMajor >= 20;
-  const pos = positionalArgs(args);
+  const pos = memoriesPositionalArgs(args);
 
   const checked: { label: string; path: string; found: boolean }[] = [];
   if (pos.length > 0) {
@@ -276,6 +300,7 @@ export function memoriesHealth(args: string[]): void {
 }
 
 export function memoriesSyncSummaries(args: string[]): void {
+  parseIdSourceFlag(args);
   const file = memoriesPath(args);
   const fix = hasFlag(args, "fix");
   const json = hasFlag(args, "json");
@@ -316,15 +341,12 @@ export function memoriesSyncSummaries(args: string[]): void {
 }
 
 function memoriesPlaceOrMove(args: string[], action: "place" | "move"): void {
+  parseIdSourceFlag(args);
   const json = hasFlag(args, "json");
   const storeOpt = flag(args, "store");
   const intoOpt = flag(args, "into");
 
-  // Filter out the values consumed by --store and --into from positionals
-  const consumed = new Set<string>();
-  if (storeOpt) consumed.add(storeOpt);
-  if (intoOpt) consumed.add(intoOpt);
-  const pos = positionalArgs(args).filter((p) => !consumed.has(p));
+  const pos = memoriesPositionalArgs(args);
 
   if (pos.length < 1 || (!intoOpt && pos.length < 2)) {
     fail(
