@@ -6,20 +6,44 @@
  */
 
 import { readFileSync } from "node:fs";
-import { dirname, relative, resolve, sep } from "node:path";
+import { basename, dirname, relative, resolve, sep } from "node:path";
 import { estimateTokens, parseFrontmatter } from "@mcptoolshop/ai-loadout";
-import type { LoadoutEntry, Budget, Frontmatter } from "@mcptoolshop/ai-loadout";
+import type { LoadoutEntry, Budget, Frontmatter, Priority } from "@mcptoolshop/ai-loadout";
 import { DEFAULT_TRIGGERS } from "@mcptoolshop/ai-loadout";
 import type { MemoryAnalysis, MemoryIndex, MemoryRef } from "./types.js";
-import { extractKeywords } from "./analyze.js";
+import { extractKeywords, detectSubindex } from "./analyze.js";
 import { resolveRefPath } from "./paths.js";
+
+/**
+ * Extract clean `[a-z0-9]{3,}` keywords from a reference title and optional file path.
+ * F-04: Strips punctuation (`[^a-z0-9\s-]`) before splitting and includes file-stem tokens.
+ */
+export function extractKeywordsFromTitle(title: string, filePath?: string): string[] {
+  return extractKeywords(title, "", filePath);
+}
+
+/**
+ * Check if the raw YAML frontmatter block explicitly declared a `priority:` line.
+ */
+function hasExplicitPriority(content: string): boolean {
+  const normalized = content.startsWith("\ufeff") ? content.slice(1) : content;
+  const lines = normalized.split("\n");
+  if (lines[0]?.trim() !== "---") return false;
+  for (let i = 1; i < lines.length; i++) {
+    const t = lines[i].trim();
+    if (t === "---") break;
+    if (/^priority\s*:/.test(t)) return true;
+  }
+  return false;
+}
 
 /**
  * Generate a memory dispatch index from analysis results.
  *
  * For each referenced topic file:
- * 1. If it has frontmatter, use that (source of truth)
- * 2. Otherwise, auto-generate entry from name + content keywords
+ * 1. If it is a sub-index (`index-*.md` or `metadata.loadout_role: subindex`), skip emitting it as an entry.
+ * 2. If it has frontmatter, use that (source of truth; summary from `fm.description` when present — F-02).
+ * 3. Otherwise, auto-generate entry from name + content keywords + file-stem tokens.
  */
 export function generateIndex(
   analysis: MemoryAnalysis,
@@ -33,21 +57,6 @@ export function generateIndex(
     // Try relative to MEMORY.md, then relative to parent
     const fullPath = resolveRefPath(ref.path, fileDir, parentDir);
     if (!fullPath) {
-      // MEM-002: don't drop unresolved refs silently. A ref whose path
-      // doesn't resolve (a non-existent file, a glob like `memory/*.md`,
-      // or an absolute path) used to vanish here with zero trace — that's
-      // exactly how parser junk slipped through undetected. Surface it.
-      //
-      // MEM-B03: surface it through DATA, not console.warn. This is a library
-      // export consumed by SDK callers — writing to stderr here spammed every
-      // consumer and rendered inconsistently across index/analyze/stats. The
-      // unresolved path already lands in analysis.missingFiles; that is the
-      // observability channel. The CLI (cmdIndex) reads missingFiles and prints
-      // a one-line summary; the library stays quiet.
-      //
-      // FT-MR3: also record the structured diagnostic so SDK callers get
-      // severity + code + line + hint, not just a bare string. missingFiles
-      // stays a derived view kept in lockstep for back-compat.
       if (!analysis.missingFiles.includes(ref.path)) {
         analysis.missingFiles.push(ref.path);
       }
@@ -68,13 +77,19 @@ export function generateIndex(
 
     const storePath = toStoreRelative(fileDir, fullPath);
     const content = readFileSync(fullPath, "utf-8");
+
+    // Never emit a sub-index file itself as an entry in index.json
+    if (detectSubindex(ref.path, content).isSubindex) {
+      continue;
+    }
+
     const { frontmatter } = parseFrontmatter(content);
 
     if (frontmatter) {
       // Frontmatter is source of truth
       entries.push(entryFromFrontmatter(frontmatter, ref, content, storePath));
     } else {
-      // Auto-generate from name + content
+      // Auto-generate from name + content + file-stem
       entries.push(entryFromContent(ref, content, storePath));
     }
   }
@@ -111,20 +126,6 @@ export function generateIndex(
 /**
  * FT-MR11: record the path that ACTUALLY resolved, expressed relative to the
  * store root (the directory holding MEMORY.md) with POSIX separators.
- *
- * `ref.path` is the pointer exactly as written in MEMORY.md, and the canonical
- * store writes it `memory/foo.md` — a namespace label for the store, not a
- * subdirectory of it. `resolveRefPath` already copes with that by falling back
- * to the parent base, but recording `ref.path` threw that work away. The CLI's
- * `rewritePathsAbsolute` then re-absolutized the raw pointer against the store
- * root ALONE, re-applying the prefix and yielding a doubled `memory/memory/`
- * segment. On the canonical store that broke 420 of 492 entries (85%): the
- * UserPromptSubmit hook reads the published index on every prompt, so every
- * session was silently handed paths to files that do not exist.
- *
- * Store-RELATIVE rather than absolute, because a portable on-disk index is the
- * contract `rewritePathsAbsolute` depends on; POSIX separators because the
- * index is written on Windows and read everywhere.
  */
 function toStoreRelative(storeRoot: string, fullPath: string): string {
   return relative(storeRoot, fullPath).split(sep).join("/");
@@ -138,6 +139,27 @@ function truncateSummary(summary: string): string {
   return summary.slice(0, MAX_SUMMARY);
 }
 
+/**
+ * Build distinct patterns from the file stem and entry id so 1–2 exact technical
+ * tokens (e.g. "udlab", "whea", "buttondown") gain patternBonus (+0.2) and clear
+ * the hook's 0.5 score floor on keyword-rich entries (F-04).
+ */
+function deriveStemPatterns(id: string, storePath: string, existingPatterns: string[]): string[] {
+  if (existingPatterns.length > 0) return existingPatterns;
+  const stem = basename(storePath).replace(/\.md$/i, "").toLowerCase();
+  const stemPattern = stem
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  const idPattern = id
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  const out = new Set<string>();
+  if (stemPattern && stemPattern.length > 2) out.add(stemPattern);
+  if (idPattern && idPattern.length > 2) out.add(idPattern);
+  return [...out];
+}
+
 function entryFromFrontmatter(
   fm: Frontmatter,
   ref: MemoryRef,
@@ -145,18 +167,42 @@ function entryFromFrontmatter(
   storePath: string,
 ): LoadoutEntry {
   const lines = content.split("\n").length;
+
+  // F-03 / F-04: when frontmatter has no explicit `keywords:` (such as Claude Code
+  // memory files with `name:` and `description:`), extract keywords from the title,
+  // content headings, and file stem, plus cleaned tokens from `fm.name`.
+  const keywords = fm.keywords.length > 0
+    ? fm.keywords
+    : extractKeywords(fm.name ? `${ref.name} ${fm.name}` : ref.name, content, storePath);
+
+  const patterns = fm.patterns.length > 0
+    ? fm.patterns
+    : deriveStemPatterns(fm.id, storePath, fm.patterns);
+
+  // Amendment 4 (Archive = manual): entries listed in a sub-index whose frontmatter
+  // sets `metadata.loadout_default_priority: manual` get `priority: "manual"` unless
+  // the topic file's own frontmatter explicitly sets `priority:`.
+  let priority: Priority = fm.priority;
+  if (ref.defaultPriority && !hasExplicitPriority(content)) {
+    priority = ref.defaultPriority;
+  }
+
+  // F-02: The entry `summary` comes from the file's frontmatter `description`,
+  // falling back to the index bullet `ref.description` only when `fm.description` is absent.
+  const rawSummary = fm.description || ref.description || `Memory: ${ref.name}`;
+
   return {
     id: fm.id,
     path: storePath,
-    keywords: fm.keywords,
-    patterns: fm.patterns,
-    priority: fm.priority,
-    // MEM-007: truncate here too — entryFromContent already truncated to
-    // 120, this branch did not, so a long summary survived asymmetrically.
-    summary: truncateSummary(ref.description || `Memory: ${ref.name}`),
+    keywords,
+    patterns,
+    priority,
+    summary: truncateSummary(rawSummary),
     triggers: fm.triggers,
     tokens_est: estimateTokens(content),
     lines,
+    ...(fm.metadata && Object.keys(fm.metadata).length > 0 ? { metadata: fm.metadata } : {}),
+    ...(ref.subindex ? { subindex: true } : {}),
   };
 }
 
@@ -166,21 +212,24 @@ function entryFromContent(
   storePath: string,
 ): LoadoutEntry {
   const id = nameToId(ref.name);
-  const keywords = extractKeywords(ref.name, content);
+  const keywords = extractKeywords(ref.name, content, storePath);
+  const patterns = deriveStemPatterns(id, storePath, []);
   const lines = content.split("\n").length;
+  const priority: Priority = ref.defaultPriority ?? "domain";
 
   return {
     id,
     path: storePath,
     keywords,
-    patterns: [],
-    priority: "domain",
+    patterns,
+    priority,
     summary: ref.description
       ? truncateSummary(ref.description)
       : `Memory: ${ref.name}`,
     triggers: { ...DEFAULT_TRIGGERS },
     tokens_est: estimateTokens(content),
     lines,
+    ...(ref.subindex ? { subindex: true } : {}),
   };
 }
 
@@ -188,11 +237,6 @@ function entryFromContent(
  * Convert a display name to kebab-case ID.
  * "AI Loadout" → "ai-loadout"
  * "Claude Guardian" → "claude-guardian"
- *
- * Exported (MEM-009) so the parser and validator can reuse the exact
- * same derivation — the kebab id is the contract shared between
- * ref-parsing (MEM-001 junk-id rejection) and validate (MEM-004
- * ID_TOO_LONG length check).
  */
 export function nameToId(name: string): string {
   return name

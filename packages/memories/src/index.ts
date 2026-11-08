@@ -27,18 +27,30 @@ export { DEFAULT_TRIGGERS } from "./types.js";
 export { parseMemoryMd } from "./parser.js";
 
 // ── Analyzer ──────────────────────────────────────────────────
-export { analyzeMemoryMd, extractKeywords } from "./analyze.js";
+export { analyzeMemoryMd, extractKeywords, detectSubindex } from "./analyze.js";
 
 // ── Index Generator ───────────────────────────────────────────
-export { generateIndex } from "./index-gen.js";
+export { generateIndex, extractKeywordsFromTitle, nameToId } from "./index-gen.js";
 
 // ── Validator ─────────────────────────────────────────────────
-export { validateMemory, validateMemoryIndex } from "./validate.js";
+export {
+  validateMemory,
+  validateMemoryIndex,
+  summariesMatch,
+  DEFAULT_MAX_MEMORY_LINES,
+  DEFAULT_MAX_MEMORY_BYTES,
+} from "./validate.js";
+export type { ValidateMemoryOptions } from "./validate.js";
+
+// ── Sync & Placement ──────────────────────────────────────────
+export {
+  syncSummaries,
+  placeOrMoveEntry,
+  resolveTargetIndexFile,
+} from "./sync.js";
+export type { SyncChange, SyncSummariesResult, PlaceMoveResult } from "./sync.js";
 
 // ── Path resolution ───────────────────────────────────────────
-// FT-MR10: the single shared ref-path resolver, so the unified loadout-os CLI
-// (and any SDK consumer) resolves topic refs identically to analyze/index-gen/
-// validate.
 export { resolveRefPath } from "./paths.js";
 
 // ── Stats ─────────────────────────────────────────────────────

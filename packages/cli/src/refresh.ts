@@ -2,64 +2,41 @@
  * loadout-os refresh — the Index Freshness Ritual, folded into one command.
  *
  * Replaces the manual three-step ritual (claude-memories index → validate →
- * copy to ~/.ai-loadout/index.json). It (a) regenerates the store index from
- * MEMORY.md, (b) validates with an ANDON HALT on any error-severity issue,
+ * copy to ~/.ai-loadout/index.json or <projectRoot>/.claude/loadout/index.json).
+ * It (a) regenerates the store index from MEMORY.md (including linked sub-indexes),
+ * (b) validates with an ANDON HALT on any error-severity issue,
  * (c) rewrites relative entry paths to absolute paths under the store root and
- * writes the global resolver index the runtime hook reads, then (d) re-validates
- * the written destination (warn-only).
- *
- * Standards compliance (workflow-standards.md — this IS a pipeline with an
- * irreversible write, unlike doctor/report which are pure reads):
- *
- *   ANDON_AUTHORITY 3 — step (b) is a hard halt: if validateMemory /
- *     validateMemoryIndex surface ANY error-severity issue, refresh prints them
- *     and EXITS 1 writing nothing downstream. The bad index never reaches the
- *     live global path the hook reads. Tested: `refresh: andon halt on an
- *     invalid store writes nothing and signals error`.
- *
- *   NAMED_COMPENSATORS 3 — the one irreversible action is the write to --dest
- *     (the live global index ~/.ai-loadout/index.json that the UserPromptSubmit
- *     hook reads on every prompt). COMPENSATOR: before writing, if --dest
- *     already exists we copy it to `<dest>.bak`; on ANY write failure we restore
- *     <dest> from that backup and re-throw, so a half-written or failed write
- *     never leaves the live index corrupt. The undo line is printed for the
- *     human ("undo: copy <dest>.bak back over <dest>"). Owner: the operator who
- *     ran refresh. Tested: `refresh: compensator backs up an existing dest`.
- *
- *   EXTERNAL_VERIFIER 2 — generation (claude-memories generateIndex) and
- *     verification (kernel validateIndex on the written dest) are different
- *     library surfaces; the CLI does not self-grade its own output.
- *
- *   PIN_PER_STEP 1 — the three wrapped library versions are pinned in
- *     package.json (the "model" of a deterministic pipeline is its dep set);
- *     not byte-pinned per invocation. Remediation: not required for a
- *     deterministic (non-LLM) pipeline — there is no sampling to replay.
- *
- *   DECOMPOSE_BY_SECRETS 2 — index generation, validation, path-rewrite, and
- *     the write+compensator are separate functions; the volatile bit (the
- *     irreversible write) is isolated behind one guarded writer.
- *
- *   UNCERTAINTY_GATED_HUMANS 2 — --dry-run is the human gate: when uncertain,
- *     run it first to see the N entries / M paths that WOULD change before
- *     committing the live write. Framed contrastively in output.
+ * writes the target resolver index (global or project), then (d) re-validates
+ * the written destination (warn-only), and (e) optionally snapshots the store's
+ * `.md` files into a git history repository and pushes to a bare mirror repo,
+ * all under an OS file lock (F-07, F-10, F-12, F-16, F-21, F-23, F-31).
  */
 
 import {
   writeFileSync,
+  readFileSync,
   existsSync,
   statSync,
   copyFileSync,
   mkdirSync,
+  readdirSync,
+  unlinkSync,
+  openSync,
+  closeSync,
 } from "node:fs";
-import { dirname, isAbsolute, join, resolve } from "node:path";
-import { homedir } from "node:os";
+import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { dirname, extname, isAbsolute, join, resolve } from "node:path";
+import { homedir, tmpdir } from "node:os";
 
 import {
   analyzeMemoryMd,
   generateIndex as generateMemoryIndex,
   validateMemory,
   validateMemoryIndex,
+  syncSummaries,
   type MemoryIndex,
+  type ValidateMemoryOptions,
 } from "@mcptoolshop/claude-memories";
 
 import {
@@ -87,11 +64,6 @@ import {
 
 /**
  * Canonical memory store (holds MEMORY.md + topic files).
- *
- * Derived from the running user's home directory, not hardcoded. The literal
- * path baked in here was one machine's, which made this shipped default resolve
- * on exactly one computer — and put a username into a public package.
- * `defaultDest()` below already derived its path this way; this matches it.
  */
 export const DEFAULT_STORE = join(
   homedir(),
@@ -106,15 +78,14 @@ export function defaultDest(): string {
   return join(homedir(), ".ai-loadout", "index.json");
 }
 
+/** Project layer destination: `<projectRoot>/.claude/loadout/index.json`. */
+export function projectDest(projectRoot: string): string {
+  return join(resolve(projectRoot), ".claude", "loadout", "index.json");
+}
+
 /**
  * True when two paths resolve to the SAME file on disk. On Windows —
- * case-insensitive volumes — drive-letter and path case are folded, because
- * node's `path.resolve` PRESERVES drive-letter case (`resolve("c:/x")` →
- * `"c:\\x"`, not `"C:\\x"`). A raw `===` would therefore misfire on a
- * `--dest c:/…/.ai-loadout/index.json` that names the live index in lowercase:
- * the write hits the real live index, but the comparison says "custom path",
- * so printRefresh would falsely tell the user the live index was NOT modified.
- * Folding case on win32 closes that false-negative; POSIX stays case-sensitive.
+ * case-insensitive volumes — drive-letter and path case are folded.
  */
 export function sameResolvedPath(a: string, b: string): boolean {
   const ra = resolve(a);
@@ -127,10 +98,34 @@ export function sameResolvedPath(a: string, b: string): boolean {
 export interface RefreshOptions {
   /** Store directory containing MEMORY.md (default DEFAULT_STORE). */
   store?: string;
-  /** Destination global index path (default ~/.ai-loadout/index.json). */
+  /** Destination index path (default ~/.ai-loadout/index.json, or <project>/.claude/loadout/index.json when project is set). */
   dest?: string;
+  /** Project root: writes <project>/.claude/loadout/index.json and leaves global index untouched. */
+  project?: string;
   /** Compute everything, write nothing; report what WOULD change. */
   dryRun?: boolean;
+  /** Sync drifted bullet summaries from topic frontmatter descriptions before validating (--fix). */
+  fixSummaries?: boolean;
+  /** Optional git working tree to snapshot all store `.md` files into (F-10 / F-21). */
+  snapshotRepo?: string;
+  /** Optional bare git mirror repository to push `main` to (F-10 / F-31). */
+  mirrorRepo?: string;
+  /** Commit message note for `--snapshot-repo` (default "loadout-os refresh snapshot"). */
+  note?: string;
+  /** Configurable MEMORY.md line limit (default 180). */
+  maxLines?: number;
+  /** Configurable MEMORY.md byte limit (default 24,000). */
+  maxBytes?: number;
+  /** Subprocess timeout in milliseconds for git commands (default 30,000). */
+  gitTimeoutMs?: number;
+}
+
+export interface SnapshotResult {
+  committed: boolean;
+  noChange: boolean;
+  sha?: string;
+  mirrored: boolean;
+  message: string;
 }
 
 export interface RefreshResult {
@@ -138,6 +133,7 @@ export interface RefreshResult {
   memoryMd: string;
   storeIndexPath: string;
   dest: string;
+  project?: string;
   dryRun: boolean;
   /** Entries in the generated index. */
   entryCount: number;
@@ -152,6 +148,8 @@ export interface RefreshResult {
   backupPath: string | null;
   /** True once the dest was written (false on dry-run or andon halt). */
   wrote: boolean;
+  /** Snapshot/mirror result when `--snapshot-repo` was provided. */
+  snapshot?: SnapshotResult;
 }
 
 /** Structured error carrying an exit code, so the caller maps it 1:1. */
@@ -168,10 +166,286 @@ export class RefreshError extends Error {
   }
 }
 
+// ── OS File Lock (F-07) ─────────────────────────────────────────
+
+const LOCK_STALE_MS = 60_000;
+const LOCK_WAIT_MS = 15_000;
+
+function sleepSync(ms: number): void {
+  const sab = new SharedArrayBuffer(4);
+  const view = new Int32Array(sab);
+  Atomics.wait(view, 0, 0, ms);
+}
+
+export function lockFilePathForKey(lockKey: string): string {
+  const hash = createHash("sha1")
+    .update(process.platform === "win32" ? resolve(lockKey).toLowerCase() : resolve(lockKey))
+    .digest("hex")
+    .slice(0, 16);
+  return join(tmpdir(), `loadout-os-lock-${hash}.lock`);
+}
+
+/**
+ * Execute `fn` while holding an exclusive atomic OS lockfile (`wx`) keyed to `lockKey`.
+ * Prevents overlapping async `refresh` / `post-write` runs from racing on `index.json`
+ * or git history snapshots (F-07).
+ */
+export function withFileLock<T>(lockKey: string, fn: () => T): T {
+  const lockPath = lockFilePathForKey(lockKey);
+  const deadline = Date.now() + LOCK_WAIT_MS;
+  let acquiredFd: number | null = null;
+
+  while (Date.now() < deadline) {
+    try {
+      acquiredFd = openSync(lockPath, "wx");
+      writeFileSync(acquiredFd, `${process.pid}\n${Date.now()}\n`, "utf-8");
+      break;
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code;
+      if (code !== "EEXIST") {
+        throw err;
+      }
+      // Check if existing lock is stale
+      try {
+        const st = statSync(lockPath);
+        if (Date.now() - st.mtimeMs > LOCK_STALE_MS) {
+          unlinkSync(lockPath);
+          continue;
+        }
+      } catch {
+        // Lock was just released by another process
+        continue;
+      }
+      sleepSync(40);
+    }
+  }
+
+  if (acquiredFd === null) {
+    throw new RefreshError(
+      "LOCK_TIMEOUT",
+      `Timed out waiting for file lock on ${lockKey} (${lockPath})`,
+      2,
+    );
+  }
+
+  try {
+    return fn();
+  } finally {
+    try {
+      closeSync(acquiredFd);
+    } catch {
+      /* ignore */
+    }
+    try {
+      unlinkSync(lockPath);
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
+// ── Git History Snapshot & Mirror (F-10 / F-12 / F-21 / F-31) ───
+
+function runGit(
+  cwd: string,
+  args: string[],
+  timeoutMs: number,
+): { status: number; stdout: string; stderr: string } {
+  const res = spawnSync("git", args, {
+    cwd,
+    encoding: "utf-8",
+    timeout: timeoutMs,
+    windowsHide: true,
+  });
+
+  if (res.error) {
+    const errCode = (res.error as NodeJS.ErrnoException).code;
+    if (errCode === "ETIMEDOUT" || /ETIMEDOUT|timed out/i.test(res.error.message)) {
+      // F-12: A subprocess timeout exits 2 with a message, never 1.
+      throw new RefreshError(
+        "SUBPROCESS_TIMEOUT",
+        `git ${args[0] ?? ""} timed out after ${timeoutMs}ms in ${cwd}`,
+        2,
+      );
+    }
+    throw new RefreshError(
+      "GIT_EXEC_FAILED",
+      `git ${args[0] ?? ""} failed to spawn: ${res.error.message}`,
+      1,
+    );
+  }
+
+  return {
+    status: res.status ?? 1,
+    stdout: res.stdout ?? "",
+    stderr: res.stderr ?? "",
+  };
+}
+
+/**
+ * Snapshot all `.md` files from `storeDir` into `snapshotRepo` on branch `main`,
+ * and optionally push `main` to `mirrorRepo` (initialising bare mirror with `-b main`).
+ * Exits non-zero on a failed commit or push; "no change" is success (F-10, F-31).
+ */
+export function runSnapshotAndMirror(opts: {
+  storeDir: string;
+  snapshotRepo: string;
+  mirrorRepo?: string;
+  note?: string;
+  timeoutMs?: number;
+}): SnapshotResult {
+  const storeDir = resolve(opts.storeDir);
+  const snapshotRepo = resolve(opts.snapshotRepo);
+  const mirrorRepo = opts.mirrorRepo ? resolve(opts.mirrorRepo) : undefined;
+  const note = opts.note?.trim() || "loadout-os refresh snapshot";
+  const timeoutMs = opts.timeoutMs ?? 30_000;
+
+  // Ensure snapshotRepo exists and is an initialized git repo on branch `main`
+  if (!existsSync(snapshotRepo)) {
+    mkdirSync(snapshotRepo, { recursive: true });
+  }
+  if (!existsSync(join(snapshotRepo, ".git"))) {
+    const init = runGit(snapshotRepo, ["init", "-q", "-b", "main", snapshotRepo], timeoutMs);
+    if (init.status !== 0) {
+      throw new RefreshError(
+        "SNAPSHOT_INIT_FAILED",
+        `Failed to initialize snapshot repo at ${snapshotRepo}: ${init.stderr.trim()}`,
+        1,
+      );
+    }
+  }
+
+  // Copy store *.md files into snapshotRepo and remove deleted *.md files
+  const storeMdFiles = new Set<string>();
+  for (const entry of readdirSync(storeDir)) {
+    const full = join(storeDir, entry);
+    try {
+      if (statSync(full).isFile() && extname(entry) === ".md") {
+        storeMdFiles.add(entry);
+        copyFileSync(full, join(snapshotRepo, entry));
+      }
+    } catch {
+      /* ignore unreadable */
+    }
+  }
+
+  for (const entry of readdirSync(snapshotRepo)) {
+    if (entry === ".git") continue;
+    const full = join(snapshotRepo, entry);
+    try {
+      if (statSync(full).isFile() && extname(entry) === ".md" && !storeMdFiles.has(entry)) {
+        unlinkSync(full);
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
+  const addRes = runGit(snapshotRepo, ["add", "-A"], timeoutMs);
+  if (addRes.status !== 0) {
+    throw new RefreshError(
+      "SNAPSHOT_COMMIT_FAILED",
+      `git add failed in ${snapshotRepo}: ${addRes.stderr.trim()}`,
+      1,
+    );
+  }
+
+  const diffRes = runGit(snapshotRepo, ["diff", "--cached", "--quiet"], timeoutMs);
+  let committed = false;
+  let noChange = false;
+  let sha: string | undefined;
+
+  if (diffRes.status === 0) {
+    // No staged changes — "No change" is success (F-10)
+    noChange = true;
+  } else {
+    const commitRes = runGit(
+      snapshotRepo,
+      [
+        "-c",
+        "user.name=loadout-os",
+        "-c",
+        "user.email=loadout-os@localhost",
+        "commit",
+        "-q",
+        "-m",
+        note,
+      ],
+      timeoutMs,
+    );
+    if (commitRes.status !== 0) {
+      throw new RefreshError(
+        "SNAPSHOT_COMMIT_FAILED",
+        `git commit failed in ${snapshotRepo}: ${(commitRes.stderr || commitRes.stdout).trim()}`,
+        1,
+      );
+    }
+    committed = true;
+    const rev = runGit(snapshotRepo, ["rev-parse", "--short", "HEAD"], timeoutMs);
+    if (rev.status === 0) {
+      sha = rev.stdout.trim();
+    }
+  }
+
+  let mirrored = false;
+  if (mirrorRepo) {
+    // Check if snapshotRepo has at least one commit to push
+    const headCheck = runGit(snapshotRepo, ["rev-parse", "--verify", "HEAD"], timeoutMs);
+    if (headCheck.status === 0) {
+      const mirrorParent = dirname(mirrorRepo);
+      if (!existsSync(mirrorParent)) {
+        throw new RefreshError(
+          "MIRROR_PUSH_FAILED",
+          `Mirror parent directory does not exist: ${mirrorParent}`,
+          1,
+        );
+      }
+      if (!existsSync(mirrorRepo)) {
+        // F-31: Initialise bare repos with `-b main`
+        const bareInit = runGit(mirrorParent, ["init", "-q", "--bare", "-b", "main", mirrorRepo], timeoutMs);
+        if (bareInit.status !== 0) {
+          throw new RefreshError(
+            "MIRROR_INIT_FAILED",
+            `Failed to initialize bare mirror repo at ${mirrorRepo}: ${bareInit.stderr.trim()}`,
+            1,
+          );
+        }
+      }
+      const pushRes = runGit(snapshotRepo, ["push", "-q", mirrorRepo, "HEAD:refs/heads/main"], timeoutMs);
+      if (pushRes.status !== 0) {
+        throw new RefreshError(
+          "MIRROR_PUSH_FAILED",
+          `git push to mirror ${mirrorRepo} failed: ${(pushRes.stderr || pushRes.stdout).trim()}`,
+          1,
+        );
+      }
+      mirrored = true;
+    }
+  }
+
+  const msgParts: string[] = [];
+  if (noChange) {
+    msgParts.push("history: no change");
+  } else {
+    msgParts.push(`history: committed ${sha ?? "HEAD"}`);
+  }
+  if (mirrored) {
+    msgParts.push(`(mirrored to ${mirrorRepo})`);
+  }
+
+  return {
+    committed,
+    noChange,
+    sha,
+    mirrored,
+    message: msgParts.join(" "),
+  };
+}
+
 /**
  * Rewrite each entry's relative `path` to an absolute path under the store
- * root, and stamp `source` = <store>/MEMORY.md. Returns a fresh index object
- * (does not mutate the input) plus a count of how many paths were rewritten.
+ * root, and stamp `source` = <store>/MEMORY.md (F-23). Returns a fresh index
+ * object (does not mutate the input) plus a count of how many paths were rewritten.
  */
 export function rewritePathsAbsolute(
   index: MemoryIndex,
@@ -191,145 +465,173 @@ export function rewritePathsAbsolute(
 }
 
 /**
- * Core refresh logic. Pure with respect to its inputs (store/dest are
- * parameters), so tests drive it against a SCRATCH store + a temp dest —
- * never the live ~/.ai-loadout or the canonical store.
+ * Core refresh logic.
  *
- * Steps:
- *   (a) index the store          — generateIndex(analyzeMemoryMd(MEMORY.md))
- *   (b) validate (ANDON HALT)    — validateMemory + validateMemoryIndex
- *   (c) path-rewrite + copy      — rewrite to absolute, write --dest (guarded)
- *   (d) re-validate the dest     — kernel.validateIndex (warn-only)
- *
- * Throws RefreshError with the right exitCode on a missing store (2), an andon
- * validation error (1), or a write failure (1, after compensator restore).
+ * When `opts.project` is provided (`loadout-os refresh --store <dir> --project <root>`):
+ * - Writes `<root>/.claude/loadout/index.json` (with `source: <store>/MEMORY.md` — F-23)
+ * - Leaves the global `~/.ai-loadout/index.json` untouched (and does not drop a stale
+ *   `index.json` inside the live memory store directory — F-36).
+ * - Keeps the ANDON HALT and `<dest>.bak` COMPENSATOR natively (F-16).
+ * - Runs under an OS file lock (F-07).
  */
 export function runRefresh(opts: RefreshOptions): RefreshResult {
   const store = resolve(opts.store ?? DEFAULT_STORE);
-  const dest = resolve(opts.dest ?? defaultDest());
+  const project = opts.project ? resolve(opts.project) : undefined;
+  const dest = resolve(
+    opts.dest ?? (project ? projectDest(project) : defaultDest()),
+  );
   const dryRun = !!opts.dryRun;
 
-  // ── precondition: store + MEMORY.md present (exit 2 when missing) ──
-  const memoryMd = join(store, "MEMORY.md");
-  if (!existsSync(store) || !statSync(store).isDirectory()) {
-    throw new RefreshError(
-      "STORE_NOT_FOUND",
-      `Store directory not found: ${store}`,
-      2,
+  return withFileLock(dest, () => {
+    // ── precondition: store + MEMORY.md present (exit 2 when missing) ──
+    const memoryMd = join(store, "MEMORY.md");
+    if (!existsSync(store) || !statSync(store).isDirectory()) {
+      throw new RefreshError(
+        "STORE_NOT_FOUND",
+        `Store directory not found: ${store}`,
+        2,
+      );
+    }
+    if (!existsSync(memoryMd)) {
+      throw new RefreshError(
+        "MEMORY_MD_NOT_FOUND",
+        `MEMORY.md not found in store: ${memoryMd}`,
+        2,
+      );
+    }
+
+    // Optional pre-validation summary sync (--fix)
+    if (opts.fixSummaries && !dryRun) {
+      syncSummaries(memoryMd, { fix: true });
+    }
+
+    // ── (a) index the store ──────────────────────────────────────
+    const analysis = analyzeMemoryMd(memoryMd);
+    const storeIndex = generateMemoryIndex(analysis);
+    const storeIndexPath = project ? dest : join(store, "index.json");
+
+    // ── (b) validate — ANDON HALT on any error-severity issue ────
+    const valOpts: ValidateMemoryOptions = {};
+    if (opts.maxLines !== undefined) valOpts.maxLines = opts.maxLines;
+    if (opts.maxBytes !== undefined) valOpts.maxBytes = opts.maxBytes;
+
+    const gate: ValidationIssue[] = [
+      ...validateMemory(analysis, valOpts),
+      ...validateMemoryIndex(storeIndex),
+    ];
+    const gateErrors = gate.filter((i) => i.severity === "error");
+    const gateWarnings = gate.filter((i) => i.severity === "warning");
+    if (gateErrors.length > 0) {
+      // Halt the pipeline: nothing downstream is written.
+      throw new RefreshError(
+        "VALIDATION_FAILED",
+        `${gateErrors.length} validation error(s) — halting, nothing written`,
+        1,
+        gateErrors,
+      );
+    }
+
+    // ── (c) path-rewrite (compute always; write only when not dry-run) ──
+    const { index: rewritten, pathsRewritten } = rewritePathsAbsolute(
+      storeIndex,
+      store,
+      memoryMd,
     );
-  }
-  if (!existsSync(memoryMd)) {
-    throw new RefreshError(
-      "MEMORY_MD_NOT_FOUND",
-      `MEMORY.md not found in store: ${memoryMd}`,
-      2,
-    );
-  }
+    const destJson = JSON.stringify(rewritten, null, 2) + "\n";
+    const storeJson = JSON.stringify(storeIndex, null, 2) + "\n";
 
-  // ── (a) index the store ──────────────────────────────────────
-  const analysis = analyzeMemoryMd(memoryMd);
-  const storeIndex = generateMemoryIndex(analysis);
-  const storeIndexPath = join(store, "index.json");
+    // re-validate the rewritten dest payload (warn-only) — kernel structure check
+    const destIssues = kernelValidateIndex(rewritten as unknown as LoadoutIndex);
 
-  // ── (b) validate — ANDON HALT on any error-severity issue ────
-  const gate: ValidationIssue[] = [
-    ...validateMemory(analysis),
-    ...validateMemoryIndex(storeIndex),
-  ];
-  const gateErrors = gate.filter((i) => i.severity === "error");
-  const gateWarnings = gate.filter((i) => i.severity === "warning");
-  if (gateErrors.length > 0) {
-    // Halt the pipeline: nothing downstream (store index.json, dest) is written.
-    throw new RefreshError(
-      "VALIDATION_FAILED",
-      `${gateErrors.length} validation error(s) — halting, nothing written`,
-      1,
-      gateErrors,
-    );
-  }
+    if (dryRun) {
+      return {
+        store,
+        memoryMd,
+        storeIndexPath,
+        dest,
+        ...(project ? { project } : {}),
+        dryRun: true,
+        entryCount: rewritten.entries.length,
+        pathsRewritten,
+        gateErrors,
+        gateWarnings,
+        destIssues,
+        backupPath: null,
+        wrote: false,
+      };
+    }
 
-  // ── (c) path-rewrite (compute always; write only when not dry-run) ──
-  const { index: rewritten, pathsRewritten } = rewritePathsAbsolute(
-    storeIndex,
-    store,
-    memoryMd,
-  );
-  const destJson = JSON.stringify(rewritten, null, 2) + "\n";
-  const storeJson = JSON.stringify(storeIndex, null, 2) + "\n";
+    // For global refresh (no --project), write the in-tree store index.json too for back-compat.
+    // For --project refresh, only write <project>/.claude/loadout/index.json so we don't leave
+    // an unrequested index.json inside the project's memory store (F-36).
+    if (!project) {
+      writeFileSync(storeIndexPath, storeJson, "utf-8");
+    }
 
-  // re-validate the rewritten dest payload (warn-only) — kernel structure check
-  const destIssues = kernelValidateIndex(rewritten as unknown as LoadoutIndex);
+    // ── COMPENSATOR (NAMED, irreversible write to the resolver index) ──
+    let backupPath: string | null = null;
+    if (existsSync(dest)) {
+      backupPath = `${dest}.bak`;
+      copyFileSync(dest, backupPath);
+    }
+    try {
+      const destDir = dirname(dest);
+      if (!existsSync(destDir)) mkdirSync(destDir, { recursive: true });
+      const tmpDest = `${dest}.tmp-${process.pid}`;
+      writeFileSync(tmpDest, destJson, "utf-8");
+      copyFileSync(tmpDest, dest);
+      try {
+        unlinkSync(tmpDest);
+      } catch {
+        /* ignore */
+      }
+    } catch (e) {
+      if (backupPath && existsSync(backupPath)) {
+        try {
+          copyFileSync(backupPath, dest);
+        } catch {
+          /* best-effort restore */
+        }
+      }
+      if (e instanceof RefreshError) throw e;
+      throw new RefreshError(
+        "WRITE_FAILED",
+        `Failed to write dest (${dest}): ${(e as Error).message}${
+          backupPath ? ` — restored from ${backupPath}` : ""
+        }`,
+        1,
+      );
+    }
 
-  if (dryRun) {
+    // ── (e) Optional git snapshot & bare mirror push (F-10 / F-21 / F-31) ──
+    let snapshot: SnapshotResult | undefined;
+    if (opts.snapshotRepo) {
+      snapshot = runSnapshotAndMirror({
+        storeDir: store,
+        snapshotRepo: opts.snapshotRepo,
+        mirrorRepo: opts.mirrorRepo,
+        note: opts.note,
+        timeoutMs: opts.gitTimeoutMs,
+      });
+    }
+
     return {
       store,
       memoryMd,
       storeIndexPath,
       dest,
-      dryRun: true,
+      ...(project ? { project } : {}),
+      dryRun: false,
       entryCount: rewritten.entries.length,
       pathsRewritten,
       gateErrors,
       gateWarnings,
       destIssues,
-      backupPath: null,
-      wrote: false,
+      backupPath,
+      wrote: true,
+      ...(snapshot ? { snapshot } : {}),
     };
-  }
-
-  // write the store index.json first (idempotent, in-tree, reversible by re-run)
-  writeFileSync(storeIndexPath, storeJson, "utf-8");
-
-  // ── COMPENSATOR (NAMED, irreversible write to the live global index) ──
-  // The dest is the index the UserPromptSubmit hook reads on every prompt; a
-  // corrupt/half-written dest breaks every future session. Before overwriting,
-  // back up the existing dest to <dest>.bak; on ANY write failure, restore the
-  // dest from that backup and re-throw. Undo command is printed for the human.
-  let backupPath: string | null = null;
-  if (existsSync(dest)) {
-    backupPath = `${dest}.bak`;
-    copyFileSync(dest, backupPath);
-  }
-  try {
-    // Create the parent dir for a first-ever write (e.g. a fresh machine with
-    // no ~/.ai-loadout yet). mkdir is idempotent + reversible, not the
-    // irreversible action the compensator guards — that is the dest write below.
-    const destDir = dirname(dest);
-    if (!existsSync(destDir)) mkdirSync(destDir, { recursive: true });
-    writeFileSync(dest, destJson, "utf-8");
-  } catch (e) {
-    // restore from the backup so the live index is never left corrupt
-    if (backupPath && existsSync(backupPath)) {
-      try {
-        copyFileSync(backupPath, dest);
-      } catch {
-        /* best-effort restore; surface the original error below */
-      }
-    }
-    if (e instanceof RefreshError) throw e;
-    throw new RefreshError(
-      "WRITE_FAILED",
-      `Failed to write dest (${dest}): ${(e as Error).message}${
-        backupPath ? ` — restored from ${backupPath}` : ""
-      }`,
-      1,
-    );
-  }
-
-  return {
-    store,
-    memoryMd,
-    storeIndexPath,
-    dest,
-    dryRun: false,
-    entryCount: rewritten.entries.length,
-    pathsRewritten,
-    gateErrors,
-    gateWarnings,
-    destIssues,
-    backupPath,
-    wrote: true,
-  };
+  });
 }
 
 /** Render a refresh result as a human screen. */
@@ -337,13 +639,16 @@ export function printRefresh(r: RefreshResult): void {
   log();
   log(`${BOLD}loadout-os refresh${RESET} ${DIM}— Index Freshness Ritual${RESET}`);
   log(`  ${DIM}store: ${r.store}${RESET}`);
+  if (r.project) {
+    log(`  ${DIM}project: ${r.project}${RESET}`);
+  }
   log(`  ${DIM}dest:  ${r.dest}${RESET}`);
   log();
 
   if (r.dryRun) {
     info(`${BOLD}--dry-run${RESET} — nothing was written.`);
     log(
-      `  ${CYAN}Would write${RESET} ${r.storeIndexPath} and ${r.dest}: ` +
+      `  ${CYAN}Would write${RESET} ${r.dest}: ` +
         `${r.entryCount} entr${r.entryCount === 1 ? "y" : "ies"}, ` +
         `${r.pathsRewritten} relative path(s) → absolute.`,
     );
@@ -357,13 +662,19 @@ export function printRefresh(r: RefreshResult): void {
     return;
   }
 
-  ok(`Wrote store index: ${r.storeIndexPath}`);
-  ok(`Wrote global index: ${r.dest} (${r.entryCount} entries, ${r.pathsRewritten} paths → absolute)`);
+  if (!r.project) {
+    ok(`Wrote store index: ${r.storeIndexPath}`);
+  }
+  const label = r.project ? "project index" : "global index";
+  ok(`Wrote ${label}: ${r.dest} (${r.entryCount} entries, ${r.pathsRewritten} paths → absolute)`);
   if (r.backupPath) {
     log(`  ${DIM}compensator: backed up previous dest → ${r.backupPath}${RESET}`);
     log(`  ${DIM}undo: copy ${r.backupPath} back over ${r.dest}${RESET}`);
   } else {
     log(`  ${DIM}compensator: no prior dest existed; nothing to back up (undo = delete ${r.dest})${RESET}`);
+  }
+  if (r.snapshot) {
+    ok(r.snapshot.message);
   }
   if (r.gateWarnings.length > 0) {
     warn(`${r.gateWarnings.length} validation warning(s) (non-blocking):`);
@@ -373,7 +684,6 @@ export function printRefresh(r: RefreshResult): void {
     const errs = r.destIssues.filter((i) => i.severity === "error");
     const wrns = r.destIssues.filter((i) => i.severity === "warning");
     if (errs.length > 0) {
-      // dest re-validation is warn-only by contract; surface but do not fail.
       warn(`dest re-validation found ${errs.length} structural error(s) (reported, not blocking):`);
       for (const i of errs) log(`    ${RED}✗[${i.code}]${RESET} ${i.message}`);
     }
@@ -382,13 +692,15 @@ export function printRefresh(r: RefreshResult): void {
     }
   }
   log();
-  if (sameResolvedPath(r.dest, defaultDest())) {
-    // dest IS the live global resolver index the hook reads every prompt.
+  if (r.project) {
+    log(
+      `  ${DIM}This refreshed the PROJECT resolver index (${r.dest}); the global index (${defaultDest()}) was NOT modified.${RESET}`,
+    );
+  } else if (sameResolvedPath(r.dest, defaultDest())) {
     log(
       `  ${DIM}This refreshed the LIVE global resolver index the UserPromptSubmit hook reads on every prompt — the change is live now.${RESET}`,
     );
   } else {
-    // a custom --dest (scratch/test/alternate): the live index was untouched.
     log(
       `  ${DIM}Note: --dest is a custom path, not the live resolver index (${defaultDest()}) — the index the hook reads was NOT modified. Re-run without --dest to refresh the live one.${RESET}`,
     );
@@ -414,15 +726,35 @@ export function printRefreshAndon(issues: ValidationIssue[]): void {
 
 /**
  * Dispatcher wiring: parse flags, run refresh, render, map exit codes.
- *   0 success · 1 andon validation error OR write failure · 2 store/MEMORY.md missing
+ *   0 success · 1 andon validation error OR write/git failure · 2 store/MEMORY.md missing or timeout
  */
 export function dispatchRefresh(args: string[]): void {
   const store = flagValue(args, "store") ?? DEFAULT_STORE;
-  const dest = flagValue(args, "dest") ?? defaultDest();
+  const project = flagValue(args, "project");
+  const dest = flagValue(args, "dest");
   const dryRun = hasFlag(args, "dry-run");
+  const fixSummaries = hasFlag(args, "fix") || hasFlag(args, "sync-summaries");
+  const snapshotRepo = flagValue(args, "snapshot-repo");
+  const mirrorRepo = flagValue(args, "mirror-repo");
+  const note = flagValue(args, "note");
+  const maxLinesStr = flagValue(args, "max-lines");
+  const maxBytesStr = flagValue(args, "max-bytes");
+  const maxLines = maxLinesStr !== undefined ? Number(maxLinesStr) : undefined;
+  const maxBytes = maxBytesStr !== undefined ? Number(maxBytesStr) : undefined;
 
   try {
-    const result = runRefresh({ store, dest, dryRun });
+    const result = runRefresh({
+      store,
+      project,
+      dest,
+      dryRun,
+      fixSummaries,
+      snapshotRepo,
+      mirrorRepo,
+      note,
+      maxLines: Number.isFinite(maxLines) ? maxLines : undefined,
+      maxBytes: Number.isFinite(maxBytes) ? maxBytes : undefined,
+    });
     printRefresh(result);
   } catch (e) {
     if (e instanceof RefreshError) {
@@ -433,8 +765,6 @@ export function dispatchRefresh(args: string[]): void {
         log(`  ${RED}✗ [${e.code}]${RESET} ${e.message}`);
         log();
       }
-      // Surface through the shared structured error so the process boundary
-      // exits with the mapped code (2 store missing, 1 andon/write).
       fail(e.code, e.message, undefined, e.exitCode);
     }
     throw e;

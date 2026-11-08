@@ -13,14 +13,17 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, existsSync, writeFileSync, statSync } from "node:fs";
-import { isAbsolute, resolve } from "node:path";
+import { readFileSync, existsSync, writeFileSync, statSync, mkdirSync } from "node:fs";
+import { isAbsolute, join, resolve } from "node:path";
 
 import {
   runRefresh,
   printRefresh,
   defaultDest,
+  projectDest,
   sameResolvedPath,
+  withFileLock,
+  lockFilePathForKey,
   RefreshError,
   type RefreshResult,
 } from "../refresh.js";
@@ -250,7 +253,7 @@ test("refresh: store present but MEMORY.md missing exits 2", () => {
 // resolver index. It's now contrastive: live-dest confirms the live write;
 // custom-dest says the live index was untouched. Neither prints the stale note.
 
-test("printRefresh: a live-dest run confirms the change is live and drops the stale note", () => {
+test("printRefresh: a live-dest run confirms the live write and drops the stale note", () => {
   const out = captureLog(() => printRefresh(okResult(resolve(defaultDest()))));
   assert.match(out, /the change is live now/i, "live-dest run must confirm the live write");
   assert.doesNotMatch(
@@ -304,3 +307,102 @@ test(
     assert.doesNotMatch(out, /deferred|coordinator-supervised/i);
   },
 );
+
+// ── Part B: --project, --snapshot-repo, --mirror-repo, --fix, and locking ──
+
+test("refresh --project <root>: writes <root>/.claude/loadout/index.json with source and leaves global index untouched (F-16, F-23)", () => {
+  const sb = makeRefreshSandbox({ valid: true });
+  try {
+    const projRoot = join(sb.dir, "my-project");
+    mkdirSync(projRoot, { recursive: true });
+
+    const result = runRefresh({ store: sb.storeDir, project: projRoot });
+    const expectedDest = projectDest(projRoot);
+    assert.equal(result.dest, expectedDest);
+    assert.equal(result.wrote, true);
+    assert.ok(existsSync(expectedDest), "project index must be written");
+    assert.equal(existsSync(sb.destPath), false, "custom/global dest must remain untouched");
+
+    const written = JSON.parse(readFileSync(expectedDest, "utf-8"));
+    assert.equal(written.source, sb.memoryMd, "project index must record source MEMORY.md (F-23)");
+
+    // Second run backs up existing project index to .bak (F-16)
+    const second = runRefresh({ store: sb.storeDir, project: projRoot });
+    assert.equal(second.backupPath, `${expectedDest}.bak`);
+    assert.ok(existsSync(`${expectedDest}.bak`));
+  } finally {
+    sb.cleanup();
+  }
+});
+
+test("refresh --snapshot-repo and --mirror-repo: commits store .md files, pushes to bare mirror (-b main), treats no-change as success, and fails non-zero on git error (F-10, F-21, F-31)", () => {
+  const sb = makeRefreshSandbox({ valid: true });
+  try {
+    const projRoot = join(sb.dir, "proj");
+    const snapDir = join(sb.dir, "snap-repo");
+    const mirrorDir = join(sb.dir, "mirror.git");
+
+    // 1. First run initializes snapshot repo + bare mirror (-b main) and commits + pushes
+    const r1 = runRefresh({
+      store: sb.storeDir,
+      project: projRoot,
+      snapshotRepo: snapDir,
+      mirrorRepo: mirrorDir,
+    });
+    assert.equal(r1.snapshot?.committed, true);
+    assert.equal(r1.snapshot?.mirrored, true);
+    assert.ok(existsSync(join(snapDir, "MEMORY.md")), "MEMORY.md copied to snapshot repo");
+    assert.ok(existsSync(join(mirrorDir, "HEAD")), "bare mirror initialized");
+    const mirrorHead = readFileSync(join(mirrorDir, "HEAD"), "utf-8");
+    assert.match(mirrorHead, /refs\/heads\/main/, "bare mirror HEAD must point to main (F-31)");
+
+    // 2. Second run with no changes succeeds with committed: false, noChange: true
+    const r2 = runRefresh({
+      store: sb.storeDir,
+      project: projRoot,
+      snapshotRepo: snapDir,
+      mirrorRepo: mirrorDir,
+    });
+    assert.equal(r2.snapshot?.committed, false);
+    assert.equal(r2.snapshot?.noChange, true);
+    assert.equal(r2.snapshot?.mirrored, true);
+
+    // 3. Broken mirror path (file instead of directory) fails non-zero (F-10 / F-21)
+    const badMirror = join(sb.dir, "not-a-repo-file");
+    writeFileSync(badMirror, "corrupt", "utf-8");
+    // Modify a store file so it tries to commit and push to the bad mirror
+    writeFileSync(join(sb.storeDir, "topic-a.md"), "# Topic A\nUpdated body.\n", "utf-8");
+    assert.throws(
+      () =>
+        runRefresh({
+          store: sb.storeDir,
+          project: projRoot,
+          snapshotRepo: snapDir,
+          mirrorRepo: badMirror,
+        }),
+      (err: unknown) => {
+        assert.ok(err instanceof RefreshError);
+        assert.equal(err.exitCode, 1);
+        return true;
+      },
+    );
+  } finally {
+    sb.cleanup();
+  }
+});
+
+test("withFileLock: serializes access and cleans up the lock file (F-07)", () => {
+  const sb = makeRefreshSandbox({ valid: true });
+  try {
+    const lockKey = join(sb.dir, "refresh-target");
+    const actualLockPath = lockFilePathForKey(lockKey);
+    const value = withFileLock(lockKey, () => {
+      assert.ok(existsSync(actualLockPath), "lock file must exist while inside critical section");
+      return 42;
+    });
+    assert.equal(value, 42);
+    assert.equal(existsSync(actualLockPath), false, "lock file must be cleaned up after completion");
+  } finally {
+    sb.cleanup();
+  }
+});

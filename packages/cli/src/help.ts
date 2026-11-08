@@ -53,9 +53,13 @@ export const COMMAND_HELP: Record<string, HelpEntry> = {
     exits: [["0", "index generated"], ["1", "MEMORY.md missing / unreadable"]],
   },
   "memories validate": {
-    synopsis: "loadout-os memories validate <MEMORY.md> [--json]",
+    synopsis: "loadout-os memories validate <MEMORY.md> [--max-lines <n>] [--max-bytes <n>] [--json]",
     args: [["<MEMORY.md>", "path to MEMORY.md to lint (required, first)"]],
-    flags: [["--json", "machine-readable output"]],
+    flags: [
+      ["--max-lines <n>", "MEMORY.md line cap (default 180)"],
+      ["--max-bytes <n>", "MEMORY.md byte cap (default 24000)"],
+      ["--json", "machine-readable output"],
+    ],
     example: "loadout-os memories validate ./MEMORY.md",
     exits: [["0", "no errors (warnings allowed)"], ["1", "≥1 error-severity issue"]],
   },
@@ -72,6 +76,44 @@ export const COMMAND_HELP: Record<string, HelpEntry> = {
     flags: [["--json", "machine-readable output"]],
     example: "loadout-os memories health",
     exits: [["0", "Node OK"], ["1", "Node < 20"]],
+  },
+  "memories sync-summaries": {
+    synopsis: "loadout-os memories sync-summaries <MEMORY.md> [--dry-run] [--json]",
+    args: [["<MEMORY.md>", "path to the store's MEMORY.md (required, first)"]],
+    flags: [
+      ["--dry-run", "report drifted bullet summaries without modifying files"],
+      ["--json", "machine-readable output"],
+    ],
+    example: "loadout-os memories sync-summaries ./MEMORY.md",
+    exits: [["0", "summaries synchronized"], ["1", "MEMORY.md missing / unreadable"]],
+  },
+  "memories place": {
+    synopsis: "loadout-os memories place <MEMORY.md> <topic.md> [--target <file>] [--section <heading>] [--json]",
+    args: [
+      ["<MEMORY.md>", "path to the store's MEMORY.md (FIRST positional)"],
+      ["<topic.md>", "topic file to place in an index (SECOND positional)"],
+    ],
+    flags: [
+      ["--target <file>", "explicit index file or sub-index stem (default: auto-resolved from id prefix)"],
+      ["--section <heading>", "section heading to append under"],
+      ["--json", "machine-readable output"],
+    ],
+    example: "loadout-os memories place ./MEMORY.md ./project_alpha.md",
+    exits: [["0", "entry placed or updated"], ["1", "missing file / invalid args"]],
+  },
+  "memories move": {
+    synopsis: "loadout-os memories move <MEMORY.md> <topic.md> --to <file> [--section <heading>] [--json]",
+    args: [
+      ["<MEMORY.md>", "path to the store's MEMORY.md (FIRST positional)"],
+      ["<topic.md>", "topic file to move across indexes (SECOND positional)"],
+    ],
+    flags: [
+      ["--to <file>", "target index file or sub-index stem (required)"],
+      ["--section <heading>", "section heading to append under in the target index"],
+      ["--json", "machine-readable output"],
+    ],
+    example: "loadout-os memories move ./MEMORY.md ./project_alpha.md --to index-archive.md",
+    exits: [["0", "entry moved atomically"], ["1", "missing file / missing --to"]],
   },
 
   // ── rules namespace ──────────────────────────────────────────
@@ -220,18 +262,22 @@ export const COMMAND_HELP: Record<string, HelpEntry> = {
     exits: [["0", "hook ran"], ["1", "hook binary not found"]],
   },
   refresh: {
-    synopsis: "loadout-os refresh [--store <dir>] [--dest <path>] [--dry-run]",
+    synopsis: "loadout-os refresh [--store <dir>] [--dest <path>] [--project <root>] [--snapshot-repo <dir>] [--mirror-repo <bare>] [--fix] [--dry-run]",
     flags: [
       ["--store <dir>", "memory store dir (default canonical store)"],
-      ["--dest <path>", "global index to write (default ~/.ai-loadout/index.json)"],
+      ["--dest <path>", "index file to write (default ~/.ai-loadout/index.json)"],
+      ["--project <root>", "write project index to <root>/.claude/loadout/index.json"],
+      ["--snapshot-repo <dir>", "git working copy to snapshot store .md files into"],
+      ["--mirror-repo <bare>", "bare git repo to push snapshot commits to"],
+      ["--fix", "synchronize drifted index bullet summaries from topic frontmatter before validating"],
       ["--dry-run", "compute everything, write NOTHING, print what WOULD change"],
     ],
-    note: "Folds the Index Freshness Ritual (index → validate → copy) into one command. ANDON HALT: any validation error writes nothing. COMPENSATOR: an existing --dest is backed up to <dest>.bak before overwrite and restored on write failure.",
-    example: "loadout-os refresh --dry-run",
+    note: "Folds the Index Freshness Ritual (index → validate → copy) into one command. ANDON HALT: any validation error writes nothing. COMPENSATOR: an existing destination is backed up to <dest>.bak before overwrite and restored on write failure.",
+    example: "loadout-os refresh --project . --store ./memory",
     exits: [
       ["0", "index written (or dry-run printed)"],
-      ["1", "validation error (andon) or write failure"],
-      ["2", "store / MEMORY.md missing"],
+      ["1", "validation error (andon), write failure, or snapshot/mirror git failure"],
+      ["2", "store / MEMORY.md missing or subprocess timeout"],
     ],
   },
 };

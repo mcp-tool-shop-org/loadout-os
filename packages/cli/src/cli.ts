@@ -8,13 +8,13 @@
  * rituals (doctor / report / hook test / refresh).
  *
  * Command tree:
- *   loadout-os memories <index|validate|stats|health> <MEMORY.md>   (namespaced)
+ *   loadout-os memories <index|validate|stats|health|sync-summaries|place|move> <MEMORY.md>
  *   loadout-os rules    <analyze|validate|stats|split> [CLAUDE.md]   (namespaced)
  *   loadout-os resolve|explain|usage|dead|overlaps|budget|validate   (flat → kernel)
  *   loadout-os doctor [--json]                                       (ritual, read-only)
  *   loadout-os report  [--jsonl <p>] [--index <p>] [--json]          (ritual, read-only)
  *   loadout-os hook test [--prompt "<text>"]                         (read-only)
- *   loadout-os refresh [--store <d>] [--dest <p>] [--dry-run]        (ritual; index→validate→publish)
+ *   loadout-os refresh [--store <d>] [--dest <p>] [--project <r>] [--dry-run]
  *   loadout-os --help | --version
  *
  * The flat `validate <index>` is the KERNEL index-structure validator; the
@@ -43,6 +43,9 @@ import {
   memoriesValidate,
   memoriesStats,
   memoriesHealth,
+  memoriesSyncSummaries,
+  memoriesPlace,
+  memoriesMove,
   rulesAnalyze,
   rulesValidate,
   rulesStats,
@@ -79,7 +82,7 @@ export function topLevelHelp(): string {
 ${BOLD}loadout-os${RESET} v${getVersion()} — unified Knowledge OS CLI
 
 ${BOLD}Namespaces (wrapped library surfaces):${RESET}
-  loadout-os memories <index|validate|stats|health> <MEMORY.md>
+  loadout-os memories <index|validate|stats|health|sync-summaries|place|move> <MEMORY.md>
   loadout-os rules    <analyze|validate|stats|split> [CLAUDE.md]
 
 ${BOLD}Flat verbs (knowledge router / kernel):${RESET}
@@ -95,7 +98,7 @@ ${BOLD}Rituals:${RESET}
   loadout-os doctor [--json]                       Read-only health screen
   loadout-os report [--index <p>] [--jsonl <p>]    Observability over usage.jsonl
   loadout-os hook test [--prompt "<text>"]         Drive the runtime hook on a sample prompt
-  loadout-os refresh [--store <d>] [--dest <p>] [--dry-run]   Index Freshness Ritual (index → validate → write global)
+  loadout-os refresh [--store <d>] [--dest <p>] [--project <r>] [--dry-run]   Index Freshness Ritual
 
 ${BOLD}Options:${RESET}
   --json       Machine-readable output (doctor/report/most verbs)
@@ -117,9 +120,12 @@ function memoriesHelp(): string {
 ${BOLD}loadout-os memories${RESET} — wraps @mcptoolshop/claude-memories
 
   loadout-os memories index <MEMORY.md> [--lazy] [--json]
-  loadout-os memories validate <MEMORY.md> [--json]
+  loadout-os memories validate <MEMORY.md> [--max-lines <n>] [--max-bytes <n>] [--json]
   loadout-os memories stats <MEMORY.md> [--json]
   loadout-os memories health [path] [--json]
+  loadout-os memories sync-summaries <MEMORY.md> [--dry-run] [--json]
+  loadout-os memories place <MEMORY.md> <topic.md> [--target <file>] [--section <h>] [--json]
+  loadout-os memories move <MEMORY.md> <topic.md> --to <file> [--section <h>] [--json]
 `;
 }
 
@@ -156,11 +162,17 @@ function dispatchMemories(args: string[]): void {
       return memoriesStats(rest);
     case "health":
       return memoriesHealth(rest);
+    case "sync-summaries":
+      return memoriesSyncSummaries(rest);
+    case "place":
+      return memoriesPlace(rest);
+    case "move":
+      return memoriesMove(rest);
     default:
       throw new CliError(
         "UNKNOWN_COMMAND",
         `Unknown memories subcommand: ${sub}`,
-        "Expected one of: index, validate, stats, health. Run 'loadout-os memories --help'.",
+        "Expected one of: index, validate, stats, health, sync-summaries, place, move. Run 'loadout-os memories --help'.",
       );
   }
 }

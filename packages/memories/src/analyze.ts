@@ -1,8 +1,9 @@
 /**
  * MEMORY.md analyzer.
  *
- * Reads MEMORY.md, parses references, checks topic files on disk,
- * extracts keywords, and produces an analysis report.
+ * Reads MEMORY.md, parses references (including linked sub-indexes `index-*.md`
+ * or files marked `metadata.loadout_role: subindex` in frontmatter), checks
+ * topic files on disk, extracts keywords, and produces an analysis report.
  *
  * Path resolution: tries paths relative to MEMORY.md's directory first,
  * then relative to its parent (for when MEMORY.md lives inside memory/
@@ -11,13 +12,48 @@
 
 import { readFileSync, existsSync, readdirSync, statSync } from "node:fs";
 import { join, dirname, relative, extname, basename, resolve } from "node:path";
-import { estimateTokens } from "@mcptoolshop/ai-loadout";
+import { estimateTokens, parseFrontmatter } from "@mcptoolshop/ai-loadout";
+import type { Priority } from "@mcptoolshop/ai-loadout";
 import { parseMemoryMd } from "./parser.js";
 import { resolveRefPath } from "./paths.js";
 import type { MemoryAnalysis, MemoryRef, Diagnostic } from "./types.js";
 
+const VALID_PRIORITIES = new Set<string>(["core", "domain", "manual"]);
+
 /**
- * Analyze a MEMORY.md file and its referenced topic files.
+ * Determine whether a referenced file is a sub-index rather than a topic entry:
+ * 1. Its basename matches `index-*.md`, OR
+ * 2. Its frontmatter carries `metadata.loadout_role === "subindex"`.
+ * Also returns the sub-index's `defaultPriority` if specified via
+ * `metadata.loadout_default_priority` or if the file is `index-archive.md`.
+ */
+export function detectSubindex(
+  refPath: string,
+  content: string,
+): { isSubindex: boolean; defaultPriority?: Priority } {
+  const base = basename(refPath).toLowerCase();
+  const isNamedSubindex = /^index-.+\.md$/i.test(base);
+  const { frontmatter } = parseFrontmatter(content);
+  const role = frontmatter?.metadata?.loadout_role;
+  const isRoleSubindex = role === "subindex";
+
+  if (!isNamedSubindex && !isRoleSubindex) {
+    return { isSubindex: false };
+  }
+
+  let defaultPriority: Priority | undefined;
+  const rawDefault = frontmatter?.metadata?.loadout_default_priority;
+  if (typeof rawDefault === "string" && VALID_PRIORITIES.has(rawDefault)) {
+    defaultPriority = rawDefault as Priority;
+  } else if (base === "index-archive.md") {
+    defaultPriority = "manual";
+  }
+
+  return { isSubindex: true, defaultPriority };
+}
+
+/**
+ * Analyze a MEMORY.md file and its referenced topic files (including sub-indexes).
  */
 export function analyzeMemoryMd(filePath: string): MemoryAnalysis {
   let content: string;
@@ -30,58 +66,93 @@ export function analyzeMemoryMd(filePath: string): MemoryAnalysis {
 
   const fileDir = dirname(resolve(filePath));
   const parentDir = dirname(fileDir);
-  const { sections, refs } = parseMemoryMd(content);
+  const { sections, refs: topRefs } = parseMemoryMd(content);
 
   const inlineTokens = estimateTokens(content);
 
-  // Check which referenced files exist
-  // Try: relative to MEMORY.md, then relative to parent dir
-  //
-  // FT-MR3: every missing/orphan signal is recorded as a structured Diagnostic
-  // here, at the point of detection — the flat string[] arrays below are derived
-  // views kept for back-compat. Library consumers read `diagnostics`; the CLI
-  // renders it uniformly. Nothing goes to stderr.
   const diagnostics: Diagnostic[] = [];
   const missingFiles: string[] = [];
+  const subindexFiles: string[] = [];
+  const expandedRefs: MemoryRef[] = [];
+  const referencedBasenames = new Set<string>();
   let topicTokens = 0;
 
-  for (const ref of refs) {
+  const recordMissing = (ref: MemoryRef, sourceLabel: string) => {
+    missingFiles.push(ref.path);
+    diagnostics.push({
+      severity: "error",
+      code: "MISSING_TOPIC_FILE",
+      message: `Referenced topic file not found: ${ref.path}`,
+      refPath: ref.path,
+      line: ref.line,
+      hint: `Create the file or remove the reference from ${sourceLabel}`,
+    });
+  };
+
+  for (const ref of topRefs) {
+    referencedBasenames.add(ref.path);
+    referencedBasenames.add(basename(ref.path));
+
     const resolved = resolveRefPath(ref.path, fileDir, parentDir);
-    if (resolved) {
-      try {
-        const topicContent = readFileSync(resolved, "utf-8");
-        topicTokens += estimateTokens(topicContent);
-      } catch {
-        missingFiles.push(ref.path);
-        diagnostics.push({
-          severity: "error",
-          code: "MISSING_TOPIC_FILE",
-          message: `Referenced topic file not found: ${ref.path}`,
-          refPath: ref.path,
-          line: ref.line,
-          hint: "Create the file or remove the reference from MEMORY.md",
-        });
+    if (!resolved) {
+      expandedRefs.push(ref);
+      recordMissing(ref, "MEMORY.md");
+      continue;
+    }
+
+    let refContent: string;
+    try {
+      refContent = readFileSync(resolved, "utf-8");
+    } catch {
+      expandedRefs.push(ref);
+      recordMissing(ref, "MEMORY.md");
+      continue;
+    }
+
+    const subCheck = detectSubindex(ref.path, refContent);
+    if (subCheck.isSubindex) {
+      // Sub-index file: its bullets become entries; the sub-index itself is not an entry.
+      subindexFiles.push(ref.path);
+      referencedBasenames.add(basename(resolved));
+      const relResolved = relative(fileDir, resolved).replace(/\\/g, "/");
+      referencedBasenames.add(relResolved);
+
+      const subDir = dirname(resolved);
+      const subParent = dirname(subDir);
+      const { refs: subRefs } = parseMemoryMd(refContent);
+
+      for (const sref of subRefs) {
+        const subEntryRef: MemoryRef = {
+          ...sref,
+          subindex: true,
+          subindexPath: ref.path,
+          ...(subCheck.defaultPriority ? { defaultPriority: subCheck.defaultPriority } : {}),
+        };
+        expandedRefs.push(subEntryRef);
+        referencedBasenames.add(sref.path);
+        referencedBasenames.add(basename(sref.path));
+
+        const subResolved =
+          resolveRefPath(sref.path, subDir, subParent) ??
+          resolveRefPath(sref.path, fileDir, parentDir);
+        if (subResolved) {
+          const relSub = relative(fileDir, subResolved).replace(/\\/g, "/");
+          referencedBasenames.add(relSub);
+          referencedBasenames.add(basename(subResolved));
+          try {
+            const subTopicContent = readFileSync(subResolved, "utf-8");
+            topicTokens += estimateTokens(subTopicContent);
+          } catch {
+            recordMissing(subEntryRef, ref.path);
+          }
+        } else {
+          recordMissing(subEntryRef, ref.path);
+        }
       }
     } else {
-      missingFiles.push(ref.path);
-      diagnostics.push({
-        severity: "error",
-        code: "MISSING_TOPIC_FILE",
-        message: `Referenced topic file not found: ${ref.path}`,
-        refPath: ref.path,
-        line: ref.line,
-        hint: "Create the file or remove the reference from MEMORY.md",
-      });
+      expandedRefs.push(ref);
+      topicTokens += estimateTokens(refContent);
     }
-  }
-
-  // Find orphan files — build a set of referenced basenames for matching
-  const referencedBasenames = new Set<string>();
-  for (const ref of refs) {
-    referencedBasenames.add(ref.path);
-    // Also add just the filename for when refs use "memory/foo.md"
-    // but files live alongside MEMORY.md as "foo.md"
-    referencedBasenames.add(basename(ref.path));
   }
 
   const orphanFiles: string[] = [];
@@ -115,7 +186,8 @@ export function analyzeMemoryMd(filePath: string): MemoryAnalysis {
   return {
     filePath,
     sections,
-    refs,
+    refs: expandedRefs,
+    subindexFiles,
     orphanFiles,
     missingFiles,
     diagnostics,
@@ -174,28 +246,38 @@ function scanDir(
 }
 
 /**
- * Extract keywords from a memory topic file name and content.
+ * Extract keywords from a memory topic file name, content, and optional file path.
+ *
+ * F-04: Strips punctuation (`[^a-z0-9\s-]`) before splitting title/name words so
+ * tokens like `udlab:`, `(PRIVATE)`, or `v1.0.2` yield clean matchable `[a-z0-9]{3,}`
+ * keywords, and includes file-stem tokens when `filePath` is provided.
  */
-export function extractKeywords(name: string, content: string): string[] {
+export function extractKeywords(name: string, content: string, filePath?: string): string[] {
   const words = new Set<string>();
 
-  // From the name (e.g. "AI Loadout" → ["ai", "loadout"])
-  for (const w of name.toLowerCase().split(/[\s-]+/)) {
-    if (w.length > 2 && !STOP_WORDS.has(w)) {
-      words.add(w);
+  const addCleanedTokens = (text: string) => {
+    const cleaned = text.toLowerCase().replace(/[^a-z0-9\s-]/g, " ");
+    for (const w of cleaned.split(/[\s-]+/)) {
+      if (w.length > 2 && !STOP_WORDS.has(w) && !/^\d+$/.test(w)) {
+        words.add(w);
+      }
     }
+  };
+
+  // From the display name (strip punctuation first — F-04)
+  addCleanedTokens(name);
+
+  // From the file stem when available (F-04)
+  if (filePath) {
+    const stem = basename(filePath).replace(/\.md$/i, "");
+    addCleanedTokens(stem);
   }
 
   // From the file content — extract heading words
   for (const line of content.split("\n")) {
     const headingMatch = line.match(/^#{1,3}\s+(.+)/);
     if (headingMatch) {
-      for (const w of headingMatch[1].toLowerCase().split(/[\s-]+/)) {
-        const cleaned = w.replace(/[^a-z0-9]/g, "");
-        if (cleaned.length > 2 && !STOP_WORDS.has(cleaned)) {
-          words.add(cleaned);
-        }
-      }
+      addCleanedTokens(headingMatch[1]);
     }
   }
 

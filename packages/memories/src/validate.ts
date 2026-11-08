@@ -3,7 +3,8 @@
  *
  * Validates MEMORY.md + topic files for structural issues.
  * Uses ai-loadout's validateIndex for the dispatch table,
- * and adds memory-specific checks.
+ * and adds memory-specific checks (including loader limits, sub-index links,
+ * and summary drift against frontmatter descriptions).
  */
 
 import { readFileSync } from "node:fs";
@@ -18,10 +19,81 @@ import { resolveRefPath } from "./paths.js";
 const MAX_ID_LENGTH = 60;
 
 /**
+ * Default MEMORY.md loader limits (Part B.3).
+ * Claude Code truncates MEMORY.md past ~200 lines or ~25 KB
+ * (measured 2026-11-08: a 242-line / 33 KB index was cut at line 194).
+ */
+export const DEFAULT_MAX_MEMORY_LINES = 180;
+export const DEFAULT_MAX_MEMORY_BYTES = 24_000;
+
+export interface ValidateMemoryOptions {
+  /** Max allowed lines in MEMORY.md before emitting MEMORY_LIMIT_EXCEEDED error (default 180). */
+  maxLines?: number;
+  /** Max allowed UTF-8 bytes in MEMORY.md before emitting MEMORY_LIMIT_EXCEEDED error (default 24,000). */
+  maxBytes?: number;
+}
+
+/**
+ * Normalize a summary or frontmatter description for drift comparison.
+ */
+function normalizeSummaryText(s: string): string {
+  return s.replace(/\s+/g, " ").trim().replace(/…|\.\.\.$/, "").trim();
+}
+
+/**
+ * Check whether an index bullet's summary matches the topic file's frontmatter description
+ * (allowing for clipping/truncation of the frontmatter description in the index bullet).
+ */
+export function summariesMatch(bulletDesc: string, frontmatterDesc: string): boolean {
+  const b = normalizeSummaryText(bulletDesc);
+  const f = normalizeSummaryText(frontmatterDesc);
+  if (!b || !f) return true;
+  if (b === f) return true;
+  // An index bullet often clips the frontmatter description to ~120–140 chars with `…` or `...`
+  if (f.startsWith(b) && b.length >= Math.min(20, f.length)) return true;
+  if (b.startsWith(f)) return true;
+  return false;
+}
+
+/**
  * Validate a memory analysis for structural issues.
  */
-export function validateMemory(analysis: MemoryAnalysis): ValidationIssue[] {
+export function validateMemory(
+  analysis: MemoryAnalysis,
+  opts: ValidateMemoryOptions = {},
+): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
+  const maxLines = opts.maxLines ?? DEFAULT_MAX_MEMORY_LINES;
+  const maxBytes = opts.maxBytes ?? DEFAULT_MAX_MEMORY_BYTES;
+
+  // Part B.3: Loader-limit check on MEMORY.md
+  // Claude Code truncates MEMORY.md past 200 lines or ~25 KB
+  // (measured 2026-11-08: a 242-line / 33 KB index was cut at line 194).
+  try {
+    const rawMemory = readFileSync(analysis.filePath, "utf-8");
+    const rawLines = rawMemory.endsWith("\n")
+      ? rawMemory.slice(0, -1).split("\n").length
+      : rawMemory.split("\n").length;
+    const rawBytes = Buffer.byteLength(rawMemory, "utf-8");
+
+    if (rawLines > maxLines || rawBytes > maxBytes) {
+      const reasons: string[] = [];
+      if (rawLines > maxLines) {
+        reasons.push(`${rawLines} lines > limit ${maxLines}`);
+      }
+      if (rawBytes > maxBytes) {
+        reasons.push(`${rawBytes} bytes > limit ${maxBytes}`);
+      }
+      issues.push({
+        severity: "error",
+        code: "MEMORY_LIMIT_EXCEEDED",
+        message: `MEMORY.md exceeds Claude Code auto-loader limits (${reasons.join("; ")}) — measured 2026-11-08: a 242-line / 33 KB index was cut at line 194`,
+        hint: `Move domain entries into linked sub-index files (index-*.md) so MEMORY.md stays <= ${maxLines} lines and <= ${maxBytes} bytes`,
+      });
+    }
+  } catch {
+    // If filePath cannot be read, analyzeMemoryMd has already surfaced it.
+  }
 
   // Missing referenced files
   for (const path of analysis.missingFiles) {
@@ -33,7 +105,7 @@ export function validateMemory(analysis: MemoryAnalysis): ValidationIssue[] {
     });
   }
 
-  // Orphan files (exist on disk but not in MEMORY.md)
+  // Orphan files (exist on disk but not in MEMORY.md or any linked sub-index)
   for (const path of analysis.orphanFiles) {
     issues.push({
       severity: "warning",
@@ -44,7 +116,7 @@ export function validateMemory(analysis: MemoryAnalysis): ValidationIssue[] {
   }
 
   // No references at all
-  if (analysis.refs.length === 0) {
+  if (analysis.refs.length === 0 && (!analysis.subindexFiles || analysis.subindexFiles.length === 0)) {
     issues.push({
       severity: "warning",
       code: "NO_REFS",
@@ -79,32 +151,43 @@ export function validateMemory(analysis: MemoryAnalysis): ValidationIssue[] {
     }
   }
 
-  // Over-long ids (MEM-004 / ROADMAP Phase 2; MEM-B08).
-  // The id that lands in the dispatch table is EITHER derived from the ref name
-  // (nameToId, reused via MEM-009) OR, when the topic file carries frontmatter,
-  // the frontmatter-supplied `id` (entryFromFrontmatter uses fm.id verbatim).
-  // MEM-004 only checked the derived path, so an 80-char frontmatter id sailed
-  // through validate and became an unwieldy key. MEM-B08: apply MAX_ID_LENGTH to
-  // whichever id index-gen would actually use.
+  // Over-long ids (MEM-004 / MEM-B08) & summary drift check (F-02 / F-09: STALE_INDEX_SUMMARY)
   const fileDir = dirname(resolve(analysis.filePath));
   const parentDir = dirname(fileDir);
   for (const ref of analysis.refs) {
-    // The effective id: frontmatter id wins (matches entryFromFrontmatter),
-    // else the derived kebab id (matches entryFromContent).
     let effectiveId = nameToId(ref.name);
     let source = "Derived";
 
     const resolved = resolveRefPath(ref.path, fileDir, parentDir);
     if (resolved) {
       try {
-        const { frontmatter } = parseFrontmatter(readFileSync(resolved, "utf-8"));
+        const content = readFileSync(resolved, "utf-8");
+        const { frontmatter } = parseFrontmatter(content);
         if (frontmatter && typeof frontmatter.id === "string" && frontmatter.id.length > 0) {
           effectiveId = frontmatter.id;
           source = "Frontmatter";
         }
+        // F-02 / F-09: Check whether the index bullet summary differs from the topic file's frontmatter description
+        if (
+          frontmatter &&
+          typeof frontmatter.description === "string" &&
+          frontmatter.description.trim().length > 0 &&
+          ref.description &&
+          ref.description.trim().length > 0
+        ) {
+          if (!summariesMatch(ref.description, frontmatter.description)) {
+            const indexLabel = ref.subindexPath ?? "MEMORY.md";
+            issues.push({
+              severity: "warning",
+              code: "STALE_INDEX_SUMMARY",
+              message: `Index bullet summary in ${indexLabel} (line ${ref.line + 1}) differs from frontmatter description in ${ref.path}`,
+              hint: `Run 'loadout-os memories sync-summaries <MEMORY.md> --fix' to sync bullet summaries from frontmatter`,
+              entryId: effectiveId,
+            });
+          }
+        }
       } catch {
         // Unreadable topic file — already flagged via MISSING_TOPIC_FILE above.
-        // Fall back to the derived id for the length check.
       }
     }
 
