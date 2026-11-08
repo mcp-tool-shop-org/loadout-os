@@ -19,11 +19,13 @@ import {
   writeFileSync,
   readFileSync,
   rmSync,
+  utimesSync,
 } from "node:fs";
 import { join, resolve } from "node:path";
 import { homedir, tmpdir } from "node:os";
 
-import { runHookTest, defaultHookPath } from "../hook.js";
+import { runHookTest, defaultHookPath, runSessionStart } from "../hook.js";
+import { runRefresh } from "../refresh.js";
 
 const HOOK = defaultHookPath(process.cwd());
 
@@ -660,6 +662,280 @@ describe("Part A: loadout-hook.mjs project-layer support", () => {
       assert.ok(projectEvt, "project event recorded");
       assert.equal(globalEvt.layer, "global");
       assert.equal(projectEvt.layer, "project");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+
+describe("Part C: loadout-os hook session-start and pre-compact", () => {
+  const CLI_BIN = resolve(process.cwd(), "dist", "cli.js");
+
+  test("1. the injected file is printed in full under a header naming the file, and non-ASCII text survives as UTF-8 on Windows (F-05)", () => {
+    const root = mkdtempSync(join(tmpdir(), "loadout-part-c-utf8-"));
+    try {
+      const storeDir = join(root, "store");
+      const projDir = join(root, "proj");
+      mkdirSync(storeDir, { recursive: true });
+      mkdirSync(projDir, { recursive: true });
+
+      const boardContent = [
+        "---",
+        "name: R&D Active Board",
+        "description: Current active R&D board state",
+        "priority: core",
+        "metadata:",
+        "  loadout_inject: session-start",
+        "  stale_after_min: 60",
+        "---",
+        "# Active Board — R&D → Antigravity ⭐",
+        "- Status: Healthy ≈ 100% (no ⚠ alerts)",
+        "- Next: Verify UTF-8 em-dash — arrow → star ⭐ warning ⚠ approx ≈",
+        "",
+      ].join("\n");
+
+      writeFileSync(join(storeDir, "BOARD.md"), boardContent, "utf-8");
+      writeFileSync(
+        join(storeDir, "MEMORY.md"),
+        "# Memory Index\n- [Board](BOARD.md) — Current active R&D board state\n",
+        "utf-8",
+      );
+
+      runRefresh({ store: storeDir, project: projDir });
+
+      // 1a. Programmatic check
+      const res = runSessionStart({ project: projDir });
+      assert.equal(res.warnings.length, 0);
+      assert.equal(res.injectedFiles.length, 1);
+      assert.match(res.output, /=== \[loadout-os session-start\] BOARD\.md/);
+      assert.ok(res.output.includes("Active Board — R&D → Antigravity ⭐"));
+      assert.ok(res.output.includes("Healthy ≈ 100% (no ⚠ alerts)"));
+
+      // 1b. Subprocess check (proves Buffer.from(..., 'utf-8') stdout survives Windows console codepage)
+      if (existsSync(CLI_BIN)) {
+        const proc = spawnSync(
+          process.execPath,
+          [CLI_BIN, "hook", "session-start", "--project", projDir],
+          { encoding: "utf-8", input: "" },
+        );
+        assert.equal(proc.status, 0);
+        assert.ok(proc.stdout.includes("Active Board — R&D → Antigravity ⭐"));
+        assert.ok(proc.stdout.includes("em-dash — arrow → star ⭐ warning ⚠ approx ≈"));
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("2. the stale warning fires in session-start, --user-prompt-submit, and pre-compact when mtime exceeds stale_after_min (F-01, F-17)", () => {
+    const root = mkdtempSync(join(tmpdir(), "loadout-part-c-stale-"));
+    try {
+      const storeDir = join(root, "store");
+      const projDir = join(root, "proj");
+      mkdirSync(storeDir, { recursive: true });
+      mkdirSync(projDir, { recursive: true });
+
+      const boardPath = join(storeDir, "BOARD.md");
+      writeFileSync(
+        boardPath,
+        [
+          "---",
+          "name: R&D Board",
+          "description: Active board",
+          "priority: core",
+          "metadata:",
+          "  loadout_inject: session-start",
+          "  stale_after_min: 30",
+          "---",
+          "# Board Body",
+          "",
+        ].join("\n"),
+        "utf-8",
+      );
+      writeFileSync(
+        join(storeDir, "MEMORY.md"),
+        "# Memory\n- [Board](BOARD.md) — Active board\n",
+        "utf-8",
+      );
+
+      runRefresh({ store: storeDir, project: projDir });
+
+      // Simulate 90 minutes in the future (board stale_after_min is 30)
+      const futureMs = Date.now() + 90 * 60_000;
+
+      // 2a. session-start prints BOTH stale warning AND board body
+      const fullRes = runSessionStart({ project: projDir, nowMs: futureMs });
+      assert.equal(fullRes.warnings.length, 1);
+      assert.match(fullRes.warnings[0], /BOARD\.md is stale/);
+      assert.match(fullRes.output, /WARNING: BOARD\.md is stale/);
+      assert.match(fullRes.output, /# Board Body/);
+
+      // 2b. --user-prompt-submit prints ONLY the stale warning (not the full board)
+      const promptRes = runSessionStart({
+        project: projDir,
+        userPromptSubmit: true,
+        nowMs: futureMs,
+      });
+      assert.equal(promptRes.warnings.length, 1);
+      assert.match(promptRes.output, /WARNING: BOARD\.md is stale/);
+      assert.doesNotMatch(promptRes.output, /# Board Body/);
+
+      // 2c. pre-compact prints the stale warning before compaction (F-01)
+      const preCompactRes = runSessionStart({
+        project: projDir,
+        preCompact: true,
+        nowMs: futureMs,
+      });
+      assert.equal(preCompactRes.warnings.length, 1);
+      assert.match(preCompactRes.output, /WARNING: BOARD\.md is stale/);
+      assert.doesNotMatch(preCompactRes.output, /# Board Body/);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("3. enforces line and byte caps with a visible truncation note (F-29)", () => {
+    const root = mkdtempSync(join(tmpdir(), "loadout-part-c-cap-"));
+    try {
+      const storeDir = join(root, "store");
+      const projDir = join(root, "proj");
+      mkdirSync(storeDir, { recursive: true });
+      mkdirSync(projDir, { recursive: true });
+
+      const manyLines = [
+        "---",
+        "name: Giant Board",
+        "description: Oversized board",
+        "priority: core",
+        "metadata:",
+        "  loadout_inject: session-start",
+        "---",
+        ...Array.from({ length: 80 }, (_, i) => `- Item line ${i + 1}`),
+      ].join("\n");
+
+      writeFileSync(join(storeDir, "BOARD.md"), manyLines, "utf-8");
+      writeFileSync(
+        join(storeDir, "MEMORY.md"),
+        "# Memory\n- [Giant Board](BOARD.md) — Oversized board\n",
+        "utf-8",
+      );
+
+      runRefresh({ store: storeDir, project: projDir });
+
+      const res = runSessionStart({ project: projDir, maxLines: 20, maxBytes: 4000 });
+      assert.equal(res.truncatedFiles.length, 1);
+      assert.match(res.output, /\[truncated: BOARD\.md exceeded session-start cap/);
+      assert.ok(!res.output.includes("- Item line 75"), "lines past the cap must be truncated");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("4. a missing board file or corrupt index fails open with a visible warning note (F-11)", () => {
+    const root = mkdtempSync(join(tmpdir(), "loadout-part-c-missing-"));
+    try {
+      const storeDir = join(root, "store");
+      const projDir = join(root, "proj");
+      mkdirSync(storeDir, { recursive: true });
+      mkdirSync(projDir, { recursive: true });
+
+      const boardPath = join(storeDir, "BOARD.md");
+      writeFileSync(
+        boardPath,
+        [
+          "---",
+          "name: Ephemeral Board",
+          "description: Board that will go missing",
+          "priority: core",
+          "metadata:",
+          "  loadout_inject: session-start",
+          "---",
+          "# Ephemeral Board",
+          "",
+        ].join("\n"),
+        "utf-8",
+      );
+      writeFileSync(
+        join(storeDir, "MEMORY.md"),
+        "# Memory\n- [Ephemeral Board](BOARD.md) — Board that will go missing\n",
+        "utf-8",
+      );
+
+      runRefresh({ store: storeDir, project: projDir });
+
+      // Delete BOARD.md after indexing to simulate missing file on disk
+      rmSync(boardPath);
+
+      const missingRes = runSessionStart({ project: projDir });
+      assert.ok(missingRes.warnings.length >= 1, "must warn when session-start file is missing");
+      assert.match(missingRes.output, /WARNING: session-start file missing on disk/);
+
+      // Corrupt the project index.json and confirm it warns visibly and fails open
+      const indexPath = join(projDir, ".claude", "loadout", "index.json");
+      writeFileSync(indexPath, "{not-valid-json", "utf-8");
+      const corruptRes = runSessionStart({ project: projDir });
+      assert.ok(corruptRes.warnings.length >= 1, "must warn when project index is corrupt");
+      assert.match(corruptRes.output, /WARNING: failed to parse project index/);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("5. checks whether any <store>/*.md is newer than project index.json and auto-refreshes (F-13)", () => {
+    const root = mkdtempSync(join(tmpdir(), "loadout-part-c-newer-"));
+    try {
+      const storeDir = join(root, "store");
+      const projDir = join(root, "proj");
+      mkdirSync(storeDir, { recursive: true });
+      mkdirSync(projDir, { recursive: true });
+
+      const boardPath = join(storeDir, "BOARD.md");
+      writeFileSync(
+        boardPath,
+        [
+          "---",
+          "name: Board",
+          "description: Active board",
+          "priority: core",
+          "metadata:",
+          "  loadout_inject: session-start",
+          "---",
+          "# Board v1",
+          "",
+        ].join("\n"),
+        "utf-8",
+      );
+      writeFileSync(
+        join(storeDir, "MEMORY.md"),
+        "# Memory\n- [Board](BOARD.md) — Active board\n",
+        "utf-8",
+      );
+
+      runRefresh({ store: storeDir, project: projDir });
+
+      // Simulate a shell edit to BOARD.md that happened 10 seconds after index.json was written
+      writeFileSync(
+        boardPath,
+        [
+          "---",
+          "name: Board",
+          "description: Active board",
+          "priority: core",
+          "metadata:",
+          "  loadout_inject: session-start",
+          "---",
+          "# Board v2 (shell-edited)",
+          "",
+        ].join("\n"),
+        "utf-8",
+      );
+      const futureSec = (Date.now() + 10_000) / 1000;
+      utimesSync(boardPath, futureSec, futureSec);
+
+      const res = runSessionStart({ project: projDir });
+      assert.equal(res.refreshedStore, true, "session-start must auto-refresh when store .md is newer than index.json");
+      assert.match(res.output, /# Board v2 \(shell-edited\)/);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

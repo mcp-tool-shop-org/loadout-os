@@ -261,6 +261,33 @@ export const COMMAND_HELP: Record<string, HelpEntry> = {
     example: 'loadout-os hook test --prompt "scaffold a new game"',
     exits: [["0", "hook ran"], ["1", "hook binary not found"]],
   },
+  "hook session-start": {
+    synopsis: "loadout-os hook session-start [--project <root>] [--store <dir>] [--user-prompt-submit] [--max-lines <n>] [--max-bytes <n>]",
+    flags: [
+      ["--project <root>", "project root containing .claude/loadout/index.json"],
+      ["--store <dir>", "memory store directory"],
+      ["--user-prompt-submit", "emit only stale/missing warnings (for UserPromptSubmit)"],
+      ["--max-lines <n>", "line cap per injected board (default 60)"],
+      ["--max-bytes <n>", "byte cap per injected board (default 6000)"],
+      ["--stale-after-min <n>", "override stale threshold in minutes"],
+      ["--json", "machine-readable output"],
+    ],
+    note: "Prints every core entry with metadata.loadout_inject: session-start in full as UTF-8 under a file header. Fails open with visible warnings when the index or board is missing, corrupt, or stale.",
+    example: "loadout-os hook session-start --project .",
+    exits: [["0", "always exits 0 (fail-open hook)"]],
+  },
+  "hook pre-compact": {
+    synopsis: "loadout-os hook pre-compact [--project <root>] [--store <dir>] [--stale-after-min <n>]",
+    flags: [
+      ["--project <root>", "project root containing .claude/loadout/index.json"],
+      ["--store <dir>", "memory store directory"],
+      ["--stale-after-min <n>", "stale threshold in minutes (default 60)"],
+      ["--json", "machine-readable output"],
+    ],
+    note: "PreCompact hook: warns on stdout when the session-start board is older than stale_after_min so it gets refreshed before compaction.",
+    example: "loadout-os hook pre-compact --project .",
+    exits: [["0", "always exits 0 (fail-open hook)"]],
+  },
   refresh: {
     synopsis: "loadout-os refresh [--store <dir>] [--dest <path>] [--project <root>] [--snapshot-repo <dir>] [--mirror-repo <bare>] [--fix] [--dry-run]",
     flags: [
