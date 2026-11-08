@@ -171,6 +171,44 @@ describe("parseFrontmatter", () => {
     assert.equal(frontmatter.triggers.plan, false);
     assert.equal(frontmatter.triggers.edit, true);
   });
+
+  it("falls back to metadata.priority and metadata.id when top-level keys are absent, and lets top-level win (#19)", () => {
+    const rewritten = parseFrontmatter(
+      [
+        "---",
+        "name: Session Board",
+        "description: Rewritten by Claude Code",
+        "metadata:",
+        "  node_type: memory",
+        "  id: nested-board-id",
+        "  priority: core",
+        "  loadout_inject: session-start",
+        "  originSessionId: sess-123",
+        "  modified: 1731090000000",
+        "---",
+        "Body",
+      ].join("\n"),
+    );
+    assert.ok(rewritten.frontmatter);
+    assert.equal(rewritten.frontmatter.id, "nested-board-id");
+    assert.equal(rewritten.frontmatter.priority, "core");
+
+    const conflict = parseFrontmatter(
+      [
+        "---",
+        "id: top-id",
+        "priority: domain",
+        "metadata:",
+        "  id: meta-id",
+        "  priority: core",
+        "---",
+        "Body",
+      ].join("\n"),
+    );
+    assert.ok(conflict.frontmatter);
+    assert.equal(conflict.frontmatter.id, "top-id");
+    assert.equal(conflict.frontmatter.priority, "domain");
+  });
 });
 
 describe("serializeFrontmatter", () => {

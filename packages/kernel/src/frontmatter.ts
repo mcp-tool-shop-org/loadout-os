@@ -118,6 +118,9 @@ export function parseFrontmatter(
       currentObject = null;
     }
 
+    // Indented lines outside a recognized block are not top-level keys
+    if (line.startsWith(" ") || line.startsWith("\t")) continue;
+
     // Key: value pair
     const colonIdx = trimmed.indexOf(":");
     if (colonIdx === -1) continue;
@@ -163,19 +166,6 @@ export function parseFrontmatter(
   if (currentArray !== null) data[currentKey] = currentArray;
   if (currentObject !== null) data[currentKey] = currentObject;
 
-  // F-03: Fall back to slugified `name` when `id` is absent so Claude Code
-  // memory files carrying `name:` and `description:` (without `id:`) parse
-  // into Frontmatter.
-  const rawId = typeof data.id === "string" && data.id.trim()
-    ? data.id.trim()
-    : typeof data.name === "string" && data.name.trim()
-      ? slugifyName(data.name.trim())
-      : "";
-
-  if (!rawId) {
-    return { frontmatter: null, body: content };
-  }
-
   const metadata: Record<string, string | number | boolean> = {};
   if (data.metadata && typeof data.metadata === "object" && !Array.isArray(data.metadata)) {
     Object.assign(metadata, data.metadata as Record<string, string | number | boolean>);
@@ -199,6 +189,29 @@ export function parseFrontmatter(
     }
   }
 
+  // F-03 / #19: Read top-level `id:`, falling back to `metadata.id`, then
+  // slugified `name:` so Claude Code memory files parse into Frontmatter even
+  // when Claude Code nests frontmatter keys under `metadata:`.
+  const topId = typeof data.id === "string" && data.id.trim() ? data.id.trim() : "";
+  const metaId = typeof metadata.id === "string" && metadata.id.trim() ? metadata.id.trim() : "";
+  const rawId = topId
+    ? topId
+    : metaId
+      ? metaId
+      : typeof data.name === "string" && data.name.trim()
+        ? slugifyName(data.name.trim())
+        : "";
+
+  if (!rawId) {
+    return { frontmatter: null, body: content };
+  }
+
+  const priority: Priority = VALID_PRIORITIES.has(data.priority as string)
+    ? (data.priority as Priority)
+    : VALID_PRIORITIES.has(metadata.priority as string)
+      ? (metadata.priority as Priority)
+      : "domain";
+
   const fm: Frontmatter = {
     id: rawId,
     ...(typeof data.name === "string" && data.name.trim() ? { name: data.name.trim() } : {}),
@@ -207,9 +220,7 @@ export function parseFrontmatter(
       : {}),
     keywords: Array.isArray(data.keywords) ? (data.keywords as string[]) : [],
     patterns: Array.isArray(data.patterns) ? (data.patterns as string[]) : [],
-    priority: VALID_PRIORITIES.has(data.priority as string)
-      ? (data.priority as Priority)
-      : "domain",
+    priority,
     triggers: parseTriggers(data.triggers),
     ...(Object.keys(metadata).length > 0 ? { metadata } : {}),
   };

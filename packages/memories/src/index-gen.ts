@@ -22,20 +22,7 @@ export function extractKeywordsFromTitle(title: string, filePath?: string): stri
   return extractKeywords(title, "", filePath);
 }
 
-/**
- * Check if the raw YAML frontmatter block explicitly declared a `priority:` line.
- */
-function hasExplicitPriority(content: string): boolean {
-  const normalized = content.startsWith("\ufeff") ? content.slice(1) : content;
-  const lines = normalized.split("\n");
-  if (lines[0]?.trim() !== "---") return false;
-  for (let i = 1; i < lines.length; i++) {
-    const t = lines[i].trim();
-    if (t === "---") break;
-    if (/^priority\s*:/.test(t)) return true;
-  }
-  return false;
-}
+const VALID_PRIORITIES = new Set<Priority>(["core", "domain", "manual"]);
 
 function stripSurroundingQuotes(s: string): string {
   const t = s.trim();
@@ -46,22 +33,120 @@ function stripSurroundingQuotes(s: string): string {
 }
 
 /**
- * Check if the raw YAML frontmatter block explicitly declared a non-empty `id:` line.
+ * Parse top-level and `metadata.` fallback values for `priority` and `id` from
+ * the raw YAML frontmatter block (#19). Indented lines outside `metadata:` are ignored.
  */
-export function hasExplicitId(content: string): boolean {
+function parseFrontmatterPriorityAndId(content: string): {
+  topPriority?: Priority;
+  metaPriority?: Priority;
+  topId?: string;
+  metaId?: string;
+} {
   const normalized = content.startsWith("\ufeff") ? content.slice(1) : content;
   const lines = normalized.split("\n");
-  if (lines[0]?.trim() !== "---") return false;
+  if (lines[0]?.trim() !== "---") return {};
+
+  let closeIndex = -1;
   for (let i = 1; i < lines.length; i++) {
-    const t = lines[i].trim();
-    if (t === "---") break;
-    const colonIdx = t.indexOf(":");
-    if (colonIdx !== -1 && t.slice(0, colonIdx).trim() === "id") {
-      const val = stripSurroundingQuotes(t.slice(colonIdx + 1));
-      if (val.length > 0) return true;
+    if (lines[i].trim() === "---") {
+      closeIndex = i;
+      break;
     }
   }
-  return false;
+  if (closeIndex === -1) return {};
+
+  const fmLines = lines.slice(1, closeIndex);
+  let topPriority: Priority | undefined;
+  let metaPriority: Priority | undefined;
+  let topId: string | undefined;
+  let metaId: string | undefined;
+  let inMetadataBlock = false;
+
+  for (let i = 0; i < fmLines.length; i++) {
+    const rawLine = fmLines[i];
+    const trimmed = rawLine.trim();
+    if (trimmed === "") continue;
+
+    if (inMetadataBlock && rawLine.startsWith("  ")) {
+      const colonIdx = trimmed.indexOf(":");
+      if (colonIdx !== -1) {
+        const key = trimmed.slice(0, colonIdx).trim();
+        const rawVal = trimmed.slice(colonIdx + 1).trim();
+        const val = stripSurroundingQuotes(rawVal);
+        if (key === "priority" && VALID_PRIORITIES.has(val as Priority)) {
+          metaPriority = val as Priority;
+        } else if (
+          key === "id" &&
+          val.length > 0 &&
+          rawVal !== "true" &&
+          rawVal !== "false" &&
+          !/^-?\d+(\.\d+)?$/.test(rawVal)
+        ) {
+          metaId = val;
+        }
+        continue;
+      }
+    }
+
+    inMetadataBlock = false;
+    if (rawLine.startsWith(" ") || rawLine.startsWith("\t") || trimmed.startsWith("- ")) {
+      continue;
+    }
+
+    const colonIdx = trimmed.indexOf(":");
+    if (colonIdx === -1) continue;
+
+    const key = trimmed.slice(0, colonIdx).trim();
+    const rawVal = trimmed.slice(colonIdx + 1).trim();
+
+    if (rawVal === "") {
+      if (key === "metadata" && i + 1 < fmLines.length) {
+        const nextTrimmed = fmLines[i + 1].trim();
+        if (!nextTrimmed.startsWith("- ") && fmLines[i + 1].startsWith("  ")) {
+          inMetadataBlock = true;
+        }
+      }
+      continue;
+    }
+
+    if (rawVal.startsWith("[") && rawVal.endsWith("]")) continue;
+    if (rawVal === "true" || rawVal === "false") continue;
+
+    const val = stripSurroundingQuotes(rawVal);
+    if (key === "priority" && VALID_PRIORITIES.has(val as Priority)) {
+      topPriority = val as Priority;
+    } else if (key === "id" && val.length > 0) {
+      topId = val;
+    }
+  }
+
+  return { topPriority, metaPriority, topId, metaId };
+}
+
+function readExplicitPriority(content: string): Priority | undefined {
+  const { topPriority, metaPriority } = parseFrontmatterPriorityAndId(content);
+  return topPriority ?? metaPriority;
+}
+
+/**
+ * Check if the raw YAML frontmatter block explicitly declared a valid `priority:`
+ * (top-level `priority:` or `metadata.priority` fallback).
+ */
+export function hasExplicitPriority(content: string): boolean {
+  return readExplicitPriority(content) !== undefined;
+}
+
+function readExplicitId(content: string): string | undefined {
+  const { topId, metaId } = parseFrontmatterPriorityAndId(content);
+  return topId ?? metaId;
+}
+
+/**
+ * Check if the raw YAML frontmatter block explicitly declared a non-empty `id:`
+ * (top-level `id:` or `metadata.id` fallback).
+ */
+export function hasExplicitId(content: string): boolean {
+  return readExplicitId(content) !== undefined;
 }
 
 function normalizeIdSource(val: unknown): IdSource | undefined {
@@ -306,10 +391,12 @@ function entryFromFrontmatter(
 ): LoadoutEntry {
   const lines = content.split("\n").length;
 
-  // Publisher ruling B: an explicit frontmatter `id:` always wins over both idSource values.
+  // Publisher ruling B / #19: an explicit frontmatter `id:` (top-level or `metadata.id` fallback)
+  // always wins over both idSource values.
   // Otherwise, use `nameToId(ref.name)` when idSource === "title", and `fm.id` (from `name:`) when idSource === "name".
-  const id = hasExplicitId(content)
-    ? fm.id
+  const explicitId = readExplicitId(content);
+  const id = explicitId
+    ? explicitId
     : idSource === "title"
       ? nameToId(ref.name) || fm.id
       : fm.id;
@@ -325,11 +412,12 @@ function entryFromFrontmatter(
     ? fm.patterns
     : deriveStemPatterns(id, storePath, fm.patterns);
 
-  // Amendment 4 (Archive = manual): entries listed in a sub-index whose frontmatter
+  // Amendment 4 (Archive = manual) & #19: entries listed in a sub-index whose frontmatter
   // sets `metadata.loadout_default_priority: manual` get `priority: "manual"` unless
-  // the topic file's own frontmatter explicitly sets `priority:`.
-  let priority: Priority = fm.priority;
-  if (ref.defaultPriority && !hasExplicitPriority(content)) {
+  // the topic file's own frontmatter explicitly sets `priority:` (top-level or `metadata.priority`).
+  const explicitPriority = readExplicitPriority(content);
+  let priority: Priority = explicitPriority ?? fm.priority;
+  if (ref.defaultPriority && !explicitPriority) {
     priority = ref.defaultPriority;
   }
 
