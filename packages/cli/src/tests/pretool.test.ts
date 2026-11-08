@@ -1493,4 +1493,381 @@ describe("Part 3: the first five rules (unreviewed-merge, director-quote, memory
   });
 });
 
+// ════════════════════════════════════════════════════════════════
+// Part 5: acceptance (2026-11-08 four-slip replay fixture & subprocess check)
+// ════════════════════════════════════════════════════════════════
+
+import { spawnSync } from "node:child_process";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+export interface ReplayCasePair {
+  id: string;
+  ruleId: string;
+  blockedStdin: Record<string, unknown>;
+  allowedStdin: Record<string, unknown>;
+  expectedAllowedOutcome: "allow" | "warn";
+}
+
+export const REPLAY_2026_11_08_STORE = "E:/AI/StudioStore/memory";
+export const REPLAY_2026_11_08_CLOCK_MS = new Date(2026, 10, 8, 15, 44, 0, 0).getTime();
+
+/**
+ * Canned PreToolUse JSON fixture of the four slips from 2026-11-08 and their
+ * matching allowed calls (Part 5.1).
+ */
+export const REPLAY_2026_11_08_FIXTURE: readonly ReplayCasePair[] = [
+  {
+    id: "slip-1-unreviewed-merge",
+    ruleId: "unreviewed-merge",
+    blockedStdin: {
+      hook_event_name: "PreToolUse",
+      session_id: "replay-2026-11-08",
+      cwd: "E:/AI/Research and Development",
+      tool_name: "Bash",
+      tool_input: { command: "gh pr merge 21" },
+    },
+    allowedStdin: {
+      hook_event_name: "PreToolUse",
+      session_id: "replay-2026-11-08",
+      cwd: "E:/AI/Publisher",
+      tool_name: "Bash",
+      tool_input: { command: "gh pr merge 21" },
+    },
+    expectedAllowedOutcome: "warn",
+  },
+  {
+    id: "slip-2-dated-director-quote",
+    ruleId: "director-quote",
+    blockedStdin: {
+      hook_event_name: "PreToolUse",
+      session_id: "replay-2026-11-08",
+      cwd: "E:/AI/Research and Development",
+      tool_name: "Write",
+      tool_input: {
+        file_path: "E:/AI/Research and Development/docs/handoff.md",
+        content:
+          '# Handoff\n\nDirector 2026-11-08: "I want every build to go through the card process before any code is merged."\n',
+      },
+    },
+    allowedStdin: {
+      hook_event_name: "PreToolUse",
+      session_id: "replay-2026-11-08",
+      cwd: "E:/AI/Research and Development",
+      tool_name: "Write",
+      tool_input: {
+        file_path: "E:/AI/Research and Development/docs/handoff.md",
+        content:
+          "# Handoff\n\nDirector 2026-11-08 ruled that every build goes through the card process before any code is merged.\n",
+      },
+    },
+    expectedAllowedOutcome: "allow",
+  },
+  {
+    id: "slip-3-future-last-updated",
+    ruleId: "future-stamp",
+    blockedStdin: {
+      hook_event_name: "PreToolUse",
+      session_id: "replay-2026-11-08",
+      cwd: "E:/AI/Research and Development",
+      tool_name: "Edit",
+      tool_input: {
+        file_path: `${REPLAY_2026_11_08_STORE}/BOARD.md`,
+        old_string: "**Last updated:** 2026-11-08 15:00 ET",
+        new_string: "**Last updated:** 2026-11-08 17:00 ET",
+      },
+    },
+    allowedStdin: {
+      hook_event_name: "PreToolUse",
+      session_id: "replay-2026-11-08",
+      cwd: "E:/AI/Research and Development",
+      tool_name: "Edit",
+      tool_input: {
+        file_path: `${REPLAY_2026_11_08_STORE}/BOARD.md`,
+        old_string: "**Last updated:** 2026-11-08 15:00 ET",
+        new_string: "**Last updated:** 2026-11-08 15:44 ET",
+      },
+    },
+    expectedAllowedOutcome: "allow",
+  },
+  {
+    id: "slip-4-memory-shell-write-python-heredoc",
+    ruleId: "memory-shell-write",
+    blockedStdin: {
+      hook_event_name: "PreToolUse",
+      session_id: "replay-2026-11-08",
+      cwd: "E:/AI/Research and Development",
+      tool_name: "Bash",
+      tool_input: {
+        command: `python - <<EOF\nwith open('${REPLAY_2026_11_08_STORE}/BOARD.md','w') as f:\n    f.write('# Board\\n')\nEOF`,
+      },
+    },
+    allowedStdin: {
+      hook_event_name: "PreToolUse",
+      session_id: "replay-2026-11-08",
+      cwd: "E:/AI/Research and Development",
+      tool_name: "Bash",
+      tool_input: {
+        command: `loadout-os memories place ${REPLAY_2026_11_08_STORE}/topic.md main --store ${REPLAY_2026_11_08_STORE}`,
+      },
+    },
+    expectedAllowedOutcome: "allow",
+  },
+];
+
+describe("Part 5: 2026-11-08 four-slip replay fixture (4/4 blocked, 4/4 matching calls pass)", () => {
+  let tempDir: string;
+  let seatsPath: string;
+  let logPath: string;
+
+  beforeEach(() => {
+    tempDir = mkdtempSync(join(tmpdir(), "loadout-pretool-p5-"));
+    seatsPath = join(tempDir, "seats.json");
+    logPath = join(tempDir, "hook-decisions.jsonl");
+    writeFileSync(
+      seatsPath,
+      JSON.stringify(
+        {
+          seats: {
+            "E:/AI/Research and Development": {
+              seat: "rnd",
+              store: REPLAY_2026_11_08_STORE,
+            },
+            "E:/AI/Publisher": {
+              seat: "publisher",
+              store: REPLAY_2026_11_08_STORE,
+            },
+          },
+        },
+        null,
+        2,
+      ),
+      "utf-8",
+    );
+  });
+
+  afterEach(() => {
+    rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  it("replays all 4 slips from 2026-11-08 in-process and via the built CLI subprocess: 4/4 blocked (exit 2) and 4/4 matching calls pass (exit 0)", () => {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const cliEntry = resolve(here, "..", "cli.js");
+
+    let blockedCount = 0;
+    let allowedCount = 0;
+
+    for (const pair of REPLAY_2026_11_08_FIXTURE) {
+      // 1. In-process check: blocked slip
+      const blockRes = runPreTool({
+        stdinJson: JSON.stringify(pair.blockedStdin),
+        seatsPath,
+        logPath,
+        nowMs: REPLAY_2026_11_08_CLOCK_MS,
+      });
+      assert.equal(blockRes.exitCode, 2, `In-process slip ${pair.id} must exit 2`);
+      assert.equal(blockRes.outcome, "block");
+      assert.equal(blockRes.stdout, "");
+      assert.ok(blockRes.stderr.length > 0);
+      assert.ok(
+        blockRes.logEntry?.matched.some((m) => m.id === pair.ruleId && m.action === "block"),
+        `Expected rule ${pair.ruleId} to block ${pair.id}`,
+      );
+
+      // 2. Subprocess check: blocked slip
+      const childEnv = { ...process.env, NODE_TEST_CONTEXT: "" };
+      const blockProc = spawnSync(
+        process.execPath,
+        [
+          cliEntry,
+          "hook",
+          "pre-tool",
+          "--seats",
+          seatsPath,
+          "--log",
+          logPath,
+          "--now",
+          String(REPLAY_2026_11_08_CLOCK_MS),
+        ],
+        {
+          input: JSON.stringify(pair.blockedStdin),
+          encoding: "utf-8",
+          env: childEnv,
+        },
+      );
+      assert.equal(blockProc.status, 2, `Subprocess slip ${pair.id} must exit 2`);
+      assert.equal(blockProc.stdout, "");
+      assert.ok(blockProc.stderr.length > 0);
+      blockedCount++;
+
+      // 3. In-process check: matching allowed call
+      const allowRes = runPreTool({
+        stdinJson: JSON.stringify(pair.allowedStdin),
+        seatsPath,
+        logPath,
+        nowMs: REPLAY_2026_11_08_CLOCK_MS,
+      });
+      assert.equal(allowRes.exitCode, 0, `In-process allowed pair for ${pair.id} must exit 0`);
+      assert.equal(allowRes.outcome, pair.expectedAllowedOutcome);
+      if (pair.expectedAllowedOutcome === "warn") {
+        assert.match(allowRes.stdout, /additionalContext/);
+      } else {
+        assert.equal(allowRes.stdout, "");
+      }
+
+      // 4. Subprocess check: matching allowed call
+      const allowProc = spawnSync(
+        process.execPath,
+        [
+          cliEntry,
+          "hook",
+          "pre-tool",
+          "--seats",
+          seatsPath,
+          "--log",
+          logPath,
+          "--now",
+          String(REPLAY_2026_11_08_CLOCK_MS),
+        ],
+        {
+          input: JSON.stringify(pair.allowedStdin),
+          encoding: "utf-8",
+          env: childEnv,
+        },
+      );
+      assert.equal(allowProc.status, 0, `Subprocess allowed pair for ${pair.id} must exit 0`);
+      allowedCount++;
+    }
+
+    assert.equal(blockedCount, 4);
+    assert.equal(allowedCount, 4);
+  });
+
+  it("evaluates the 8 replay calls + 1,000 mixed synthetic calls within p50 < 10 ms and p99 < 50 ms in-process", () => {
+    const payloads: string[] = [];
+    for (const pair of REPLAY_2026_11_08_FIXTURE) {
+      payloads.push(JSON.stringify(pair.blockedStdin));
+      payloads.push(JSON.stringify(pair.allowedStdin));
+    }
+
+    const syntheticTemplates: Record<string, unknown>[] = [
+      {
+        hook_event_name: "PreToolUse",
+        session_id: "bench-session",
+        cwd: "E:/AI/Research and Development",
+        tool_name: "Read",
+        tool_input: { file_path: "E:/AI/Research and Development/README.md" },
+      },
+      {
+        hook_event_name: "PreToolUse",
+        session_id: "bench-session",
+        cwd: "E:/AI/Research and Development",
+        tool_name: "Grep",
+        tool_input: { pattern: "loadout_skill", path: "packages" },
+      },
+      {
+        hook_event_name: "PreToolUse",
+        session_id: "bench-session",
+        cwd: "E:/AI/Research and Development",
+        tool_name: "Bash",
+        tool_input: { command: "git status && git diff --stat | head -n 20" },
+      },
+      {
+        hook_event_name: "PreToolUse",
+        session_id: "bench-session",
+        cwd: "E:/AI/Research and Development",
+        tool_name: "Write",
+        tool_input: {
+          file_path: "E:/AI/Research and Development/notes/design.md",
+          content:
+            "# Design Notes\n\n**Last updated:** 2026-11-08 15:40 ET\n\nParaphrased summary of studio architecture rules.\n",
+        },
+      },
+      {
+        hook_event_name: "PreToolUse",
+        session_id: "bench-session",
+        cwd: "E:/AI/Research and Development",
+        tool_name: "Edit",
+        tool_input: {
+          file_path: `${REPLAY_2026_11_08_STORE}/BOARD.md`,
+          old_string: "**Last updated:** 2026-11-08 15:00 ET",
+          new_string: "**Last updated:** 2026-11-08 15:44 ET",
+        },
+      },
+      {
+        hook_event_name: "PreToolUse",
+        session_id: "bench-session",
+        cwd: "E:/AI/Research and Development",
+        tool_name: "Bash",
+        tool_input: { command: "gh pr merge 21 --squash" },
+      },
+      {
+        hook_event_name: "PreToolUse",
+        session_id: "bench-session",
+        cwd: "E:/AI/Publisher",
+        tool_name: "Bash",
+        tool_input: { command: "npm publish --access public" },
+      },
+      {
+        hook_event_name: "PreToolUse",
+        session_id: "bench-session",
+        cwd: "E:/AI/Research and Development",
+        tool_name: "Write",
+        tool_input: {
+          file_path: "E:/AI/Research and Development/docs/post.md",
+          content: 'Director 2026-11-08: "We always verify the build before opening a pull request."\n',
+        },
+      },
+      {
+        hook_event_name: "PreToolUse",
+        session_id: "bench-session",
+        cwd: "E:/AI/Research and Development",
+        tool_name: "Bash",
+        tool_input: {
+          command: `echo "overwrite" > "${REPLAY_2026_11_08_STORE}/BOARD.md"`,
+        },
+      },
+      {
+        hook_event_name: "PreToolUse",
+        session_id: "bench-session",
+        cwd: "E:/AI/Research and Development",
+        tool_name: "Edit",
+        tool_input: {
+          file_path: `${REPLAY_2026_11_08_STORE}/BOARD.md`,
+          old_string: "**Last updated:** 2026-11-08 15:00 ET",
+          new_string: "**Last updated:** 2026-11-08 18:30 ET",
+        },
+      },
+    ];
+
+    for (let i = 0; i < 1000; i++) {
+      const tpl = syntheticTemplates[i % syntheticTemplates.length]!;
+      payloads.push(JSON.stringify({ ...tpl, call_seq: i }));
+    }
+
+    assert.equal(payloads.length, 1008);
+
+    const wallTimesMs: number[] = [];
+    for (const stdinJson of payloads) {
+      const t0 = performance.now();
+      runPreTool({
+        stdinJson,
+        seatsPath,
+        logPath,
+        nowMs: REPLAY_2026_11_08_CLOCK_MS,
+      });
+      const elapsed = performance.now() - t0;
+      wallTimesMs.push(elapsed);
+    }
+
+    wallTimesMs.sort((a, b) => a - b);
+    const p50 = wallTimesMs[Math.floor(wallTimesMs.length * 0.5)]!;
+    const p95 = wallTimesMs[Math.floor(wallTimesMs.length * 0.95)]!;
+    const p99 = wallTimesMs[Math.floor(wallTimesMs.length * 0.99)]!;
+
+    assert.ok(p50 < 10, `Expected in-process p50 < 10 ms, got ${p50.toFixed(3)} ms`);
+    assert.ok(p95 < 50, `Expected in-process p95 < 50 ms, got ${p95.toFixed(3)} ms`);
+    assert.ok(p99 < 50, `Expected in-process p99 < 50 ms, got ${p99.toFixed(3)} ms`);
+  });
+});
 
