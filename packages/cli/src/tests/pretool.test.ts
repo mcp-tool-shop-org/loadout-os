@@ -1556,6 +1556,119 @@ describe("Part 3: the first five rules (unreviewed-merge, director-quote, memory
       );
     });
 
+    it("handles Markdown heading stamp lines (`^#{1,6} ... updated <timestamp>`) in memory-store files (5/5 heading-stamp cases)", () => {
+      // Clock fixed at 2026-11-08 17:57:00 EST (22:57:00 UTC)
+      const clock1757Ms = Date.UTC(2026, 10, 8, 22, 57, 0, 0);
+
+      // 1. `# Publisher BOARD — updated 2026-11-08 17:55 ET (stamped from date)` -> allow (clock fixed at 17:57)
+      const allowPub1755 = runPreTool({
+        stdinJson: JSON.stringify({
+          tool_name: "Edit",
+          tool_input: {
+            file_path: `${configuredStore}/BOARD.md`,
+            old_string: "old",
+            new_string:
+              "# Publisher BOARD — updated 2026-11-08 17:55 ET (stamped from date)",
+          },
+          cwd: "E:/AI/Publisher",
+        }),
+        seatsPath,
+        logPath,
+        nowMs: clock1757Ms,
+      });
+      assert.equal(allowPub1755.exitCode, 0);
+      assert.equal(allowPub1755.outcome, "allow");
+
+      // 2. The same line at 23:59 -> block
+      const blockPub2359 = runPreTool({
+        stdinJson: JSON.stringify({
+          tool_name: "Edit",
+          tool_input: {
+            file_path: `${configuredStore}/BOARD.md`,
+            old_string: "old",
+            new_string:
+              "# Publisher BOARD — updated 2026-11-08 23:59 ET (stamped from date)",
+          },
+          cwd: "E:/AI/Publisher",
+        }),
+        seatsPath,
+        logPath,
+        nowMs: clock1757Ms,
+      });
+      assert.equal(blockPub2359.exitCode, 2);
+      assert.equal(blockPub2359.outcome, "block");
+      assert.ok(blockPub2359.logEntry?.matched.some((m) => m.id === "future-stamp"));
+
+      // 3. `## Status — Updated 2026-11-09 08:00 ET` in a memory-store file -> block
+      const blockStatusHeading = runPreTool({
+        stdinJson: JSON.stringify({
+          tool_name: "Edit",
+          tool_input: {
+            file_path: `${configuredStore}/status.md`,
+            old_string: "old",
+            new_string: "## Status — Updated 2026-11-09 08:00 ET",
+          },
+          cwd: "E:/AI/Publisher",
+        }),
+        seatsPath,
+        logPath,
+        nowMs: clock1757Ms,
+      });
+      assert.equal(blockStatusHeading.exitCode, 2);
+      assert.equal(blockStatusHeading.outcome, "block");
+      assert.ok(blockStatusHeading.logEntry?.matched.some((m) => m.id === "future-stamp"));
+
+      // 4. A body line `- updated the docs 2026-12-01` (and `updated the README on 2026-12-01`) -> allow
+      for (const bodyLine of [
+        "- updated the docs 2026-12-01",
+        "updated the README on 2026-12-01",
+      ]) {
+        const allowBodyRes = runPreTool({
+          stdinJson: JSON.stringify({
+            tool_name: "Edit",
+            tool_input: {
+              file_path: `${configuredStore}/BOARD.md`,
+              old_string: "old",
+              new_string: bodyLine,
+            },
+            cwd: "E:/AI/Publisher",
+          }),
+          seatsPath,
+          logPath,
+          nowMs: clock1757Ms,
+        });
+        assert.equal(allowBodyRes.exitCode, 0, `Expected body line to allow: ${bodyLine}`);
+        assert.equal(allowBodyRes.outcome, "allow");
+      }
+
+      // 5. The same heading in a non-memory file -> allow
+      for (const heading of [
+        "# Publisher BOARD — updated 2026-11-08 23:59 ET (stamped from date)",
+        "## Status — Updated 2026-11-09 08:00 ET",
+      ]) {
+        const allowNonMemoryRes = runPreTool({
+          stdinJson: JSON.stringify({
+            tool_name: "Edit",
+            tool_input: {
+              file_path: "E:/AI/Publisher/docs/STATUS.md",
+              old_string: "old",
+              new_string: heading,
+            },
+            cwd: "E:/AI/Publisher",
+          }),
+          seatsPath,
+          logPath,
+          nowMs: clock1757Ms,
+        });
+        assert.equal(
+          allowNonMemoryRes.exitCode,
+          0,
+          `Expected heading in non-memory file to allow: ${heading}`,
+        );
+        assert.equal(allowNonMemoryRes.outcome, "allow");
+      }
+    });
+
     it("allows current/past stamps (<= +5 min), ignores non-stamped future deadlines, and logs unparseable stamps without blocking", () => {
       // Current stamp (15:44 ET) and +4 min (~15:48 ET) pass
       for (const stamp of [
@@ -1811,11 +1924,11 @@ describe("Part 5: 2026-11-08 four-slip replay fixture (4/4 blocked, 4/4 matching
       allowedCount++;
     }
 
-    assert.equal(blockedCount, 4);
-    assert.equal(allowedCount, 4);
+    assert.equal(blockedCount, 5);
+    assert.equal(allowedCount, 5);
   });
 
-  it("evaluates the 8 replay calls + 1,000 mixed synthetic calls within p50 < 10 ms and p99 < 50 ms in-process", () => {
+  it("evaluates the 10 replay calls + 1,000 mixed synthetic calls within p50 < 10 ms and p99 < 50 ms in-process", () => {
     const payloads: string[] = [];
     for (const pair of REPLAY_2026_11_08_FIXTURE) {
       payloads.push(JSON.stringify(pair.blockedStdin));
@@ -1917,7 +2030,7 @@ describe("Part 5: 2026-11-08 four-slip replay fixture (4/4 blocked, 4/4 matching
       payloads.push(JSON.stringify({ ...tpl, call_seq: i }));
     }
 
-    assert.equal(payloads.length, 1008);
+    assert.equal(payloads.length, 1010);
 
     const wallTimesMs: number[] = [];
     for (const stdinJson of payloads) {

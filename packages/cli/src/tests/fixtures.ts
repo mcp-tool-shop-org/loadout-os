@@ -472,6 +472,37 @@ export const REPLAY_2026_11_08_FIXTURE: readonly ReplayCasePair[] = [
     expectedAllowedOutcome: "allow",
   },
   {
+    id: "slip-3b-publisher-heading-updated",
+    ruleId: "future-stamp",
+    blockedStdin: {
+      hook_event_name: "PreToolUse",
+      session_id: "replay-2026-11-08",
+      cwd: "E:/AI/Publisher",
+      tool_name: "Edit",
+      tool_input: {
+        file_path: `${REPLAY_2026_11_08_STORE}/BOARD.md`,
+        old_string:
+          "# Publisher BOARD — updated 2026-11-08 15:03 ET (stamped from date)",
+        new_string:
+          "# Publisher BOARD — updated 2026-11-08 23:59 ET (stamped from date)",
+      },
+    },
+    allowedStdin: {
+      hook_event_name: "PreToolUse",
+      session_id: "replay-2026-11-08",
+      cwd: "E:/AI/Publisher",
+      tool_name: "Edit",
+      tool_input: {
+        file_path: `${REPLAY_2026_11_08_STORE}/BOARD.md`,
+        old_string:
+          "# Publisher BOARD — updated 2026-11-08 15:03 ET (stamped from date)",
+        new_string:
+          "# Publisher BOARD — updated 2026-11-08 15:44 ET (stamped from date)",
+      },
+    },
+    expectedAllowedOutcome: "allow",
+  },
+  {
     id: "slip-4-memory-shell-write-python-heredoc",
     ruleId: "memory-shell-write",
     blockedStdin: {

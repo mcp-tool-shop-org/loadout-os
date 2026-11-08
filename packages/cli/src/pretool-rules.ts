@@ -870,6 +870,23 @@ export function extractToolStampedFields(text: string): ExtractedStampField[] {
     }
   }
 
+  // Markdown heading lines (`^#{1,6} `) whose text contains `updated` (any case)
+  // followed by a leading timestamp (e.g. `# Publisher BOARD — updated 2026-11-08 17:55 ET (stamped from date)`
+  // or `## Status — Updated 2026-11-09 08:00 ET`).
+  const headingLineRe = /^[ \t]*#{1,6}[ \t]+(.+?)[ \t]*$/gm;
+  for (const hm of text.matchAll(headingLineRe)) {
+    const headingBody = hm[1] ?? "";
+    const updatedTokenRe = /\bupdated\b(?::\*\*|\*\*:|:)?[ \t]+/gi;
+    for (const um of headingBody.matchAll(updatedTokenRe)) {
+      const idx = (um.index ?? 0) + um[0].length;
+      const afterUpdated = headingBody.slice(idx).trim();
+      if (afterUpdated && parseToolStampedTime(afterUpdated, 0) !== null) {
+        out.push({ field: "heading updated", rawValue: afterUpdated });
+        break;
+      }
+    }
+  }
+
   // Frontmatter keys `created_at`, `modified`, `verified_at`
   const fmFieldRe = /^\s*(created_at|modified|verified_at)\s*:\s*(.+?)\s*$/gm;
   for (const m of text.matchAll(fmFieldRe)) {
