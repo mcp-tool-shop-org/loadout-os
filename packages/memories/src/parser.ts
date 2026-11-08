@@ -122,26 +122,22 @@ function parseRefLine(line: string, lineNum: number): MemoryRef | null {
   const stripped = line.replace(/^[-*]\s+/, "").trim();
   if (!stripped) return null;
 
+  const arrowMatch = line.match(ARROW_REF_RE);
+  const hasBacktickedArrowTarget =
+    arrowMatch !== null && line.trimEnd().endsWith("`" + arrowMatch[2] + "`");
+
   // Markdown-link entries: "- [Title](file.md) — hook".
   //
-  // MEM-B12 / #20: a bullet whose first token is a Markdown link to a relative
-  // .md file is parsed by the link branch first, whatever its hook text holds
-  // (including arrows like "teach → apply → verify"). The arrow branch below
-  // applies only to lines with no leading link bullet.
-  const linkMatch = line.match(LINK_REF_RE);
+  // MEM-B12 / #20: for a bullet whose first token is a Markdown link to a
+  // relative .md file, the link branch wins unless the line has an arrow whose
+  // target is backticked (the MEM-B12 shape: `- [Old](old.md) Topic — desc → \`memory/topic.md\``).
+  const linkMatch = !hasBacktickedArrowTarget ? line.match(LINK_REF_RE) : null;
   if (linkMatch) {
     const [, , text, path, rest] = linkMatch;
-    const trimmedRest = rest.trim();
-    const isSeparatorOrEmpty =
-      trimmedRest === "" ||
-      trimmedRest.startsWith("—") ||
-      trimmedRest.startsWith("--") ||
-      trimmedRest.startsWith("-") ||
-      trimmedRest.startsWith(":");
-    if (isSeparatorOrEmpty && isRelativeTopicPath(path) && !/^[a-z][a-z0-9+.-]*:/i.test(path)) {
+    if (isRelativeTopicPath(path) && !/^[a-z][a-z0-9+.-]*:/i.test(path)) {
       const split = splitNameDesc(text);
       const name = split.name;
-      const after = trimmedRest.replace(/^(?:—|--|-|:)\s*/, "").trim();
+      const after = rest.trim().replace(/^(?:—|--|-|:)\s*/, "").trim();
       const description = after || split.description;
       const id = nameToId(name);
       if (id && !id.startsWith("-") && !id.endsWith("-")) {
@@ -150,8 +146,7 @@ function parseRefLine(line: string, lineNum: number): MemoryRef | null {
     }
   }
 
-  // Try arrow pattern (handles both bulleted and non-bulleted lines without a leading link)
-  const arrowMatch = line.match(ARROW_REF_RE);
+  // Try arrow pattern (handles lines with no leading link, or with a backticked arrow target)
   if (arrowMatch) {
     const [, nameDesc, path] = arrowMatch;
     const { name, description } = splitNameDesc(nameDesc);

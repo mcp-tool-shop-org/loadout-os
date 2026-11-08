@@ -241,41 +241,87 @@ Full frame in [user profile](user_profile.md).
   });
 
   it("parses Markdown-link bullets with arrows in their hook text via the link branch without MISSING_TOPIC_FILE, while keeping arrow-form lines on the arrow branch (#20)", () => {
-    const hooks = [
-      "teach → apply → verify",
-      "teach then apply → verify",
-      "one → arrow",
-      "see loop.md → apply",
+    const table: Array<{ line: string; name: string; path: string; description: string }> = [
+      // Four #20 hook texts
+      {
+        line: "- [Loop](loop.md) — teach → apply → verify",
+        name: "Loop",
+        path: "loop.md",
+        description: "teach → apply → verify",
+      },
+      {
+        line: "- [Loop](loop.md) — teach then apply → verify",
+        name: "Loop",
+        path: "loop.md",
+        description: "teach then apply → verify",
+      },
+      {
+        line: "- [Loop](loop.md) — one → arrow",
+        name: "Loop",
+        path: "loop.md",
+        description: "one → arrow",
+      },
+      {
+        line: "- [Loop](loop.md) — see loop.md → apply",
+        name: "Loop",
+        path: "loop.md",
+        description: "see loop.md → apply",
+      },
+      // Non-separator text after leading link (no em-dash/hyphen/colon prefix)
+      {
+        line: "- [Loop](loop.md) (11-08) teach loop",
+        name: "Loop",
+        path: "loop.md",
+        description: "(11-08) teach loop",
+      },
+      {
+        line: "- [Loop](loop.md) **core** teach loop",
+        name: "Loop",
+        path: "loop.md",
+        description: "**core** teach loop",
+      },
+      // Plain-text .md tail after arrow (not backticked)
+      {
+        line: "- [Loop](loop.md) — teach → notes.md",
+        name: "Loop",
+        path: "loop.md",
+        description: "teach → notes.md",
+      },
+      // Existing arrow-form line (no leading link)
+      {
+        line: "- Name — desc → `path.md`",
+        name: "Name",
+        path: "path.md",
+        description: "desc",
+      },
+      // MEM-B12 shape (leading link + backticked arrow target)
+      {
+        line: "- [Old](old.md) Topic — desc → `memory/topic.md`",
+        name: "[Old](old.md) Topic",
+        path: "memory/topic.md",
+        description: "desc",
+      },
     ];
-    const lines = [
-      "## Active",
-      ...hooks.map((h) => `- [Loop](loop.md) — ${h}`),
-      "- Name — desc → `path.md`",
-      "",
-    ].join("\n");
 
-    const { refs } = parseMemoryMd(lines);
-    assert.equal(refs.length, 5);
-    for (let i = 0; i < hooks.length; i++) {
-      assert.equal(refs[i].name, "Loop");
-      assert.equal(refs[i].path, "loop.md");
-      assert.equal(refs[i].description, hooks[i]);
+    for (const c of table) {
+      const { refs } = parseMemoryMd(`## Active\n${c.line}\n`);
+      assert.equal(refs.length, 1, `expected 1 ref for: ${c.line}`);
+      assert.equal(refs[0].name, c.name, `name mismatch for: ${c.line}`);
+      assert.equal(refs[0].path, c.path, `path mismatch for: ${c.line}`);
+      assert.equal(refs[0].description, c.description, `description mismatch for: ${c.line}`);
     }
-    assert.equal(refs[4].name, "Name");
-    assert.equal(refs[4].description, "desc");
-    assert.equal(refs[4].path, "path.md");
 
     // Verify in a temp store with loop.md and path.md present that none of the
-    // four arrow-bearing hook texts trigger MISSING_TOPIC_FILE.
+    // link-branch bullets trigger MISSING_TOPIC_FILE or ORPHAN_TOPIC_FILE.
     const tmp = mkdtempSync(join(tmpdir(), "loadout-issue20-"));
     try {
       writeFileSync(join(tmp, "loop.md"), "# Loop\nBody.\n", "utf-8");
       writeFileSync(join(tmp, "path.md"), "# Path\nBody.\n", "utf-8");
-      for (const hook of hooks) {
+      for (const c of table.filter((row) => row.path === "loop.md")) {
         const memPath = join(tmp, "MEMORY.md");
         writeFileSync(
           memPath,
-          `# Memory\n- [Loop](loop.md) — ${hook}\n- Name — desc → \`path.md\`\n`,
+          `# Memory\n${c.line}\n- Name — desc → \`path.md\`\n`,
           "utf-8",
         );
         const analysis = analyzeMemoryMd(memPath);
@@ -283,11 +329,16 @@ Full frame in [user profile](user_profile.md).
         assert.equal(
           analysis.missingFiles.length,
           0,
-          `hook "${hook}" must not report missingFiles (got ${analysis.missingFiles.join(", ")})`,
+          `bullet "${c.line}" must not report missingFiles (got ${analysis.missingFiles.join(", ")})`,
+        );
+        assert.equal(
+          analysis.orphanFiles.length,
+          0,
+          `bullet "${c.line}" must not report orphanFiles (got ${analysis.orphanFiles.join(", ")})`,
         );
         assert.ok(
           !issues.some((iss) => iss.code === "MISSING_TOPIC_FILE"),
-          `hook "${hook}" must not raise MISSING_TOPIC_FILE`,
+          `bullet "${c.line}" must not raise MISSING_TOPIC_FILE`,
         );
       }
     } finally {
