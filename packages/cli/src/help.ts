@@ -288,6 +288,24 @@ export const COMMAND_HELP: Record<string, HelpEntry> = {
     example: "loadout-os hook pre-compact --project .",
     exits: [["0", "always exits 0 (fail-open hook)"]],
   },
+  "hook post-write": {
+    synopsis: "loadout-os hook post-write [--project <root>] [--store <dir>] [--snapshot-repo <dir>] [--mirror-repo <bare>] [--fix]",
+    flags: [
+      ["--project <root>", "project root containing .claude/loadout/index.json"],
+      ["--store <dir>", "memory store directory (default: resolved from index.json source field)"],
+      ["--file <path>", "explicit edited file path (default: read from PostToolUse stdin JSON)"],
+      ["--snapshot-repo <dir>", "git working copy to snapshot store .md files into"],
+      ["--mirror-repo <bare>", "bare git repo to push snapshot commits to"],
+      ["--fix", "synchronize drifted index bullet summaries from topic frontmatter before validating"],
+      ["--timeout-ms <ms>", "subprocess timeout in milliseconds for git commands (default 30000)"],
+    ],
+    note: "PostToolUse hook for Write/Edit: validates and refreshes the project index when the edited file is inside the memory store. Exits 2 on any validation, refresh, git, or timeout failure (for asyncRewake), and exits 0 silently otherwise.",
+    example: "loadout-os hook post-write --project .",
+    exits: [
+      ["0", "clean edit (or path outside store)"],
+      ["2", "validation error, refresh failure, git error, or subprocess timeout"],
+    ],
+  },
   refresh: {
     synopsis: "loadout-os refresh [--store <dir>] [--dest <path>] [--project <root>] [--snapshot-repo <dir>] [--mirror-repo <bare>] [--fix] [--dry-run]",
     flags: [

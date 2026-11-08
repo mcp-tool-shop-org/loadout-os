@@ -24,7 +24,7 @@ import {
 import { join, resolve } from "node:path";
 import { homedir, tmpdir } from "node:os";
 
-import { runHookTest, defaultHookPath, runSessionStart } from "../hook.js";
+import { runHookTest, defaultHookPath, runSessionStart, runPostWrite } from "../hook.js";
 import { runRefresh } from "../refresh.js";
 
 const HOOK = defaultHookPath(process.cwd());
@@ -936,6 +936,200 @@ describe("Part C: loadout-os hook session-start and pre-compact", () => {
       const res = runSessionStart({ project: projDir });
       assert.equal(res.refreshedStore, true, "session-start must auto-refresh when store .md is newer than index.json");
       assert.match(res.output, /# Board v2 \(shell-edited\)/);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+
+describe("Part D: loadout-os hook post-write", () => {
+  const CLI_BIN = resolve(process.cwd(), "dist", "cli.js");
+
+  test("1. an edit inside the store with an error exits 2 with the message", () => {
+    const root = mkdtempSync(join(tmpdir(), "loadout-part-d-err-"));
+    try {
+      const storeDir = join(root, "store");
+      const projDir = join(root, "proj");
+      mkdirSync(storeDir, { recursive: true });
+      mkdirSync(projDir, { recursive: true });
+
+      writeFileSync(join(storeDir, "topic-a.md"), "# Topic A\nValid content.\n", "utf-8");
+      writeFileSync(
+        join(storeDir, "MEMORY.md"),
+        "# Memory\n- [Topic A](topic-a.md) — Valid topic\n",
+        "utf-8",
+      );
+
+      // Build initial clean project index
+      runRefresh({ store: storeDir, project: projDir });
+
+      // Introduce a broken link inside MEMORY.md
+      const memPath = join(storeDir, "MEMORY.md");
+      writeFileSync(
+        memPath,
+        "# Memory\n- [Topic A](topic-a.md) — Valid topic\n- [Broken](nonexistent.md) — Dead link\n",
+        "utf-8",
+      );
+
+      const payloadJson = JSON.stringify({
+        hook_event_name: "PostToolUse",
+        tool_name: "Write",
+        cwd: projDir,
+        tool_input: { file_path: memPath },
+      });
+
+      const res = runPostWrite({ stdinJson: payloadJson });
+      assert.equal(res.matchedStore, true);
+      assert.equal(res.exitCode, 2, "must exit 2 on validation failure for asyncRewake");
+      assert.match(res.stderr, /MISSING_TOPIC_FILE/);
+      assert.match(res.stderr, /nonexistent\.md/);
+
+      // Also verify CLI process exit code is 2 (never 1)
+      if (existsSync(CLI_BIN)) {
+        const proc = spawnSync(process.execPath, [CLI_BIN, "hook", "post-write"], {
+          encoding: "utf-8",
+          input: payloadJson,
+        });
+        assert.equal(proc.status, 2);
+        assert.match(proc.stderr, /MISSING_TOPIC_FILE/);
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("2. a clean edit exits 0 silently and refreshes the project index via index.source (F-23)", () => {
+    const root = mkdtempSync(join(tmpdir(), "loadout-part-d-clean-"));
+    try {
+      const storeDir = join(root, "external-claude-store", "memory");
+      const projDir = join(root, "proj");
+      mkdirSync(storeDir, { recursive: true });
+      mkdirSync(projDir, { recursive: true });
+
+      writeFileSync(join(storeDir, "topic-a.md"), "# Topic A\nInitial content.\n", "utf-8");
+      writeFileSync(
+        join(storeDir, "MEMORY.md"),
+        "# Memory\n- [Topic A](topic-a.md) — Initial topic\n",
+        "utf-8",
+      );
+
+      // Initial project refresh stamps `source` in <projDir>/.claude/loadout/index.json
+      runRefresh({ store: storeDir, project: projDir });
+
+      // Add a new topic file and link it in MEMORY.md
+      const newTopicPath = join(storeDir, "topic-b.md");
+      writeFileSync(
+        newTopicPath,
+        [
+          "---",
+          "name: Topic B",
+          "description: Newly added topic B",
+          "---",
+          "# Topic B",
+          "Body text.",
+          "",
+        ].join("\n"),
+        "utf-8",
+      );
+      writeFileSync(
+        join(storeDir, "MEMORY.md"),
+        "# Memory\n- [Topic A](topic-a.md) — Initial topic\n- [Topic B](topic-b.md) — Newly added topic B\n",
+        "utf-8",
+      );
+
+      // PostToolUse payload carries only `cwd: projDir` and `file_path: newTopicPath` (no --store flag!)
+      // runPostWrite maps the edit back to projDir via index.source (F-23).
+      const payloadJson = JSON.stringify({
+        hook_event_name: "PostToolUse",
+        tool_name: "Write",
+        cwd: projDir,
+        tool_input: { file_path: newTopicPath },
+      });
+
+      const res = runPostWrite({ stdinJson: payloadJson });
+      assert.equal(res.matchedStore, true);
+      assert.equal(res.exitCode, 0);
+      assert.equal(res.stderr, "");
+
+      const indexPath = join(projDir, ".claude", "loadout", "index.json");
+      const updatedIndex = JSON.parse(readFileSync(indexPath, "utf-8"));
+      assert.ok(
+        updatedIndex.entries.some((e: { id: string }) => e.id === "topic-b"),
+        "project index must include newly added topic-b after post-write",
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("3. an edit outside the store exits 0 without touching anything", () => {
+    const root = mkdtempSync(join(tmpdir(), "loadout-part-d-outside-"));
+    try {
+      const storeDir = join(root, "store");
+      const projDir = join(root, "proj");
+      mkdirSync(storeDir, { recursive: true });
+      mkdirSync(projDir, { recursive: true });
+
+      writeFileSync(join(storeDir, "topic-a.md"), "# Topic A\nContent.\n", "utf-8");
+      writeFileSync(
+        join(storeDir, "MEMORY.md"),
+        "# Memory\n- [Topic A](topic-a.md) — Topic A\n",
+        "utf-8",
+      );
+
+      runRefresh({ store: storeDir, project: projDir });
+      const indexPath = join(projDir, ".claude", "loadout", "index.json");
+      const beforeMtime = statSync(indexPath).mtimeMs;
+
+      const outsideFile = join(projDir, "src", "index.ts");
+      const payloadJson = JSON.stringify({
+        hook_event_name: "PostToolUse",
+        tool_name: "Edit",
+        cwd: projDir,
+        tool_input: { file_path: outsideFile },
+      });
+
+      const res = runPostWrite({ stdinJson: payloadJson });
+      assert.equal(res.matchedStore, false);
+      assert.equal(res.exitCode, 0);
+      assert.equal(res.stderr, "");
+      assert.equal(statSync(indexPath).mtimeMs, beforeMtime, "index.json must not be touched");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("4. a subprocess timeout or git snapshot failure exits 2 with a message, never 1 (F-10, F-12)", () => {
+    const root = mkdtempSync(join(tmpdir(), "loadout-part-d-timeout-"));
+    try {
+      const storeDir = join(root, "store");
+      const projDir = join(root, "proj");
+      const snapDir = join(root, "snap");
+      mkdirSync(storeDir, { recursive: true });
+      mkdirSync(projDir, { recursive: true });
+
+      const topicPath = join(storeDir, "topic-a.md");
+      writeFileSync(topicPath, "# Topic A\nContent.\n", "utf-8");
+      writeFileSync(
+        join(storeDir, "MEMORY.md"),
+        "# Memory\n- [Topic A](topic-a.md) — Topic A\n",
+        "utf-8",
+      );
+
+      runRefresh({ store: storeDir, project: projDir });
+
+      // Force a git subprocess timeout with gitTimeoutMs: 1
+      const res = runPostWrite({
+        project: projDir,
+        store: storeDir,
+        filePath: topicPath,
+        snapshotRepo: snapDir,
+        gitTimeoutMs: 1,
+      });
+      assert.equal(res.matchedStore, true);
+      assert.equal(res.exitCode, 2, "must exit 2 (never 1) on timeout/git failure");
+      assert.match(res.stderr, /\[loadout-os post-write\]/);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

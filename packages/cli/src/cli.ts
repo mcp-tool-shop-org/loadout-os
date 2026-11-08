@@ -66,6 +66,7 @@ import {
   printHookTest,
   defaultHookPath,
   runSessionStart,
+  runPostWrite,
   writeUtf8Stdout,
   readHookStdin,
 } from "./hook.js";
@@ -107,6 +108,7 @@ ${BOLD}Rituals:${RESET}
   loadout-os hook test [--prompt "<text>"]         Drive the runtime hook on a sample prompt
   loadout-os hook session-start [--project <r>]    SessionStart board injection & stale warning
   loadout-os hook pre-compact [--project <r>]      PreCompact board staleness check
+  loadout-os hook post-write [--project <r>]       PostToolUse Write/Edit validator & project refresh
   loadout-os refresh [--store <d>] [--dest <p>] [--project <r>] [--dry-run]   Index Freshness Ritual
 
 ${BOLD}Options:${RESET}
@@ -323,11 +325,40 @@ function dispatchHook(args: string[]): void {
       }
       return;
     }
+    case "post-write": {
+      const stdinRaw = readHookStdin();
+      const project = flagValue(rest, "project");
+      const store = flagValue(rest, "store");
+      const filePath = flagValue(rest, "file");
+      const snapshotRepo = flagValue(rest, "snapshot-repo");
+      const mirrorRepo = flagValue(rest, "mirror-repo");
+      const timeoutRaw = flagValue(rest, "timeout-ms");
+      const gitTimeoutMs = timeoutRaw !== undefined ? Number(timeoutRaw) : undefined;
+
+      const res = runPostWrite({
+        project,
+        store,
+        filePath,
+        stdinJson: stdinRaw,
+        fixSummaries: hasFlag(rest, "fix"),
+        snapshotRepo,
+        mirrorRepo,
+        gitTimeoutMs: Number.isFinite(gitTimeoutMs) ? gitTimeoutMs : undefined,
+      });
+
+      if (res.exitCode !== 0) {
+        if (res.stderr) {
+          process.stderr.write(Buffer.from(res.stderr, "utf-8"));
+        }
+        process.exitCode = 2;
+      }
+      return;
+    }
     default:
       throw new CliError(
         "UNKNOWN_COMMAND",
         `Unknown hook subcommand: ${sub ?? "(none)"}`,
-        "Expected one of: test, session-start, pre-compact.",
+        "Expected one of: test, session-start, pre-compact, post-write.",
       );
   }
 }

@@ -554,3 +554,176 @@ export function runSessionStart(opts: SessionStartOptions = {}): SessionStartRes
     truncatedFiles,
   };
 }
+
+
+// ── Part D: Post-Write Validation & Project Refresh Hook ──────────────
+
+export interface PostWriteOptions {
+  /** Explicit project root containing `.claude/loadout/index.json`. */
+  project?: string;
+  /** Explicit memory store directory (optional when project index has `source`). */
+  store?: string;
+  /** Edited file path (from PostToolUse stdin payload or `--file`). */
+  filePath?: string;
+  /** Working directory from PostToolUse stdin payload. */
+  cwd?: string;
+  /** Raw stdin JSON string (parsed when `filePath` is not provided directly). */
+  stdinJson?: string;
+  /** Optional git working tree to snapshot store `.md` files into (F-10 / F-21). */
+  snapshotRepo?: string;
+  /** Optional bare git mirror repository to push `main` to (F-10 / F-31). */
+  mirrorRepo?: string;
+  /** Synchronize drifted bullet summaries from topic frontmatter before validating. */
+  fixSummaries?: boolean;
+  /** Subprocess timeout in milliseconds for git commands (default 30,000). */
+  gitTimeoutMs?: number;
+}
+
+export interface PostWriteResult {
+  matchedStore: boolean;
+  exitCode: 0 | 2;
+  stderr: string;
+  refreshedDest?: string;
+}
+
+/**
+ * Normalize a path for containment checks, folding case and separators on Windows (F-13).
+ */
+export function isPathInsideDir(filePath: string, dirPath: string): boolean {
+  const normFile = resolve(filePath).replace(/\\/g, "/");
+  const normDir = resolve(dirPath).replace(/\\/g, "/").replace(/\/+$/, "");
+  const cmpFile = process.platform === "win32" ? normFile.toLowerCase() : normFile;
+  const cmpDir = process.platform === "win32" ? normDir.toLowerCase() : normDir;
+  return cmpFile === cmpDir || cmpFile.startsWith(cmpDir + "/");
+}
+
+/**
+ * Extract `filePath` and `cwd` from a Claude Code `PostToolUse` JSON payload.
+ */
+export function parsePostToolUsePayload(raw: string): { filePath?: string; cwd?: string } {
+  if (!raw || !raw.trim()) return {};
+  try {
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const cwd = typeof parsed.cwd === "string" ? parsed.cwd : undefined;
+    const toolInput =
+      parsed.tool_input && typeof parsed.tool_input === "object"
+        ? (parsed.tool_input as Record<string, unknown>)
+        : undefined;
+    const toolResponse =
+      parsed.tool_response && typeof parsed.tool_response === "object"
+        ? (parsed.tool_response as Record<string, unknown>)
+        : undefined;
+
+    const candidate =
+      toolInput?.file_path ??
+      toolInput?.path ??
+      toolResponse?.filePath ??
+      toolResponse?.file_path ??
+      parsed.file_path;
+
+    return {
+      filePath: typeof candidate === "string" && candidate.trim() ? candidate.trim() : undefined,
+      cwd,
+    };
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Run `loadout-os hook post-write`:
+ * - Checks whether the edited file is inside the configured memory store (resolved from
+ *   `--store` or from the `source` field of `<projectRoot>/.claude/loadout/index.json` — F-23).
+ * - Paths outside the store return `{ matchedStore: false, exitCode: 0, stderr: "" }` immediately.
+ * - Paths inside the store run `runRefresh` (validate + project index refresh + optional
+ *   snapshot/mirror under OS file lock — F-07).
+ * - Any validation error, git failure, or timeout returns `exitCode: 2` (never 1, for
+ *   `asyncRewake` — F-10, F-12) with the error details in `stderr`.
+ * - A clean edit returns `exitCode: 0` silently.
+ */
+export function runPostWrite(opts: PostWriteOptions = {}): PostWriteResult {
+  const payload = opts.stdinJson ? parsePostToolUsePayload(opts.stdinJson) : {};
+  const editedPath = opts.filePath ?? payload.filePath;
+  if (!editedPath) {
+    return { matchedStore: false, exitCode: 0, stderr: "" };
+  }
+
+  const startDir = opts.project
+    ? resolve(opts.project)
+    : opts.cwd
+      ? resolve(opts.cwd)
+      : payload.cwd
+        ? resolve(payload.cwd)
+        : process.cwd();
+
+  const envProjectIndex = process.env.AI_LOADOUT_PROJECT_INDEX?.trim();
+  let indexPath: string | null = null;
+  if (envProjectIndex) {
+    indexPath = resolve(envProjectIndex);
+  } else if (opts.project) {
+    indexPath = projectDest(opts.project);
+  } else {
+    indexPath = findProjectIndex(startDir);
+  }
+
+  let projectRoot = opts.project ? resolve(opts.project) : startDir;
+  let storeDir: string | null = opts.store ? resolve(opts.store) : null;
+
+  if (indexPath && existsSync(indexPath)) {
+    if (!opts.project && !envProjectIndex) {
+      projectRoot = dirname(dirname(dirname(indexPath)));
+    }
+    if (!storeDir) {
+      try {
+        const raw = readFileSync(indexPath, "utf-8");
+        const parsed = JSON.parse(raw) as LoadoutIndex;
+        if (parsed && typeof parsed.source === "string" && parsed.source.trim()) {
+          storeDir = dirname(resolve(parsed.source));
+        }
+      } catch {
+        // ignore corrupt index when probing source; if storeDir wasn't passed we can't match
+      }
+    }
+  }
+
+  if (!storeDir || !isPathInsideDir(editedPath, storeDir)) {
+    return { matchedStore: false, exitCode: 0, stderr: "" };
+  }
+
+  try {
+    const dest = indexPath ?? projectDest(projectRoot);
+    const res = runRefresh({
+      store: storeDir,
+      dest,
+      project: projectRoot,
+      fixSummaries: opts.fixSummaries,
+      snapshotRepo: opts.snapshotRepo,
+      mirrorRepo: opts.mirrorRepo,
+      gitTimeoutMs: opts.gitTimeoutMs,
+    });
+    return {
+      matchedStore: true,
+      exitCode: 0,
+      stderr: "",
+      refreshedDest: res.dest,
+    };
+  } catch (err) {
+    const lines: string[] = [];
+    const msg = err instanceof Error ? err.message : String(err);
+    lines.push(`[loadout-os post-write] ${msg}`);
+    if (err && typeof err === "object" && "issues" in err && Array.isArray((err as { issues?: unknown[] }).issues)) {
+      const issues = (err as { issues: { code?: string; message?: string; hint?: string }[] }).issues;
+      for (const issue of issues) {
+        lines.push(`  - [${issue.code ?? "ERROR"}] ${issue.message ?? ""}`);
+        if (issue.hint) {
+          lines.push(`    hint: ${issue.hint}`);
+        }
+      }
+    }
+    return {
+      matchedStore: true,
+      exitCode: 2,
+      stderr: lines.join("\n") + "\n",
+    };
+  }
+}
