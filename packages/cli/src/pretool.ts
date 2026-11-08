@@ -1414,26 +1414,8 @@ export function runPreTool(opts: PreToolOptions = {}): PreToolResult {
     toolName = payload.tool_name;
     session = payload.session_id ?? "";
     cwd = payload.cwd && payload.cwd.trim() ? payload.cwd.trim() : process.cwd();
-    inputHash = hashToolInput(payload.tool_input);
 
-    seatConfig = loadSeatConfig(opts.seatsPath);
-    seat = resolveSeat(cwd, seatConfig);
-
-    // Check internal timeout before parsing/matching
-    if (elapsedMs(1) > timeoutMs) {
-      const { entry } = safeWriteLog("timeout", elapsedMs(1));
-      return {
-        exitCode: 0,
-        stdout: "",
-        stderr: "",
-        passThrough: false,
-        seat,
-        outcome: "timeout",
-        logEntry: entry,
-      };
-    }
-
-    // ── 2. Read-only tool pass-through (before Bash parsing) ──
+    // ── 2. Read-only tool pass-through (zero disk I/O, before Bash parsing) ──
     if (READ_ONLY_TOOLS.has(toolName)) {
       return {
         exitCode: 0,
@@ -1445,7 +1427,7 @@ export function runPreTool(opts: PreToolOptions = {}): PreToolResult {
       };
     }
 
-    // ── 3. Parse Bash command or extract Write/Edit payload ──
+    // ── 3. Parse Bash command (and pass through read-only Bash with zero disk I/O) or extract Write/Edit payload ──
     if (toolName === "Bash") {
       const rawCmd =
         typeof payload.tool_input.command === "string"
@@ -1466,6 +1448,24 @@ export function runPreTool(opts: PreToolOptions = {}): PreToolResult {
       }
     } else {
       writePayload = extractWritePayload(toolName, payload.tool_input);
+    }
+
+    inputHash = hashToolInput(payload.tool_input);
+    seatConfig = loadSeatConfig(opts.seatsPath);
+    seat = resolveSeat(cwd, seatConfig);
+
+    // Check internal timeout before matching
+    if (elapsedMs(1) > timeoutMs) {
+      const { entry } = safeWriteLog("timeout", elapsedMs(1));
+      return {
+        exitCode: 0,
+        stdout: "",
+        stderr: "",
+        passThrough: false,
+        seat,
+        outcome: "timeout",
+        logEntry: entry,
+      };
     }
   } catch {
     notes.push("pre_match_error");

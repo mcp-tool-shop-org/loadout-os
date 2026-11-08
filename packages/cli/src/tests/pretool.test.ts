@@ -1346,8 +1346,10 @@ describe("Part 3: the first five rules (unreviewed-merge, director-quote, memory
 
   // ── 3.4 future-stamp ──────────────────────────────────────────
   describe("3.4 future-stamp (Layer A)", () => {
-    // Fixed clock: 2026-11-08 15:44:00 local time
-    const fixedClockMs = new Date(2026, 10, 8, 15, 44, 0, 0).getTime();
+    // Fixed clocks in America/New_York (EST on 2026-11-08 = UTC-5):
+    // 15:44 ET = 20:44 UTC; 17:39 ET = 22:39 UTC
+    const fixedClockMs = Date.UTC(2026, 10, 8, 20, 44, 0, 0);
+    const clock1739Ms = Date.UTC(2026, 10, 8, 22, 39, 0, 0);
 
     it("blocks tool-stamped fields (> 5 min ahead of OS clock) in `2026-11-08 15:03 ET`, `~15:05 ET`, and ISO 8601 forms", () => {
       const futurePayloads = [
@@ -1381,6 +1383,177 @@ describe("Part 3: the first five rules (unreviewed-merge, director-quote, memory
         assert.equal(res.outcome, "block");
         assert.ok(res.logEntry?.matched.some((m) => m.id === "future-stamp"));
       }
+    });
+
+    it("handles real-world board lines with trailing text, zones (ET/EST/EDT/UTC/Z/±HH:MM), bare dates (end-of-day), prose values, and body deadlines (8/8 real-line cases)", () => {
+      // 1. Real board line at 15:03 ET with trailing text -> allow (clock fixed at 15:44 ET)
+      const allow1503 = runPreTool({
+        stdinJson: JSON.stringify({
+          tool_name: "Edit",
+          tool_input: {
+            file_path: `${configuredStore}/BOARD.md`,
+            old_string: "old",
+            new_string:
+              "**Last updated:** 2026-11-08 15:03 ET (clock-checked). loadout-os 1.1.1 live …",
+          },
+          cwd: "E:/AI/Research and Development",
+        }),
+        seatsPath,
+        logPath,
+        nowMs: fixedClockMs,
+      });
+      assert.equal(allow1503.exitCode, 0);
+      assert.equal(allow1503.outcome, "allow");
+
+      // 2. The same real board line at 23:59 (and `23:59 ET. x` at 17:39 ET) -> block
+      for (const [line, clock] of [
+        [
+          "**Last updated:** 2026-11-08 23:59 ET (clock-checked). loadout-os 1.1.1 live …",
+          fixedClockMs,
+        ],
+        ["**Last updated:** 2026-11-08 23:59 ET. x", clock1739Ms],
+      ] as const) {
+        const block2359 = runPreTool({
+          stdinJson: JSON.stringify({
+            tool_name: "Edit",
+            tool_input: {
+              file_path: `${configuredStore}/BOARD.md`,
+              old_string: "old",
+              new_string: line,
+            },
+            cwd: "E:/AI/Research and Development",
+          }),
+          seatsPath,
+          logPath,
+          nowMs: clock,
+        });
+        assert.equal(block2359.exitCode, 2, `Expected block on: ${line}`);
+        assert.equal(block2359.outcome, "block");
+        assert.ok(block2359.logEntry?.matched.some((m) => m.id === "future-stamp"));
+      }
+
+      // 3. `**Last updated:** 2026-11-08 ~15:05 ET. Cutover: …` -> allow (clock 17:39 ET)
+      const allowApprox1505 = runPreTool({
+        stdinJson: JSON.stringify({
+          tool_name: "Edit",
+          tool_input: {
+            file_path: `${configuredStore}/BOARD.md`,
+            old_string: "old",
+            new_string: "**Last updated:** 2026-11-08 ~15:05 ET. Cutover: …",
+          },
+          cwd: "E:/AI/Research and Development",
+        }),
+        seatsPath,
+        logPath,
+        nowMs: clock1739Ms,
+      });
+      assert.equal(allowApprox1505.exitCode, 0);
+      assert.equal(allowApprox1505.outcome, "allow");
+
+      // 4. `~19:30 ET` (both full date+~time and time-only with trailing text) -> block (clock 17:39 ET)
+      for (const line of [
+        "**Last updated:** 2026-11-08 ~19:30 ET. Cutover: …",
+        "**Last updated:** ~19:30 ET. Cutover: …",
+      ]) {
+        const blockApprox1930 = runPreTool({
+          stdinJson: JSON.stringify({
+            tool_name: "Edit",
+            tool_input: {
+              file_path: `${configuredStore}/BOARD.md`,
+              old_string: "old",
+              new_string: line,
+            },
+            cwd: "E:/AI/Research and Development",
+          }),
+          seatsPath,
+          logPath,
+          nowMs: clock1739Ms,
+        });
+        assert.equal(blockApprox1930.exitCode, 2, `Expected block on: ${line}`);
+        assert.equal(blockApprox1930.outcome, "block");
+      }
+
+      // 5. `**Last updated**: 2026-11-08T23:59:00Z — …` -> block
+      const blockIsoZ = runPreTool({
+        stdinJson: JSON.stringify({
+          tool_name: "Edit",
+          tool_input: {
+            file_path: `${configuredStore}/BOARD.md`,
+            old_string: "old",
+            new_string: "**Last updated**: 2026-11-08T23:59:00Z — …",
+          },
+          cwd: "E:/AI/Research and Development",
+        }),
+        seatsPath,
+        logPath,
+        nowMs: fixedClockMs,
+      });
+      assert.equal(blockIsoZ.exitCode, 2);
+      assert.equal(blockIsoZ.outcome, "block");
+
+      // 6. A value that is pure prose -> allow and log in `notes`
+      const proseRes = runPreTool({
+        stdinJson: JSON.stringify({
+          tool_name: "Edit",
+          tool_input: {
+            file_path: `${configuredStore}/BOARD.md`,
+            old_string: "old",
+            new_string: "**Last updated:** stamped by the CLI on next refresh",
+          },
+          cwd: "E:/AI/Research and Development",
+        }),
+        seatsPath,
+        logPath,
+        nowMs: fixedClockMs,
+      });
+      assert.equal(proseRes.exitCode, 0);
+      assert.equal(proseRes.outcome, "allow");
+      assert.ok(
+        proseRes.logEntry?.notes?.some((n) =>
+          n.startsWith("unparseable_timestamp:Last updated=stamped by the CLI"),
+        ),
+      );
+
+      // 7. A deadline elsewhere in the body (`due 2026-12-01`) -> allow (not a stamped field)
+      const deadlineRes = runPreTool({
+        stdinJson: JSON.stringify({
+          tool_name: "Write",
+          tool_input: {
+            file_path: `${configuredStore}/BOARD.md`,
+            content:
+              "# R&D Board\n\n**Last updated:** 2026-11-08 15:03 ET (clock-checked). loadout-os 1.1.1 live.\n\n- Milestone 2: due 2026-12-01 (hard deadline)\n",
+          },
+          cwd: "E:/AI/Research and Development",
+        }),
+        seatsPath,
+        logPath,
+        nowMs: fixedClockMs,
+      });
+      assert.equal(deadlineRes.exitCode, 0);
+      assert.equal(deadlineRes.outcome, "allow");
+
+      // 8. Frontmatter fields (`created_at`, `modified`, `verified_at`), zones (`EST`, `EDT`, `UTC`, `Z`, `±HH:MM`, EDT summer), and bare `YYYY-MM-DD` (compared at end-of-day)
+      // Bare date `2026-11-07` (end of day 2026-11-07 23:59:59.999 ET <= 2026-11-08 15:44 ET) -> allow
+      assert.ok(parseToolStampedTime("2026-11-07 (yesterday)", fixedClockMs)! < fixedClockMs);
+      // Bare date `2026-11-08` (end of day 2026-11-08 23:59:59.999 ET > 2026-11-08 15:44 ET) -> > fixedClockMs
+      assert.ok(parseToolStampedTime("2026-11-08 (today date-only)", fixedClockMs)! > fixedClockMs);
+      // Explicit zones (`EST`, `EDT`, `UTC`, `Z`, `-05:00`) and summer EDT (`2026-07-15 12:00 ET` = 16:00 UTC)
+      assert.equal(
+        parseToolStampedTime("2026-07-15 12:00 ET (summer EDT)", fixedClockMs),
+        Date.UTC(2026, 6, 15, 16, 0, 0, 0),
+      );
+      assert.equal(
+        parseToolStampedTime("2026-11-08 15:03 EST (winter EST)", fixedClockMs),
+        Date.UTC(2026, 10, 8, 20, 3, 0, 0),
+      );
+      assert.equal(
+        parseToolStampedTime("2026-11-08 20:03 UTC — note", fixedClockMs),
+        Date.UTC(2026, 10, 8, 20, 3, 0, 0),
+      );
+      assert.equal(
+        parseToolStampedTime("~2026-11-08 15:03 -05:00 (offset)", fixedClockMs),
+        Date.UTC(2026, 10, 8, 20, 3, 0, 0),
+      );
     });
 
     it("allows current/past stamps (<= +5 min), ignores non-stamped future deadlines, and logs unparseable stamps without blocking", () => {
@@ -1500,120 +1673,19 @@ describe("Part 3: the first five rules (unreviewed-merge, director-quote, memory
 import { spawnSync } from "node:child_process";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  REPLAY_2026_11_08_FIXTURE,
+  REPLAY_2026_11_08_STORE,
+  REPLAY_2026_11_08_CLOCK_MS,
+  type ReplayCasePair,
+} from "./fixtures.js";
 
-export interface ReplayCasePair {
-  id: string;
-  ruleId: string;
-  blockedStdin: Record<string, unknown>;
-  allowedStdin: Record<string, unknown>;
-  expectedAllowedOutcome: "allow" | "warn";
-}
-
-export const REPLAY_2026_11_08_STORE = "E:/AI/StudioStore/memory";
-export const REPLAY_2026_11_08_CLOCK_MS = new Date(2026, 10, 8, 15, 44, 0, 0).getTime();
-
-/**
- * Canned PreToolUse JSON fixture of the four slips from 2026-11-08 and their
- * matching allowed calls (Part 5.1).
- */
-export const REPLAY_2026_11_08_FIXTURE: readonly ReplayCasePair[] = [
-  {
-    id: "slip-1-unreviewed-merge",
-    ruleId: "unreviewed-merge",
-    blockedStdin: {
-      hook_event_name: "PreToolUse",
-      session_id: "replay-2026-11-08",
-      cwd: "E:/AI/Research and Development",
-      tool_name: "Bash",
-      tool_input: { command: "gh pr merge 21" },
-    },
-    allowedStdin: {
-      hook_event_name: "PreToolUse",
-      session_id: "replay-2026-11-08",
-      cwd: "E:/AI/Publisher",
-      tool_name: "Bash",
-      tool_input: { command: "gh pr merge 21" },
-    },
-    expectedAllowedOutcome: "warn",
-  },
-  {
-    id: "slip-2-dated-director-quote",
-    ruleId: "director-quote",
-    blockedStdin: {
-      hook_event_name: "PreToolUse",
-      session_id: "replay-2026-11-08",
-      cwd: "E:/AI/Research and Development",
-      tool_name: "Write",
-      tool_input: {
-        file_path: "E:/AI/Research and Development/docs/handoff.md",
-        content:
-          '# Handoff\n\nDirector 2026-11-08: "I want every build to go through the card process before any code is merged."\n',
-      },
-    },
-    allowedStdin: {
-      hook_event_name: "PreToolUse",
-      session_id: "replay-2026-11-08",
-      cwd: "E:/AI/Research and Development",
-      tool_name: "Write",
-      tool_input: {
-        file_path: "E:/AI/Research and Development/docs/handoff.md",
-        content:
-          "# Handoff\n\nDirector 2026-11-08 ruled that every build goes through the card process before any code is merged.\n",
-      },
-    },
-    expectedAllowedOutcome: "allow",
-  },
-  {
-    id: "slip-3-future-last-updated",
-    ruleId: "future-stamp",
-    blockedStdin: {
-      hook_event_name: "PreToolUse",
-      session_id: "replay-2026-11-08",
-      cwd: "E:/AI/Research and Development",
-      tool_name: "Edit",
-      tool_input: {
-        file_path: `${REPLAY_2026_11_08_STORE}/BOARD.md`,
-        old_string: "**Last updated:** 2026-11-08 15:00 ET",
-        new_string: "**Last updated:** 2026-11-08 17:00 ET",
-      },
-    },
-    allowedStdin: {
-      hook_event_name: "PreToolUse",
-      session_id: "replay-2026-11-08",
-      cwd: "E:/AI/Research and Development",
-      tool_name: "Edit",
-      tool_input: {
-        file_path: `${REPLAY_2026_11_08_STORE}/BOARD.md`,
-        old_string: "**Last updated:** 2026-11-08 15:00 ET",
-        new_string: "**Last updated:** 2026-11-08 15:44 ET",
-      },
-    },
-    expectedAllowedOutcome: "allow",
-  },
-  {
-    id: "slip-4-memory-shell-write-python-heredoc",
-    ruleId: "memory-shell-write",
-    blockedStdin: {
-      hook_event_name: "PreToolUse",
-      session_id: "replay-2026-11-08",
-      cwd: "E:/AI/Research and Development",
-      tool_name: "Bash",
-      tool_input: {
-        command: `python - <<EOF\nwith open('${REPLAY_2026_11_08_STORE}/BOARD.md','w') as f:\n    f.write('# Board\\n')\nEOF`,
-      },
-    },
-    allowedStdin: {
-      hook_event_name: "PreToolUse",
-      session_id: "replay-2026-11-08",
-      cwd: "E:/AI/Research and Development",
-      tool_name: "Bash",
-      tool_input: {
-        command: `loadout-os memories place ${REPLAY_2026_11_08_STORE}/topic.md main --store ${REPLAY_2026_11_08_STORE}`,
-      },
-    },
-    expectedAllowedOutcome: "allow",
-  },
-];
+export {
+  REPLAY_2026_11_08_FIXTURE,
+  REPLAY_2026_11_08_STORE,
+  REPLAY_2026_11_08_CLOCK_MS,
+  type ReplayCasePair,
+};
 
 describe("Part 5: 2026-11-08 four-slip replay fixture (4/4 blocked, 4/4 matching calls pass)", () => {
   let tempDir: string;

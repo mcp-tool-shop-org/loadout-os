@@ -637,10 +637,133 @@ export function isStoreOrBoardFile(
   return /^(?:board|.*[-_]board)\.md$/i.test(base);
 }
 
+function isValidYmdHms(
+  year: number,
+  month: number,
+  day: number,
+  hour: number,
+  minute: number,
+  second: number,
+): boolean {
+  if (
+    month < 1 ||
+    month > 12 ||
+    day < 1 ||
+    day > 31 ||
+    hour < 0 ||
+    hour > 23 ||
+    minute < 0 ||
+    minute > 59 ||
+    second < 0 ||
+    second > 59
+  ) {
+    return false;
+  }
+  const d = new Date(Date.UTC(year, month - 1, day));
+  return (
+    d.getUTCFullYear() === year &&
+    d.getUTCMonth() === month - 1 &&
+    d.getUTCDate() === day
+  );
+}
+
 /**
- * Parse a tool-stamped timestamp string (`2026-11-08 15:03 ET`, `~15:05 ET`, or ISO 8601)
- * into epoch milliseconds relative to the local timezone of `nowMs`.
- * Returns `null` if the string cannot be parsed.
+ * Compute the UTC offset in milliseconds (local - UTC) for `America/New_York`
+ * at a given year and approximate UTC timestamp using US DST rules
+ * (2nd Sunday in March 02:00 EST = 07:00 UTC to 1st Sunday in November 02:00 EDT = 06:00 UTC).
+ */
+function americaNewYorkOffsetMs(year: number, approxUtcMs: number): number {
+  const march1Dow = new Date(Date.UTC(year, 2, 1)).getUTCDay();
+  const secondSundayMarch = 8 + ((7 - march1Dow) % 7);
+  const dstStartUtc = Date.UTC(year, 2, secondSundayMarch, 7, 0, 0, 0);
+
+  const nov1Dow = new Date(Date.UTC(year, 10, 1)).getUTCDay();
+  const firstSundayNov = 1 + ((7 - nov1Dow) % 7);
+  const dstEndUtc = Date.UTC(year, 10, firstSundayNov, 6, 0, 0, 0);
+
+  return approxUtcMs >= dstStartUtc && approxUtcMs < dstEndUtc
+    ? -4 * 3_600_000 // EDT (UTC-4)
+    : -5 * 3_600_000; // EST (UTC-5)
+}
+
+/**
+ * Resolve a zone token (`ET`, `EST`, `EDT`, `UTC`, `Z`, `±HH:MM`, `±HHMM`, or undefined -> `ET`)
+ * to its UTC offset in milliseconds (local - UTC) at the given wall-clock year and UTC guess.
+ */
+function resolveZoneOffsetMs(
+  zoneRaw: string | undefined,
+  year: number,
+  utcGuessMs: number,
+): number | null {
+  const z = (zoneRaw ?? "ET").trim().toUpperCase();
+  if (!z || z === "ET") {
+    // Check with EDT assumption first (standard US DST boundary check)
+    const offsetWithEdtGuess = americaNewYorkOffsetMs(
+      year,
+      utcGuessMs + 4 * 3_600_000,
+    );
+    return offsetWithEdtGuess;
+  }
+  if (z === "EST") return -5 * 3_600_000;
+  if (z === "EDT") return -4 * 3_600_000;
+  if (z === "UTC" || z === "Z") return 0;
+
+  const offMatch = z.match(/^([+-])(\d{2}):?(\d{2})$/);
+  if (offMatch) {
+    const sign = offMatch[1] === "+" ? 1 : -1;
+    const offH = Number(offMatch[2]);
+    const offM = Number(offMatch[3]);
+    if (offH <= 23 && offM <= 59) {
+      return sign * (offH * 60 + offM) * 60_000;
+    }
+  }
+  return null;
+}
+
+function zonedWallTimeToUtcMs(
+  year: number,
+  month: number,
+  day: number,
+  hour: number,
+  minute: number,
+  second: number,
+  ms: number,
+  zoneRaw?: string,
+): number | null {
+  const utcWall = Date.UTC(year, month - 1, day, hour, minute, second, ms);
+  const offsetMs = resolveZoneOffsetMs(zoneRaw, year, utcWall);
+  if (offsetMs === null) return null;
+  return utcWall - offsetMs;
+}
+
+function calendarDateInZone(
+  epochMs: number,
+  zoneRaw?: string,
+): { year: number; month: number; day: number } {
+  const approxYear = new Date(epochMs).getUTCFullYear();
+  const z = (zoneRaw ?? "ET").trim().toUpperCase();
+  const offsetMs =
+    !z || z === "ET"
+      ? americaNewYorkOffsetMs(approxYear, epochMs)
+      : (resolveZoneOffsetMs(zoneRaw, approxYear, epochMs) ??
+        americaNewYorkOffsetMs(approxYear, epochMs));
+  const shifted = new Date(epochMs + offsetMs);
+  return {
+    year: shifted.getUTCFullYear(),
+    month: shifted.getUTCMonth() + 1,
+    day: shifted.getUTCDate(),
+  };
+}
+
+/**
+ * Parse a leading tool-stamped timestamp in `rawValue` and ignore any trailing text after it.
+ * Accepts at the start of the value (with optional leading `~`):
+ *   - `YYYY-MM-DD HH:MM` (plus optional `:SS` and optional zone `ET`, `EST`, `EDT`, `UTC`, `Z`, or `±HH:MM`);
+ *   - ISO 8601 with a `T` (`YYYY-MM-DDTHH:MM...` with optional zone);
+ *   - time-only `~HH:MM ET` anchored to the calendar date of `nowMs` in that zone;
+ *   - a bare `YYYY-MM-DD` (compared at its end of day `23:59:59.999 ET` against the clock).
+ * `ET` (and omitted zones) mean `America/New_York` (handling EST/EDT).
+ * Returns `null` if the string has no valid leading timestamp.
  */
 export function parseToolStampedTime(
   rawValue: string,
@@ -652,87 +775,77 @@ export function parseToolStampedTime(
     (s.startsWith("'") && s.endsWith("'"))
   ) {
     s = s.slice(1, -1).trim();
+  } else if (s.startsWith('"') || s.startsWith("'")) {
+    s = s.slice(1).trim();
   }
   if (!s) return null;
 
-  // Form 1: `2026-11-08 15:03 ET` / `2026-11-08 ~15:03 ET` / `2026-11-08 15:03:00 ET`
-  const dateTimeEt = s.match(
-    /^~?\s*(\d{4})-(\d{2})-(\d{2})\s+~?(\d{1,2}):(\d{2})(?::(\d{2}))?(?:\s*(?:ET|EST|EDT))?(?:\s*(?:[(;\u2014-].*)?)$/i,
+  // Form 1: Leading ISO 8601 with `T` (`2026-11-08T23:59:00Z — ...`, `~2026-11-08T15:03:00-05:00`)
+  const isoMatch = s.match(
+    /^~?\s*(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d+))?)?(?:\s*(Z|UTC|ET|EST|EDT|[+-]\d{2}:?\d{2}))?(?=$|[\s.,;()[\]\u2013\u2014"'-])/i,
   );
-  if (dateTimeEt) {
-    const year = Number(dateTimeEt[1]);
-    const month = Number(dateTimeEt[2]);
-    const day = Number(dateTimeEt[3]);
-    const hour = Number(dateTimeEt[4]);
-    const minute = Number(dateTimeEt[5]);
-    const second = dateTimeEt[6] !== undefined ? Number(dateTimeEt[6]) : 0;
-    if (
-      month >= 1 &&
-      month <= 12 &&
-      day >= 1 &&
-      day <= 31 &&
-      hour >= 0 &&
-      hour <= 23 &&
-      minute >= 0 &&
-      minute <= 59 &&
-      second >= 0 &&
-      second <= 59
-    ) {
-      return new Date(year, month - 1, day, hour, minute, second, 0).getTime();
+  if (isoMatch) {
+    const year = Number(isoMatch[1]);
+    const month = Number(isoMatch[2]);
+    const day = Number(isoMatch[3]);
+    const hour = Number(isoMatch[4]);
+    const minute = Number(isoMatch[5]);
+    const second = isoMatch[6] !== undefined ? Number(isoMatch[6]) : 0;
+    const fracStr = isoMatch[7] ? isoMatch[7].slice(0, 3).padEnd(3, "0") : "0";
+    const ms = Number(fracStr);
+    const zone = isoMatch[8];
+    if (!isValidYmdHms(year, month, day, hour, minute, second)) {
+      return null;
     }
-    return null;
+    return zonedWallTimeToUtcMs(year, month, day, hour, minute, second, ms, zone);
   }
 
-  // Form 2: `~15:05 ET` / `15:05 ET` (anchored to local calendar date of `nowMs`)
-  const timeOnlyEt = s.match(
-    /^~?\s*(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(?:ET|EST|EDT)(?:\s*(?:[(;\u2014-].*)?)$/i,
+  // Form 2: Leading `YYYY-MM-DD HH:MM` (`2026-11-08 15:03 ET (clock-checked)...`, `2026-11-08 ~15:05 ET. Cutover: ...`)
+  const ymdHmMatch = s.match(
+    /^~?\s*(\d{4})-(\d{2})-(\d{2})\s+~?\s*(\d{1,2}):(\d{2})(?::(\d{2}))?(?:\s*(ET|EST|EDT|UTC|Z|[+-]\d{2}:?\d{2}))?(?=$|[\s.,;()[\]\u2013\u2014"'-])/i,
   );
-  if (timeOnlyEt) {
-    const hour = Number(timeOnlyEt[1]);
-    const minute = Number(timeOnlyEt[2]);
-    const second = timeOnlyEt[3] !== undefined ? Number(timeOnlyEt[3]) : 0;
-    if (
-      hour >= 0 &&
-      hour <= 23 &&
-      minute >= 0 &&
-      minute <= 59 &&
-      second >= 0 &&
-      second <= 59
-    ) {
-      const ref = new Date(nowMs);
-      return new Date(
-        ref.getFullYear(),
-        ref.getMonth(),
-        ref.getDate(),
-        hour,
-        minute,
-        second,
-        0,
-      ).getTime();
+  if (ymdHmMatch) {
+    const year = Number(ymdHmMatch[1]);
+    const month = Number(ymdHmMatch[2]);
+    const day = Number(ymdHmMatch[3]);
+    const hour = Number(ymdHmMatch[4]);
+    const minute = Number(ymdHmMatch[5]);
+    const second = ymdHmMatch[6] !== undefined ? Number(ymdHmMatch[6]) : 0;
+    const zone = ymdHmMatch[7];
+    if (!isValidYmdHms(year, month, day, hour, minute, second)) {
+      return null;
     }
-    return null;
+    return zonedWallTimeToUtcMs(year, month, day, hour, minute, second, 0, zone);
   }
 
-  // Form 3a: ISO 8601 date-time (`2026-11-08T15:03:00Z`, `2026-11-08T15:03:00-05:00`, `2026-11-08T15:03`)
-  if (
-    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?$/i.test(
-      s,
-    )
-  ) {
-    const ms = Date.parse(s);
-    return Number.isFinite(ms) ? ms : null;
+  // Form 3: Leading time-only `~15:05 ET` / `~19:30 ET` (anchored to calendar date of `nowMs` in that zone)
+  const hmOnlyMatch = s.match(
+    /^~?\s*(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(ET|EST|EDT|UTC|Z|[+-]\d{2}:?\d{2})(?=$|[\s.,;()[\]\u2013\u2014"'-])/i,
+  );
+  if (hmOnlyMatch) {
+    const hour = Number(hmOnlyMatch[1]);
+    const minute = Number(hmOnlyMatch[2]);
+    const second = hmOnlyMatch[3] !== undefined ? Number(hmOnlyMatch[3]) : 0;
+    const zone = hmOnlyMatch[4];
+    const { year, month, day } = calendarDateInZone(nowMs, zone);
+    if (!isValidYmdHms(year, month, day, hour, minute, second)) {
+      return null;
+    }
+    return zonedWallTimeToUtcMs(year, month, day, hour, minute, second, 0, zone);
   }
 
-  // Form 3b: ISO 8601 date-only (`2026-11-08`) -> local start of day
-  const isoDateOnly = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (isoDateOnly) {
-    const year = Number(isoDateOnly[1]);
-    const month = Number(isoDateOnly[2]);
-    const day = Number(isoDateOnly[3]);
-    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
-      return new Date(year, month - 1, day, 0, 0, 0, 0).getTime();
+  // Form 4: Leading bare `YYYY-MM-DD` (date only: compare its end of day `23:59:59.999 ET` with the clock)
+  const ymdOnlyMatch = s.match(
+    /^~?\s*(\d{4})-(\d{2})-(\d{2})(?![T\s]+~?\s*\d{1,2}:\d{2})(?=$|[\s.,;()[\]\u2013\u2014"'-])/,
+  );
+  if (ymdOnlyMatch) {
+    const year = Number(ymdOnlyMatch[1]);
+    const month = Number(ymdOnlyMatch[2]);
+    const day = Number(ymdOnlyMatch[3]);
+    if (!isValidYmdHms(year, month, day, 23, 59, 59)) {
+      return null;
     }
-    return null;
+    return zonedWallTimeToUtcMs(year, month, day, 23, 59, 59, 999, "ET");
   }
 
   return null;
@@ -748,7 +861,8 @@ export function extractToolStampedFields(text: string): ExtractedStampField[] {
   if (!text) return out;
 
   // `**Last updated:** <value>` or `**Last updated**: <value>`
-  const lastUpdatedRe = /^\s*\*\*Last updated(?::\*\*|\*\*:)\s*(.+?)\s*$/gim;
+  const lastUpdatedRe =
+    /^\s*(?:[-*>]\s*)?\*\*Last updated(?::\*\*|\*\*:)\s*(.+?)\s*$/gim;
   for (const m of text.matchAll(lastUpdatedRe)) {
     const val = (m[1] ?? "").trim();
     if (val) {

@@ -377,3 +377,123 @@ export const RND_TRIAD_ENTRIES: LoadoutIndex["entries"] = [
   },
 ];
 
+export interface ReplayCasePair {
+  id: string;
+  ruleId: string;
+  blockedStdin: Record<string, unknown>;
+  allowedStdin: Record<string, unknown>;
+  expectedAllowedOutcome: "allow" | "warn";
+}
+
+export const REPLAY_2026_11_08_STORE = "E:/AI/StudioStore/memory";
+/** Fixed clock: 2026-11-08 15:44:00 EST (20:44:00 UTC). */
+export const REPLAY_2026_11_08_CLOCK_MS = Date.UTC(2026, 10, 8, 20, 44, 0, 0);
+
+/**
+ * Canned PreToolUse JSON fixture of the four slips from 2026-11-08 and their
+ * matching allowed calls (Part 5.1, with a real board line carrying trailing text).
+ */
+export const REPLAY_2026_11_08_FIXTURE: readonly ReplayCasePair[] = [
+  {
+    id: "slip-1-unreviewed-merge",
+    ruleId: "unreviewed-merge",
+    blockedStdin: {
+      hook_event_name: "PreToolUse",
+      session_id: "replay-2026-11-08",
+      cwd: "E:/AI/Research and Development",
+      tool_name: "Bash",
+      tool_input: { command: "gh pr merge 21" },
+    },
+    allowedStdin: {
+      hook_event_name: "PreToolUse",
+      session_id: "replay-2026-11-08",
+      cwd: "E:/AI/Publisher",
+      tool_name: "Bash",
+      tool_input: { command: "gh pr merge 21" },
+    },
+    expectedAllowedOutcome: "warn",
+  },
+  {
+    id: "slip-2-dated-director-quote",
+    ruleId: "director-quote",
+    blockedStdin: {
+      hook_event_name: "PreToolUse",
+      session_id: "replay-2026-11-08",
+      cwd: "E:/AI/Research and Development",
+      tool_name: "Write",
+      tool_input: {
+        file_path: "E:/AI/Research and Development/docs/handoff.md",
+        content:
+          '# Handoff\n\nDirector 2026-11-08: "I want every build to go through the card process before any code is merged."\n',
+      },
+    },
+    allowedStdin: {
+      hook_event_name: "PreToolUse",
+      session_id: "replay-2026-11-08",
+      cwd: "E:/AI/Research and Development",
+      tool_name: "Write",
+      tool_input: {
+        file_path: "E:/AI/Research and Development/docs/handoff.md",
+        content:
+          "# Handoff\n\nDirector 2026-11-08 ruled that every build goes through the card process before any code is merged.\n",
+      },
+    },
+    expectedAllowedOutcome: "allow",
+  },
+  {
+    id: "slip-3-future-last-updated",
+    ruleId: "future-stamp",
+    blockedStdin: {
+      hook_event_name: "PreToolUse",
+      session_id: "replay-2026-11-08",
+      cwd: "E:/AI/Research and Development",
+      tool_name: "Edit",
+      tool_input: {
+        file_path: `${REPLAY_2026_11_08_STORE}/BOARD.md`,
+        old_string:
+          "**Last updated:** 2026-11-08 15:03 ET (clock-checked). loadout-os 1.1.1 live; pretool step 1 in flight.",
+        new_string:
+          "**Last updated:** 2026-11-08 17:00 ET (clock-checked). loadout-os 1.1.1 live; pretool step 1 in flight.",
+      },
+    },
+    allowedStdin: {
+      hook_event_name: "PreToolUse",
+      session_id: "replay-2026-11-08",
+      cwd: "E:/AI/Research and Development",
+      tool_name: "Edit",
+      tool_input: {
+        file_path: `${REPLAY_2026_11_08_STORE}/BOARD.md`,
+        old_string:
+          "**Last updated:** 2026-11-08 15:03 ET (clock-checked). loadout-os 1.1.1 live; pretool step 1 in flight.",
+        new_string:
+          "**Last updated:** 2026-11-08 15:44 ET (clock-checked). loadout-os 1.1.1 live; pretool step 1 in flight.",
+      },
+    },
+    expectedAllowedOutcome: "allow",
+  },
+  {
+    id: "slip-4-memory-shell-write-python-heredoc",
+    ruleId: "memory-shell-write",
+    blockedStdin: {
+      hook_event_name: "PreToolUse",
+      session_id: "replay-2026-11-08",
+      cwd: "E:/AI/Research and Development",
+      tool_name: "Bash",
+      tool_input: {
+        command: `python - <<EOF\nwith open('${REPLAY_2026_11_08_STORE}/BOARD.md','w') as f:\n    f.write('# Board\\n')\nEOF`,
+      },
+    },
+    allowedStdin: {
+      hook_event_name: "PreToolUse",
+      session_id: "replay-2026-11-08",
+      cwd: "E:/AI/Research and Development",
+      tool_name: "Bash",
+      tool_input: {
+        command: `loadout-os memories place ${REPLAY_2026_11_08_STORE}/topic.md main --store ${REPLAY_2026_11_08_STORE}`,
+      },
+    },
+    expectedAllowedOutcome: "allow",
+  },
+];
+
+
