@@ -12,6 +12,13 @@ export interface Triggers {
   edit: boolean;   // load before file edits
 }
 
+// ── Verification status (provenance / triad) ───────────────────
+export type VerificationStatus =
+  | "unverified"
+  | "tool_verified"
+  | "cross_agent_verified"
+  | "human_ruling";
+
 // ── A single entry in the dispatch table ───────────────────────
 export interface LoadoutEntry {
   id: string;            // kebab-case, unique, stable once created
@@ -25,6 +32,13 @@ export interface LoadoutEntry {
   lines: number;         // line count of the payload file
   metadata?: Record<string, string | number | boolean>; // optional arbitrary frontmatter metadata
   subindex?: boolean;    // true when sourced from a linked sub-index rather than top-level MEMORY.md
+  loadout_skill?: string;
+  loadout_triggers?: string[];
+  author_agent?: string;
+  created_at?: string;
+  verification_status?: VerificationStatus;
+  evidence_ref?: string;
+  supersedes?: string;
 }
 
 // ── Budget model ───────────────────────────────────────────────
@@ -59,6 +73,13 @@ export interface Frontmatter {
   priority: Priority;
   triggers: Triggers;
   metadata?: Record<string, string | number | boolean>;
+  loadout_skill?: string;
+  loadout_triggers?: string[];
+  author_agent?: string;
+  created_at?: string;
+  verification_status?: VerificationStatus;
+  evidence_ref?: string;
+  supersedes?: string;
 }
 
 // ── Score components (matcher transparency) ────────────────────

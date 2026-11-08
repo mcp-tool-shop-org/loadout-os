@@ -235,11 +235,13 @@ export const COMMAND_HELP: Record<string, HelpEntry> = {
 
   // ── rituals ──────────────────────────────────────────────────
   doctor: {
-    synopsis: "loadout-os doctor [--store <dir>] [--index <p>] [--settings <p>] [--usage <p>] [--repo-root <dir>] [--json]",
+    synopsis: "loadout-os doctor [--store <dir>] [--index <p>] [--project-index <p>] [--settings <p>] [--skills <dir>] [--usage <p>] [--repo-root <dir>] [--json]",
     flags: [
       ["--store <dir>", "memory store dir (default canonical store)"],
       ["--index <p>", "global resolver index (default ~/.ai-loadout/index.json)"],
+      ["--project-index <p>", "additional project index searched for triad memory IDs (default <repo-root>/.claude/loadout/index.json)"],
       ["--settings <p>", "Claude Code settings.json (default ~/.claude/settings.json)"],
+      ["--skills <dir>", "skills directory for triad skill checks (default ~/.claude/skills)"],
       ["--usage <p>", "usage.jsonl path (default ~/.ai-loadout/usage.jsonl)"],
       ["--repo-root <dir>", "repo root for the hook-drift check (default cwd)"],
       ["--json", "machine-readable output"],
@@ -313,6 +315,22 @@ export const COMMAND_HELP: Record<string, HelpEntry> = {
     exits: [
       ["0", "clean edit (or path outside store)"],
       ["2", "validation error, refresh failure, git error, or subprocess timeout"],
+    ],
+  },
+  "hook pre-tool": {
+    synopsis: "loadout-os hook pre-tool [--mode enforce|log-only] [--seats <path>] [--log <path>] [--timeout-ms <ms>]",
+    flags: [
+      ["--mode <mode>", "execution mode: 'enforce' (default: exit 2 on block, additionalContext on warn) or 'log-only' (always exit 0)"],
+      ["--seats <path>", "override path to seats.json (default: ~/.ai-loadout/seats.json or AI_LOADOUT_SEATS_PATH)"],
+      ["--log <path>", "override path to hook-decisions.jsonl (default: ~/.ai-loadout/hook-decisions.jsonl or AI_LOADOUT_DECISIONS_LOG)"],
+      ["--timeout-ms <ms>", "hard internal timeout in milliseconds (default: 300)"],
+      ["--now <iso|ms>", "override wall-clock time for deterministic timestamp checks"],
+    ],
+    note: "PreToolUse hook: passes read-only tools and read-only Bash pipelines silently (exit 0), evaluates the Layer A/B rule table per seat, appends a hashed decision record to hook-decisions.jsonl, fails open before any block match, and fails closed (exit 2 + stderr only) once a block rule has matched.",
+    example: "loadout-os hook pre-tool --mode enforce",
+    exits: [
+      ["0", "allowed, read-only pass-through, warn (additionalContext on stdout), log-only, or fail-open error/timeout"],
+      ["2", "blocked by a Layer A rule in enforce mode (message on stderr, never JSON deny)"],
     ],
   },
   refresh: {

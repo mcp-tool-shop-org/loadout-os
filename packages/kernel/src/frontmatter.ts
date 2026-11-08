@@ -6,10 +6,21 @@
  * one level of nested objects (triggers, metadata). No deps, deterministic.
  */
 
-import type { Frontmatter, Priority, Triggers } from "./types.js";
+import type {
+  Frontmatter,
+  Priority,
+  Triggers,
+  VerificationStatus,
+} from "./types.js";
 import { DEFAULT_TRIGGERS } from "./types.js";
 
 const VALID_PRIORITIES = new Set<string>(["core", "domain", "manual"]);
+const VALID_VERIFICATION_STATUSES = new Set<VerificationStatus>([
+  "unverified",
+  "tool_verified",
+  "cross_agent_verified",
+  "human_ruling",
+]);
 
 function slugifyName(name: string): string {
   const parts: string[] = [];
@@ -85,6 +96,7 @@ export function parseFrontmatter(
   let currentKey = "";
   let currentArray: string[] | null = null;
   let currentObject: Record<string, string | number | boolean> | null = null;
+  let lastNestedKey = "";
 
   for (let i = 0; i < fmLines.length; i++) {
     const line = fmLines[i];
@@ -99,11 +111,19 @@ export function parseFrontmatter(
 
     // Nested object value (indented)
     if (currentObject !== null && line.startsWith("  ")) {
+      if (line.startsWith("    ") && trimmed.startsWith("- ") && lastNestedKey) {
+        const item = unquoteScalar(trimmed.slice(2).trim());
+        const prev = currentObject[lastNestedKey];
+        currentObject[lastNestedKey] =
+          typeof prev === "string" && prev.length > 0 ? `${prev}, ${item}` : item;
+        continue;
+      }
       const colonIdx = trimmed.indexOf(":");
       if (colonIdx !== -1) {
         const key = trimmed.slice(0, colonIdx).trim();
         const val = trimmed.slice(colonIdx + 1).trim();
-        currentObject[key] = parseScalarValue(val);
+        lastNestedKey = key;
+        currentObject[key] = val === "" ? "" : parseScalarValue(val);
         continue;
       }
     }
@@ -116,6 +136,7 @@ export function parseFrontmatter(
     if (currentObject !== null) {
       data[currentKey] = currentObject;
       currentObject = null;
+      lastNestedKey = "";
     }
 
     // Indented lines outside a recognized block are not top-level keys
@@ -178,6 +199,12 @@ export function parseFrontmatter(
     "enforce_limits",
     "max_lines",
     "max_bytes",
+    "loadout_skill",
+    "author_agent",
+    "created_at",
+    "verification_status",
+    "evidence_ref",
+    "supersedes",
   ]) {
     if (data[TopMetaKey] !== undefined && metadata[TopMetaKey] === undefined) {
       const val = data[TopMetaKey];
@@ -187,6 +214,59 @@ export function parseFrontmatter(
         metadata[TopMetaKey] = val;
       }
     }
+  }
+
+  const readOptString = (key: string): string | undefined => {
+    const top = data[key];
+    if (typeof top === "string" && top.trim()) return top.trim();
+    if (typeof top === "number") return String(top);
+    const meta = metadata[key];
+    if (typeof meta === "string" && meta.trim()) return meta.trim();
+    if (typeof meta === "number") return String(meta);
+    return undefined;
+  };
+
+  const parseStringArrayVal = (raw: unknown): string[] | undefined => {
+    if (Array.isArray(raw)) {
+      const arr = raw
+        .map((s) => unquoteScalar(String(s).trim()))
+        .filter((s) => s.length > 0);
+      return arr;
+    }
+    if (typeof raw === "string") {
+      const t = raw.trim();
+      if (!t) return undefined;
+      const inner =
+        t.startsWith("[") && t.endsWith("]") ? t.slice(1, -1) : t;
+      const arr = inner
+        .split(",")
+        .map((s) => unquoteScalar(s.trim()))
+        .filter((s) => s.length > 0);
+      return arr;
+    }
+    return undefined;
+  };
+
+  const loadout_skill = readOptString("loadout_skill");
+  const loadout_triggers =
+    parseStringArrayVal(data.loadout_triggers) ??
+    parseStringArrayVal(metadata.loadout_triggers);
+  const author_agent = readOptString("author_agent");
+  const created_at = readOptString("created_at");
+  const rawVerStatus = readOptString("verification_status");
+  const verification_status =
+    rawVerStatus &&
+    VALID_VERIFICATION_STATUSES.has(rawVerStatus as VerificationStatus)
+      ? (rawVerStatus as VerificationStatus)
+      : undefined;
+  const evidence_ref = readOptString("evidence_ref");
+  const supersedes = readOptString("supersedes");
+
+  if (
+    loadout_triggers !== undefined &&
+    metadata.loadout_triggers === undefined
+  ) {
+    metadata.loadout_triggers = `[${loadout_triggers.join(", ")}]`;
   }
 
   // F-03 / #19: Read top-level `id:`, falling back to `metadata.id`, then
@@ -223,6 +303,13 @@ export function parseFrontmatter(
     priority,
     triggers: parseTriggers(data.triggers),
     ...(Object.keys(metadata).length > 0 ? { metadata } : {}),
+    ...(loadout_skill !== undefined ? { loadout_skill } : {}),
+    ...(loadout_triggers !== undefined ? { loadout_triggers } : {}),
+    ...(author_agent !== undefined ? { author_agent } : {}),
+    ...(created_at !== undefined ? { created_at } : {}),
+    ...(verification_status !== undefined ? { verification_status } : {}),
+    ...(evidence_ref !== undefined ? { evidence_ref } : {}),
+    ...(supersedes !== undefined ? { supersedes } : {}),
   };
 
   return { frontmatter: fm, body };
@@ -253,6 +340,17 @@ export function serializeFrontmatter(fm: Frontmatter): string {
   lines.push(`  task: ${fm.triggers.task}`);
   lines.push(`  plan: ${fm.triggers.plan}`);
   lines.push(`  edit: ${fm.triggers.edit}`);
+  if (fm.loadout_skill !== undefined) lines.push(`loadout_skill: ${fm.loadout_skill}`);
+  if (fm.loadout_triggers !== undefined) {
+    lines.push(`loadout_triggers: [${fm.loadout_triggers.join(", ")}]`);
+  }
+  if (fm.author_agent !== undefined) lines.push(`author_agent: ${fm.author_agent}`);
+  if (fm.created_at !== undefined) lines.push(`created_at: ${fm.created_at}`);
+  if (fm.verification_status !== undefined) {
+    lines.push(`verification_status: ${fm.verification_status}`);
+  }
+  if (fm.evidence_ref !== undefined) lines.push(`evidence_ref: ${fm.evidence_ref}`);
+  if (fm.supersedes !== undefined) lines.push(`supersedes: ${fm.supersedes}`);
   if (fm.metadata && Object.keys(fm.metadata).length > 0) {
     lines.push("metadata:");
     for (const [k, v] of Object.entries(fm.metadata)) {

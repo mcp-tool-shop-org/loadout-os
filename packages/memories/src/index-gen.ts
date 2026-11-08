@@ -437,6 +437,13 @@ function entryFromFrontmatter(
     lines,
     ...(fm.metadata && Object.keys(fm.metadata).length > 0 ? { metadata: fm.metadata } : {}),
     ...(ref.subindex ? { subindex: true } : {}),
+    ...(fm.loadout_skill !== undefined ? { loadout_skill: fm.loadout_skill } : {}),
+    ...(fm.loadout_triggers !== undefined ? { loadout_triggers: fm.loadout_triggers } : {}),
+    ...(fm.author_agent !== undefined ? { author_agent: fm.author_agent } : {}),
+    ...(fm.created_at !== undefined ? { created_at: fm.created_at } : {}),
+    ...(fm.verification_status !== undefined ? { verification_status: fm.verification_status } : {}),
+    ...(fm.evidence_ref !== undefined ? { evidence_ref: fm.evidence_ref } : {}),
+    ...(fm.supersedes !== undefined ? { supersedes: fm.supersedes } : {}),
   };
 }
 

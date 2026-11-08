@@ -70,6 +70,7 @@ import {
   writeUtf8Stdout,
   readHookStdin,
 } from "./hook.js";
+import { runPreTool } from "./pretool.js";
 import { dispatchRefresh } from "./refresh.js";
 import { interceptHelp } from "./help.js";
 
@@ -109,6 +110,7 @@ ${BOLD}Rituals:${RESET}
   loadout-os hook session-start [--project <r>]    SessionStart board injection & stale warning
   loadout-os hook pre-compact [--project <r>]      PreCompact board staleness check
   loadout-os hook post-write [--project <r>]       PostToolUse Write/Edit validator & project refresh
+  loadout-os hook pre-tool [--mode enforce|log-only] PreToolUse Layer A/B guard & decision logger
   loadout-os refresh [--store <d>] [--dest <p>] [--project <r>] [--dry-run]   Index Freshness Ritual
 
 ${BOLD}Options:${RESET}
@@ -220,10 +222,14 @@ function dispatchDoctor(args: string[]): void {
   const index = flagValue(args, "index");
   const settings = flagValue(args, "settings");
   const usage = flagValue(args, "usage");
+  const skills = flagValue(args, "skills");
+  const projectIndex = flagValue(args, "project-index");
   if (store) paths.store = resolve(store);
   if (index) paths.index = resolve(index);
   if (settings) paths.settings = resolve(settings);
   if (usage) paths.usage = resolve(usage);
+  if (skills) paths.skillsDir = resolve(skills);
+  if (projectIndex) paths.extraIndexes = [resolve(projectIndex)];
 
   const result = runDoctor(paths);
   if (hasFlag(args, "json")) {
@@ -354,11 +360,50 @@ function dispatchHook(args: string[]): void {
       }
       return;
     }
+    case "pre-tool": {
+      const stdinRaw = readHookStdin();
+      const mode = flagValue(rest, "mode");
+      const seatsPath = flagValue(rest, "seats");
+      const logPath = flagValue(rest, "log");
+      const timeoutRaw = flagValue(rest, "timeout-ms");
+      const nowRaw = flagValue(rest, "now");
+      const timeoutMs = timeoutRaw !== undefined ? Number(timeoutRaw) : undefined;
+      let nowMs: number | undefined;
+      if (nowRaw !== undefined) {
+        const parsedNum = Number(nowRaw);
+        const parsedDate = Date.parse(nowRaw);
+        nowMs = Number.isFinite(parsedNum)
+          ? parsedNum
+          : Number.isFinite(parsedDate)
+            ? parsedDate
+            : undefined;
+      }
+
+      const res = runPreTool({
+        stdinJson: stdinRaw,
+        mode,
+        seatsPath,
+        logPath,
+        timeoutMs: Number.isFinite(timeoutMs) ? timeoutMs : undefined,
+        nowMs,
+      });
+
+      if (res.stdout) {
+        writeUtf8Stdout(res.stdout);
+      }
+      if (res.stderr) {
+        process.stderr.write(Buffer.from(res.stderr, "utf-8"));
+      }
+      if (res.exitCode !== 0) {
+        process.exitCode = res.exitCode;
+      }
+      return;
+    }
     default:
       throw new CliError(
         "UNKNOWN_COMMAND",
         `Unknown hook subcommand: ${sub ?? "(none)"}`,
-        "Expected one of: test, session-start, pre-compact, post-write.",
+        "Expected one of: test, session-start, pre-compact, post-write, pre-tool.",
       );
   }
 }

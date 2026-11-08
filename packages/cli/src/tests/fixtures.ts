@@ -277,3 +277,254 @@ export function captureLog(fn: () => void): string {
   }
   return lines.join("\n");
 }
+
+/**
+ * The 5 R&D project index entries referenced by the Part 3/Part 4.3 rule table,
+ * copied from `.claude/loadout/index.json` with store-relative paths (`memory/<id>.md`)
+ * so no home paths are committed.
+ */
+export const RND_TRIAD_ENTRIES: LoadoutIndex["entries"] = [
+  {
+    id: "rnd-memory-system",
+    path: "memory/rnd-memory-system.md",
+    keywords: ["loadout", "memory", "rnd", "system", "works"],
+    patterns: ["rnd_memory_system"],
+    priority: "domain",
+    summary:
+      "How R&D memory works since the 2026-11-08 cutover to loadout-os 1.1.0: BOARD injected at start/compaction by loadout-os ",
+    triggers: { task: true, plan: true, edit: false },
+    tokens_est: 977,
+    lines: 52,
+    metadata: {
+      node_type: "memory",
+      type: "reference",
+      originSessionId: "de321234-740c-46e3-a4de-c1be5fbb071c",
+      modified: "2026-11-08T11:25:59.656Z",
+    },
+  },
+  {
+    id: "publisher-approves-every-publish",
+    path: "memory/publisher-approves-every-publish.md",
+    keywords: ["approves", "publish", "publisher"],
+    patterns: ["publisher_approves_every_publish"],
+    priority: "domain",
+    summary:
+      "Director 2026-10-21 via Publisher — nothing publishes (npm/PyPI/binary, a tag or release that triggers one, Store, repo/",
+    triggers: { task: true, plan: true, edit: false },
+    tokens_est: 336,
+    lines: 18,
+    metadata: {
+      node_type: "memory",
+      type: "feedback",
+      originSessionId: "cee64436-f327-4887-b701-506d061395dc",
+      modified: "2026-10-21T01:58:06.571Z",
+    },
+    subindex: true,
+  },
+  {
+    id: "publisher-merges",
+    path: "memory/publisher-merges.md",
+    keywords: ["merges", "publisher"],
+    patterns: ["publisher_merges"],
+    priority: "domain",
+    summary:
+      "R&D never merges PRs, even when its re-check is the last gate; the Publisher merges via gatemerge",
+    triggers: { task: true, plan: true, edit: false },
+    tokens_est: 228,
+    lines: 16,
+    metadata: {
+      node_type: "memory",
+      type: "feedback",
+      originSessionId: "4f3291fb-4c6f-4baa-afe7-02032688e512",
+      modified: "2026-10-12T02:44:18.541Z",
+    },
+  },
+  {
+    id: "never-quote-director-in-public",
+    path: "memory/never-quote-director-in-public.md",
+    keywords: ["director", "never", "public", "quote"],
+    patterns: ["never_quote_director_in_public"],
+    priority: "domain",
+    summary:
+      "Records carry the Director's decisions, never his words; brief status lines are where the slip happens; nothing is exemp",
+    triggers: { task: true, plan: true, edit: false },
+    tokens_est: 364,
+    lines: 20,
+    metadata: {
+      node_type: "memory",
+      type: "feedback",
+      originSessionId: "4f3291fb-4c6f-4baa-afe7-02032688e512",
+      modified: "2026-10-14T19:56:53.784Z",
+    },
+  },
+  {
+    id: "build-in-studio-tools-not-side-scripts",
+    path: "memory/build-in-studio-tools-not-side-scripts.md",
+    keywords: ["build", "scripts", "side", "studio", "tools"],
+    patterns: ["build_in_studio_tools_not_side_scripts"],
+    priority: "domain",
+    summary:
+      "Director 2026-11-08 (very unhappy): infrastructure is built INSIDE the studio's own tools (loadout-os etc.) as Argon bui",
+    triggers: { task: true, plan: true, edit: false },
+    tokens_est: 388,
+    lines: 26,
+    metadata: {
+      node_type: "memory",
+      type: "feedback",
+      originSessionId: "de321234-740c-46e3-a4de-c1be5fbb071c",
+      modified: "2026-11-08T07:48:45.358Z",
+    },
+  },
+];
+
+export interface ReplayCasePair {
+  id: string;
+  ruleId: string;
+  blockedStdin: Record<string, unknown>;
+  allowedStdin: Record<string, unknown>;
+  expectedAllowedOutcome: "allow" | "warn";
+}
+
+export const REPLAY_2026_11_08_STORE = "E:/AI/StudioStore/memory";
+/** Fixed clock: 2026-11-08 15:44:00 EST (20:44:00 UTC). */
+export const REPLAY_2026_11_08_CLOCK_MS = Date.UTC(2026, 10, 8, 20, 44, 0, 0);
+
+/**
+ * Canned PreToolUse JSON fixture of the four slips from 2026-11-08 and their
+ * matching allowed calls (Part 5.1, with a real board line carrying trailing text).
+ */
+export const REPLAY_2026_11_08_FIXTURE: readonly ReplayCasePair[] = [
+  {
+    id: "slip-1-unreviewed-merge",
+    ruleId: "unreviewed-merge",
+    blockedStdin: {
+      hook_event_name: "PreToolUse",
+      session_id: "replay-2026-11-08",
+      cwd: "E:/AI/Research and Development",
+      tool_name: "Bash",
+      tool_input: { command: "gh pr merge 21" },
+    },
+    allowedStdin: {
+      hook_event_name: "PreToolUse",
+      session_id: "replay-2026-11-08",
+      cwd: "E:/AI/Publisher",
+      tool_name: "Bash",
+      tool_input: { command: "gh pr merge 21" },
+    },
+    expectedAllowedOutcome: "warn",
+  },
+  {
+    id: "slip-2-dated-director-quote",
+    ruleId: "director-quote",
+    blockedStdin: {
+      hook_event_name: "PreToolUse",
+      session_id: "replay-2026-11-08",
+      cwd: "E:/AI/Research and Development",
+      tool_name: "Write",
+      tool_input: {
+        file_path: "E:/AI/Research and Development/docs/handoff.md",
+        content:
+          '# Handoff\n\nDirector 2026-11-08: "I want every build to go through the card process before any code is merged."\n',
+      },
+    },
+    allowedStdin: {
+      hook_event_name: "PreToolUse",
+      session_id: "replay-2026-11-08",
+      cwd: "E:/AI/Research and Development",
+      tool_name: "Write",
+      tool_input: {
+        file_path: "E:/AI/Research and Development/docs/handoff.md",
+        content:
+          "# Handoff\n\nDirector 2026-11-08 ruled that every build goes through the card process before any code is merged.\n",
+      },
+    },
+    expectedAllowedOutcome: "allow",
+  },
+  {
+    id: "slip-3-future-last-updated",
+    ruleId: "future-stamp",
+    blockedStdin: {
+      hook_event_name: "PreToolUse",
+      session_id: "replay-2026-11-08",
+      cwd: "E:/AI/Research and Development",
+      tool_name: "Edit",
+      tool_input: {
+        file_path: `${REPLAY_2026_11_08_STORE}/BOARD.md`,
+        old_string:
+          "**Last updated:** 2026-11-08 15:03 ET (clock-checked). loadout-os 1.1.1 live; pretool step 1 in flight.",
+        new_string:
+          "**Last updated:** 2026-11-08 17:00 ET (clock-checked). loadout-os 1.1.1 live; pretool step 1 in flight.",
+      },
+    },
+    allowedStdin: {
+      hook_event_name: "PreToolUse",
+      session_id: "replay-2026-11-08",
+      cwd: "E:/AI/Research and Development",
+      tool_name: "Edit",
+      tool_input: {
+        file_path: `${REPLAY_2026_11_08_STORE}/BOARD.md`,
+        old_string:
+          "**Last updated:** 2026-11-08 15:03 ET (clock-checked). loadout-os 1.1.1 live; pretool step 1 in flight.",
+        new_string:
+          "**Last updated:** 2026-11-08 15:44 ET (clock-checked). loadout-os 1.1.1 live; pretool step 1 in flight.",
+      },
+    },
+    expectedAllowedOutcome: "allow",
+  },
+  {
+    id: "slip-3b-publisher-heading-updated",
+    ruleId: "future-stamp",
+    blockedStdin: {
+      hook_event_name: "PreToolUse",
+      session_id: "replay-2026-11-08",
+      cwd: "E:/AI/Publisher",
+      tool_name: "Edit",
+      tool_input: {
+        file_path: `${REPLAY_2026_11_08_STORE}/BOARD.md`,
+        old_string:
+          "# Publisher BOARD — updated 2026-11-08 15:03 ET (stamped from date)",
+        new_string:
+          "# Publisher BOARD — updated 2026-11-08 23:59 ET (stamped from date)",
+      },
+    },
+    allowedStdin: {
+      hook_event_name: "PreToolUse",
+      session_id: "replay-2026-11-08",
+      cwd: "E:/AI/Publisher",
+      tool_name: "Edit",
+      tool_input: {
+        file_path: `${REPLAY_2026_11_08_STORE}/BOARD.md`,
+        old_string:
+          "# Publisher BOARD — updated 2026-11-08 15:03 ET (stamped from date)",
+        new_string:
+          "# Publisher BOARD — updated 2026-11-08 15:44 ET (stamped from date)",
+      },
+    },
+    expectedAllowedOutcome: "allow",
+  },
+  {
+    id: "slip-4-memory-shell-write-python-heredoc",
+    ruleId: "memory-shell-write",
+    blockedStdin: {
+      hook_event_name: "PreToolUse",
+      session_id: "replay-2026-11-08",
+      cwd: "E:/AI/Research and Development",
+      tool_name: "Bash",
+      tool_input: {
+        command: `python - <<EOF\nwith open('${REPLAY_2026_11_08_STORE}/BOARD.md','w') as f:\n    f.write('# Board\\n')\nEOF`,
+      },
+    },
+    allowedStdin: {
+      hook_event_name: "PreToolUse",
+      session_id: "replay-2026-11-08",
+      cwd: "E:/AI/Research and Development",
+      tool_name: "Bash",
+      tool_input: {
+        command: `loadout-os memories place ${REPLAY_2026_11_08_STORE}/topic.md main --store ${REPLAY_2026_11_08_STORE}`,
+      },
+    },
+    expectedAllowedOutcome: "allow",
+  },
+];
+
+
