@@ -145,14 +145,25 @@ export function resolveScaleThresholds(
       toPositiveNumber(meta?.subindexWarnEntries);
 
     // Fallback when MEMORY.md frontmatter has no `name:` or `id:` field
-    if (fmBytes === undefined || fmEntries === undefined) {
-      const fmMatch = memoryMdContent.match(/^---\r?\n([\s\S]*?)\r?\n---/);
-      if (fmMatch) {
-        for (const rawLine of fmMatch[1].split(/\r?\n/)) {
-          const m = rawLine.match(/^\s*([a-zA-Z0-9_-]+):\s*(.+)$/);
-          if (!m) continue;
-          const [, k, v] = m;
-          const val = v.trim().replace(/^["']|["']$/g, "");
+    if (
+      (fmBytes === undefined || fmEntries === undefined) &&
+      memoryMdContent.startsWith("---")
+    ) {
+      const firstNewline = memoryMdContent.indexOf("\n");
+      const closeIdx =
+        firstNewline !== -1
+          ? memoryMdContent.indexOf("\n---", firstNewline)
+          : -1;
+      if (closeIdx !== -1) {
+        const block = memoryMdContent.slice(firstNewline + 1, closeIdx);
+        for (const rawLine of block.split(/\r?\n/)) {
+          const colonIdx = rawLine.indexOf(":");
+          if (colonIdx <= 0) continue;
+          const k = rawLine.slice(0, colonIdx).trim();
+          const val = rawLine
+            .slice(colonIdx + 1)
+            .trim()
+            .replace(/^["']|["']$/g, "");
           if (
             (k === "memory_warn_bytes" || k === "memoryWarnBytes") &&
             fmBytes === undefined
