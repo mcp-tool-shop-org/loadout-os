@@ -7,7 +7,7 @@
 
 import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -1077,8 +1077,8 @@ describe("Part 3: the first five rules (unreviewed-merge, director-quote, memory
   });
 
   // ── 3.1 unreviewed-merge ──────────────────────────────────────
-  describe("3.1 unreviewed-merge (Layer A)", () => {
-    it("blocks `gh pr merge` and `gatemerge` (any path/form) on R&D seat, and warns on Publisher and default seats", () => {
+  describe("3.1 unreviewed-merge (Layer A, permanently warn-only on every seat per Ruling 2)", () => {
+    it("warns on `gh pr merge` and `gatemerge` (any path/form) on R&D, Publisher, and default seats (never blocks), naming the seat's memory id", () => {
       const mergeCommands = [
         "gh pr merge 21 --squash",
         "gh -R mcp-tool-shop-org/loadout-os pr merge 21",
@@ -1088,7 +1088,7 @@ describe("Part 3: the first five rules (unreviewed-merge, director-quote, memory
       ];
 
       for (const command of mergeCommands) {
-        // R&D seat -> block (exit 2)
+        // R&D seat -> warn (exit 0, permanently warn-only per Ruling 2)
         const rndRes = runPreTool({
           stdinJson: JSON.stringify({
             tool_name: "Bash",
@@ -1098,11 +1098,12 @@ describe("Part 3: the first five rules (unreviewed-merge, director-quote, memory
           seatsPath,
           logPath,
         });
-        assert.equal(rndRes.exitCode, 2, `R&D should block: ${command}`);
-        assert.equal(rndRes.outcome, "block");
-        assert.match(rndRes.stderr, /R&D never merges/i);
+        assert.equal(rndRes.exitCode, 0, `R&D should warn (never block): ${command}`);
+        assert.equal(rndRes.outcome, "warn");
+        assert.match(rndRes.stdout, /R&D hands reviewed PRs to the Publisher to merge/i);
+        assert.match(rndRes.stdout, /publisher-merges/);
 
-        // Publisher seat -> warn (exit 0 + Argon-verdict sha reminder mentioning ledger step 2)
+        // Publisher seat -> warn (exit 0 + Argon-verdict sha reminder mentioning ledger step 2 and publisher-merges-as-coordinator)
         const pubRes = runPreTool({
           stdinJson: JSON.stringify({
             tool_name: "Bash",
@@ -1116,6 +1117,7 @@ describe("Part 3: the first five rules (unreviewed-merge, director-quote, memory
         assert.equal(pubRes.outcome, "warn");
         assert.match(pubRes.stdout, /Argon-verdict sha/);
         assert.match(pubRes.stdout, /step 2/);
+        assert.match(pubRes.stdout, /publisher-merges-as-coordinator/);
 
         // Default seat -> warn
         const defRes = runPreTool({
@@ -1129,6 +1131,94 @@ describe("Part 3: the first five rules (unreviewed-merge, director-quote, memory
         });
         assert.equal(defRes.exitCode, 0, `Default should warn: ${command}`);
         assert.equal(defRes.outcome, "warn");
+      }
+    });
+
+    it("suppresses the warning when a review reply exists in repliesDir whose first line contains `PASS at <head8>` for the PR's head, and still warns for PASS at another head, FIX, or no reply", () => {
+      const repliesDir = join(tempDir, "replies");
+      mkdirSync(repliesDir, { recursive: true });
+      writeFileSync(
+        seatsPath,
+        JSON.stringify({
+          repliesDir,
+          seats: {
+            "E:/AI/Research and Development": { seat: "rnd", store: configuredStore },
+            "E:/AI/Publisher": { seat: "publisher", store: "E:/AI/PublisherStore/memory" },
+          },
+        }),
+        "utf-8",
+      );
+
+      const mergeWithMatchHead =
+        "gh pr merge 24 -R mcp-tool-shop-org/loadout-os --squash --match-head-commit eb90790a2146c31c";
+      const gatemergeWithHead =
+        "bash E:/AI/Publisher/scripts/gatemerge.sh mcp-tool-shop-org/loadout-os 24 eb90790a";
+
+      // 1. No reply in repliesDir -> warns
+      const noReplyRes = runPreTool({
+        stdinJson: JSON.stringify({
+          tool_name: "Bash",
+          tool_input: { command: mergeWithMatchHead },
+          cwd: "E:/AI/Publisher",
+        }),
+        seatsPath,
+        logPath,
+      });
+      assert.equal(noReplyRes.outcome, "warn");
+
+      // 2. Reply with FIX at eb90790a -> still warns
+      writeFileSync(
+        join(repliesDir, "2026-11-08-review.md"),
+        "LOADOUT-OS #24 REVIEW: FIX at eb90790a — 1 blocker\n\nDetails...\n",
+        "utf-8",
+      );
+      const fixReplyRes = runPreTool({
+        stdinJson: JSON.stringify({
+          tool_name: "Bash",
+          tool_input: { command: mergeWithMatchHead },
+          cwd: "E:/AI/Publisher",
+        }),
+        seatsPath,
+        logPath,
+      });
+      assert.equal(fixReplyRes.outcome, "warn");
+
+      // 3. Reply with PASS at another head (deadbeef) -> still warns
+      writeFileSync(
+        join(repliesDir, "2026-11-08-review.md"),
+        "LOADOUT-OS #24 REVIEW: PASS at deadbeef — 472 tests, 94.84% cov\n\nDetails...\n",
+        "utf-8",
+      );
+      const wrongHeadRes = runPreTool({
+        stdinJson: JSON.stringify({
+          tool_name: "Bash",
+          tool_input: { command: mergeWithMatchHead },
+          cwd: "E:/AI/Publisher",
+        }),
+        seatsPath,
+        logPath,
+      });
+      assert.equal(wrongHeadRes.outcome, "warn");
+
+      // 4. Reply with PASS at eb90790a on first line -> suppressed (allow, exit 0, empty stdout)
+      writeFileSync(
+        join(repliesDir, "2026-11-08-review.md"),
+        "LOADOUT-OS #24 REVIEW: PASS at eb90790a — 472 tests, 94.84% cov, 4/4 slips blocked, 34/34 quote-gate, 13/13 stamps\n\nBody.\n",
+        "utf-8",
+      );
+      for (const cmd of [mergeWithMatchHead, gatemergeWithHead]) {
+        const passReplyRes = runPreTool({
+          stdinJson: JSON.stringify({
+            tool_name: "Bash",
+            tool_input: { command: cmd },
+            cwd: "E:/AI/Publisher",
+          }),
+          seatsPath,
+          logPath,
+        });
+        assert.equal(passReplyRes.exitCode, 0);
+        assert.equal(passReplyRes.outcome, "allow", `Expected warning suppressed for: ${cmd}`);
+        assert.equal(passReplyRes.stdout, "");
       }
     });
   });
@@ -1491,7 +1581,7 @@ describe("Part 3: the first five rules (unreviewed-merge, director-quote, memory
       assert.equal(blockIsoZ.exitCode, 2);
       assert.equal(blockIsoZ.outcome, "block");
 
-      // 6. A value that is pure prose -> allow and log in `notes`
+      // 6. A value that is pure prose -> allow and log hashed note (never raw prose, P4.14)
       const proseRes = runPreTool({
         stdinJson: JSON.stringify({
           tool_name: "Edit",
@@ -1510,8 +1600,13 @@ describe("Part 3: the first five rules (unreviewed-merge, director-quote, memory
       assert.equal(proseRes.outcome, "allow");
       assert.ok(
         proseRes.logEntry?.notes?.some((n) =>
-          n.startsWith("unparseable_timestamp:Last updated=stamped by the CLI"),
+          /^unparseable_timestamp:Last updated=sha256:[0-9a-f]{12}\(len=\d+\)$/.test(n),
         ),
+      );
+      assert.equal(
+        JSON.stringify(proseRes.logEntry).includes("stamped by the CLI"),
+        false,
+        "notes must never leak raw unparseable timestamp text (P4.14)",
       );
 
       // 7. A deadline elsewhere in the body (`due 2026-12-01`) -> allow (not a stamped field)
@@ -1532,11 +1627,13 @@ describe("Part 3: the first five rules (unreviewed-merge, director-quote, memory
       assert.equal(deadlineRes.exitCode, 0);
       assert.equal(deadlineRes.outcome, "allow");
 
-      // 8. Frontmatter fields (`created_at`, `modified`, `verified_at`), zones (`EST`, `EDT`, `UTC`, `Z`, `±HH:MM`, EDT summer), and bare `YYYY-MM-DD` (compared at end-of-day)
-      // Bare date `2026-11-07` (end of day 2026-11-07 23:59:59.999 ET <= 2026-11-08 15:44 ET) -> allow
+      // 8. Frontmatter fields (`created_at`, `modified`, `verified_at`), zones (`EST`, `EDT`, `UTC`, `Z`, `±HH:MM`, EDT summer), and bare `YYYY-MM-DD` (compared at start-of-day per P3.13 so same-day bare dates pass)
+      // Bare date `2026-11-07` (start of day 2026-11-07 00:00:00 ET <= 2026-11-08 15:44 ET) -> allow
       assert.ok(parseToolStampedTime("2026-11-07 (yesterday)", fixedClockMs)! < fixedClockMs);
-      // Bare date `2026-11-08` (end of day 2026-11-08 23:59:59.999 ET > 2026-11-08 15:44 ET) -> > fixedClockMs
-      assert.ok(parseToolStampedTime("2026-11-08 (today date-only)", fixedClockMs)! > fixedClockMs);
+      // Bare date `2026-11-08` (start of day 2026-11-08 00:00:00 ET <= 2026-11-08 15:44 ET) -> allow (same-day bare date passes per P3.13)
+      assert.ok(parseToolStampedTime("2026-11-08 (today date-only)", fixedClockMs)! <= fixedClockMs);
+      // Bare date `2026-11-09` (tomorrow) -> > fixedClockMs (blocks)
+      assert.ok(parseToolStampedTime("2026-11-09 (tomorrow date-only)", fixedClockMs)! > fixedClockMs);
       // Explicit zones (`EST`, `EDT`, `UTC`, `Z`, `-05:00`) and summer EDT (`2026-07-15 12:00 ET` = 16:00 UTC)
       assert.equal(
         parseToolStampedTime("2026-07-15 12:00 ET (summer EDT)", fixedClockMs),
@@ -1733,11 +1830,11 @@ describe("Part 3: the first five rules (unreviewed-merge, director-quote, memory
       ];
 
       for (const command of releaseCommands) {
-        for (const cwd of [
-          "E:/AI/Research and Development",
-          "E:/AI/Publisher",
-          "E:/AI/OtherRepo",
-        ]) {
+        for (const [cwd, expectedMemId] of [
+          ["E:/AI/Research and Development", /publisher-approves-every-publish/],
+          ["E:/AI/Publisher", /publishing-tags-need-publisher-ok/],
+          ["E:/AI/OtherRepo", /publisher-approves-every-publish/],
+        ] as const) {
           const res = runPreTool({
             stdinJson: JSON.stringify({
               tool_name: "Bash",
@@ -1749,7 +1846,7 @@ describe("Part 3: the first five rules (unreviewed-merge, director-quote, memory
           });
           assert.equal(res.exitCode, 0);
           assert.equal(res.outcome, "warn");
-          assert.match(res.stdout, /publisher-approves-every-publish/);
+          assert.match(res.stdout, expectedMemId);
           assert.match(res.stdout, /full-treatment/);
         }
       }
@@ -1843,23 +1940,37 @@ describe("Part 5: 2026-11-08 four-slip replay fixture (4/4 blocked, 4/4 matching
     let allowedCount = 0;
 
     for (const pair of REPLAY_2026_11_08_FIXTURE) {
-      // 1. In-process check: blocked slip
+      const expectedAction = pair.expectedViolatingAction ?? "block";
+      const expectedExit = expectedAction === "block" ? 2 : 0;
+
+      // 1. In-process check: violating slip
       const blockRes = runPreTool({
         stdinJson: JSON.stringify(pair.blockedStdin),
         seatsPath,
         logPath,
         nowMs: REPLAY_2026_11_08_CLOCK_MS,
       });
-      assert.equal(blockRes.exitCode, 2, `In-process slip ${pair.id} must exit 2`);
-      assert.equal(blockRes.outcome, "block");
-      assert.equal(blockRes.stdout, "");
-      assert.ok(blockRes.stderr.length > 0);
+      assert.equal(
+        blockRes.exitCode,
+        expectedExit,
+        `In-process slip ${pair.id} must exit ${expectedExit}`,
+      );
+      assert.equal(blockRes.outcome, expectedAction);
+      if (expectedAction === "block") {
+        assert.equal(blockRes.stdout, "");
+        assert.ok(blockRes.stderr.length > 0);
+      } else {
+        assert.match(blockRes.stdout, /additionalContext/);
+        assert.equal(blockRes.stderr, "");
+      }
       assert.ok(
-        blockRes.logEntry?.matched.some((m) => m.id === pair.ruleId && m.action === "block"),
-        `Expected rule ${pair.ruleId} to block ${pair.id}`,
+        blockRes.logEntry?.matched.some(
+          (m) => m.id === pair.ruleId && m.action === expectedAction,
+        ),
+        `Expected rule ${pair.ruleId} to ${expectedAction} ${pair.id}`,
       );
 
-      // 2. Subprocess check: blocked slip
+      // 2. Subprocess check: violating slip
       const childEnv = { ...process.env, NODE_TEST_CONTEXT: "" };
       const blockProc = spawnSync(
         process.execPath,
@@ -1880,9 +1991,17 @@ describe("Part 5: 2026-11-08 four-slip replay fixture (4/4 blocked, 4/4 matching
           env: childEnv,
         },
       );
-      assert.equal(blockProc.status, 2, `Subprocess slip ${pair.id} must exit 2`);
-      assert.equal(blockProc.stdout, "");
-      assert.ok(blockProc.stderr.length > 0);
+      assert.equal(
+        blockProc.status,
+        expectedExit,
+        `Subprocess slip ${pair.id} must exit ${expectedExit}`,
+      );
+      if (expectedAction === "block") {
+        assert.equal(blockProc.stdout, "");
+        assert.ok(blockProc.stderr.length > 0);
+      } else {
+        assert.match(blockProc.stdout, /additionalContext/);
+      }
       blockedCount++;
 
       // 3. In-process check: matching allowed call
@@ -2050,9 +2169,432 @@ describe("Part 5: 2026-11-08 four-slip replay fixture (4/4 blocked, 4/4 matching
     const p95 = wallTimesMs[Math.floor(wallTimesMs.length * 0.95)]!;
     const p99 = wallTimesMs[Math.floor(wallTimesMs.length * 0.99)]!;
 
+    console.log(
+      `[benchmark] 1,010 synthetic calls covering all 5 rules: p50=${p50.toFixed(2)}ms, p95=${p95.toFixed(2)}ms, p99=${p99.toFixed(2)}ms`,
+    );
+
     assert.ok(p50 < 10, `Expected in-process p50 < 10 ms, got ${p50.toFixed(3)} ms`);
-    assert.ok(p95 < 50, `Expected in-process p95 < 50 ms, got ${p95.toFixed(3)} ms`);
-    assert.ok(p99 < 50, `Expected in-process p99 < 50 ms, got ${p99.toFixed(3)} ms`);
+    assert.ok(p95 < 10, `Expected in-process p95 < 10 ms, got ${p95.toFixed(3)} ms`);
+    assert.ok(p99 <= 10, `Expected in-process p99 <= 10 ms (design line), got ${p99.toFixed(3)} ms`);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════
+// Part 6: Issue #25 (all 15 items P1.1–P4.15) & Ruling 1/2/3 tests
+// ════════════════════════════════════════════════════════════════
+
+import { resolveRuleMemory } from "../pretool.js";
+
+describe("Part 6: Issue #25 (P1.1–P4.15) and log-only rulings", () => {
+  let tempDir: string;
+  let seatsPath: string;
+  let logPath: string;
+  let storeDir: string;
+  const fixedClockMs = Date.UTC(2026, 10, 8, 20, 44, 0, 0); // 2026-11-08 15:44 ET
+
+  beforeEach(() => {
+    tempDir = mkdtempSync(join(tmpdir(), "loadout-pretool-25-"));
+    seatsPath = join(tempDir, "seats.json");
+    logPath = join(tempDir, "hook-decisions.jsonl");
+    storeDir = join(tempDir, "store", "memory");
+    mkdirSync(storeDir, { recursive: true });
+
+    writeFileSync(
+      seatsPath,
+      JSON.stringify(
+        {
+          seats: {
+            "E:/AI/Research and Development": {
+              seat: "rnd",
+              store: storeDir,
+              worktrees: ["E:/AI/_worktrees/loadout-os-25-pr1"],
+            },
+            "E:/AI/Publisher": {
+              seat: "publisher",
+              store: "E:/AI/PublisherStore/memory",
+              prefixes: ["E:/AI/_worktrees/publisher-pr"],
+            },
+          },
+        },
+        null,
+        2,
+      ),
+      "utf-8",
+    );
+  });
+
+  afterEach(() => {
+    rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  it("P1.1: disables read-only pass-through on `git -c <key>=<val>` and leading env assignments (`GIT_EXTERNAL_DIFF=...`, `LESSOPEN=...`)", () => {
+    const bypassed = [
+      "git -c core.fsmonitor=evil status",
+      "git -c diff.external=evil diff",
+      "git -c core.pager=evil log -n 1",
+      "GIT_EXTERNAL_DIFF=evil git diff",
+      "GIT_PAGER=evil git log -1",
+      "LESSOPEN='|evil %s' head -n 5 README.md",
+      "FOO=bar ls",
+    ];
+    for (const cmd of bypassed) {
+      const parsed = parseBashCommand(cmd);
+      assert.equal(
+        isBashCommandReadOnly(parsed),
+        false,
+        `Expected read-only pass-through disabled for: ${cmd}`,
+      );
+      const res = runPreTool({
+        stdinJson: JSON.stringify({
+          tool_name: "Bash",
+          tool_input: { command: cmd },
+          cwd: "E:/AI/Research and Development",
+        }),
+        seatsPath,
+        logPath,
+      });
+      assert.equal(res.passThrough, false, `Expected passThrough=false for: ${cmd}`);
+    }
+  });
+
+  it("P1.2: resolves worktree and extra prefix roots per seat from seats.json (`worktrees` / `prefixes`)", () => {
+    const cfg = loadSeatConfig(seatsPath);
+    assert.equal(resolveSeat("E:/AI/_worktrees/loadout-os-25-pr1/packages/cli", cfg), "rnd");
+    assert.equal(resolveSeat("E:/AI/_worktrees/publisher-pr/src", cfg), "publisher");
+  });
+
+  it("P1.3: disables read-only pass-through on `sed -n` scripts containing the `w` or `W` write command", () => {
+    for (const badSed of [
+      "sed -n 'w /tmp/pwn' README.md",
+      "sed -n '1,10w out.txt' README.md",
+      "sed -n -e '1,5p' -e 'w leaked.txt' README.md",
+      "sed -n 's/a/b/w out.txt' README.md",
+    ]) {
+      const parsed = parseBashCommand(badSed);
+      assert.equal(
+        isSegmentReadOnly(parsed.segments[0]!),
+        false,
+        `Expected sed -n write command rejected: ${badSed}`,
+      );
+    }
+    // Pure print sed -n still passes
+    const goodParsed = parseBashCommand("sed -n '1,20p' README.md");
+    assert.equal(isSegmentReadOnly(goodParsed.segments[0]!), true);
+  });
+
+  it("P2.4: blocks PowerShell (`pwsh -c`, `powershell -Command`), subshell (`bash -c`, `sh -c`), `env`/`command`/`xargs` wrappers, and `find <store> -delete|-exec`", () => {
+    const target = `${storeDir.replace(/\\/g, "/")}/BOARD.md`;
+    const storeSlash = storeDir.replace(/\\/g, "/");
+    const commands = [
+      `pwsh -Command "Set-Content -Path '${target}' -Value 'x'"`,
+      `powershell -c "Out-File -FilePath '${target}'"`,
+      `bash -c "rm -f '${target}'"`,
+      `sh -c "cp /tmp/a '${target}'"`,
+      `env rm -f "${target}"`,
+      `command rm -f "${target}"`,
+      `echo "${target}" | xargs rm`,
+      `find "${storeSlash}" -name "*.md" -delete`,
+      `find "${storeSlash}" -name "*.md" -exec rm {} ;`,
+    ];
+
+    for (const command of commands) {
+      const res = runPreTool({
+        stdinJson: JSON.stringify({
+          tool_name: "Bash",
+          tool_input: { command },
+          cwd: "E:/AI/Research and Development",
+        }),
+        seatsPath,
+        logPath,
+      });
+      assert.equal(res.exitCode, 2, `Expected P2.4 block for: ${command}`);
+      assert.ok(res.logEntry?.matched.some((m) => m.id === "memory-shell-write"));
+    }
+  });
+
+  it("P2.5: blocks expanded Python/Node file-write APIs (`shutil.copy|move`, `os.replace|remove|rename`, `Path.unlink|rename|write_bytes`, `fs.unlinkSync|copyFileSync|renameSync`, nested `open(..., 'w')`, and script file arguments)", () => {
+    const target = `${storeDir.replace(/\\/g, "/")}/BOARD.md`;
+    const commands = [
+      `python -c "import shutil; shutil.copy('a.md', '${target}')"`,
+      `python -c "import shutil; shutil.move('a.md', '${target}')"`,
+      `python -c "import os; os.replace('a.md', '${target}')"`,
+      `python -c "import os; os.remove('${target}')"`,
+      `python -c "from pathlib import Path; Path('${target}').unlink()"`,
+      `python -c "from pathlib import Path; Path('${target}').write_bytes(b'hi')"`,
+      `python -c "f = open(str('${target}'), 'w'); f.write('x')"`,
+      `node -e "fs.unlinkSync('${target}')"`,
+      `node -e "fs.copyFileSync('a.md', '${target}')"`,
+      `node -e "fs.renameSync('a.md', '${target}')"`,
+      `python scripts/mutate.py "${target}"`,
+    ];
+
+    for (const command of commands) {
+      const res = runPreTool({
+        stdinJson: JSON.stringify({
+          tool_name: "Bash",
+          tool_input: { command },
+          cwd: "E:/AI/Research and Development",
+        }),
+        seatsPath,
+        logPath,
+      });
+      assert.equal(res.exitCode, 2, `Expected P2.5 block for: ${command}`);
+      assert.ok(res.logEntry?.matched.some((m) => m.id === "memory-shell-write"));
+    }
+  });
+
+  it("P2.6: blocks relative paths after `cd <store>` and when `cwd` is already inside a memory store", () => {
+    const storeSlash = storeDir.replace(/\\/g, "/");
+
+    // 1. `cd <store> && echo x > BOARD.md` and `cd <store> && rm BOARD.md`
+    for (const cmd of [
+      `cd "${storeSlash}" && echo x > BOARD.md`,
+      `cd "${storeSlash}" && rm -f BOARD.md`,
+      `pushd "${storeSlash}" && sed -i 's/a/b/' MEMORY.md`,
+      `cd "${storeSlash}" && python -c "open('BOARD.md', 'w').write('x')"`,
+    ]) {
+      const res = runPreTool({
+        stdinJson: JSON.stringify({
+          tool_name: "Bash",
+          tool_input: { command: cmd },
+          cwd: "E:/AI/Research and Development",
+        }),
+        seatsPath,
+        logPath,
+      });
+      assert.equal(res.exitCode, 2, `Expected P2.6 block after cd <store> for: ${cmd}`);
+      assert.ok(res.logEntry?.matched.some((m) => m.id === "memory-shell-write"));
+    }
+
+    // 2. When `cwd` itself is inside the store
+    for (const cmd of [
+      "echo x > BOARD.md",
+      "rm MEMORY.md",
+      "cp /tmp/draft.md ./topic.md",
+    ]) {
+      const res = runPreTool({
+        stdinJson: JSON.stringify({
+          tool_name: "Bash",
+          tool_input: { command: cmd },
+          cwd: storeSlash,
+        }),
+        seatsPath,
+        logPath,
+      });
+      assert.equal(res.exitCode, 2, `Expected P2.6 block when cwd is inside store for: ${cmd}`);
+      assert.ok(res.logEntry?.matched.some((m) => m.id === "memory-shell-write"));
+    }
+  });
+
+  it("P2.7: blocks `git -C <store> restore|switch|apply|am|cherry-pick|pull`", () => {
+    const storeSlash = storeDir.replace(/\\/g, "/");
+    for (const sub of ["restore", "switch", "apply", "am", "cherry-pick", "pull"]) {
+      const cmd = `git -C "${storeSlash}" ${sub} .`;
+      const res = runPreTool({
+        stdinJson: JSON.stringify({
+          tool_name: "Bash",
+          tool_input: { command: cmd },
+          cwd: "E:/AI/Research and Development",
+        }),
+        seatsPath,
+        logPath,
+      });
+      assert.equal(res.exitCode, 2, `Expected P2.7 block for: ${cmd}`);
+      assert.ok(res.logEntry?.matched.some((m) => m.id === "memory-shell-write"));
+    }
+  });
+
+  it("P2.8: normalizes `%USERPROFILE%`, `$USERPROFILE`, `$HOME`, quoted `~`, and doubled backslashes `\\\\` on store paths", () => {
+    const commands = [
+      'rm "%USERPROFILE%/.claude/projects/F--AI/memory/BOARD.md"',
+      'rm "$HOME/.claude/projects/F--AI/memory/BOARD.md"',
+      'rm "$USERPROFILE/.claude/projects/F--AI/memory/BOARD.md"',
+      'rm "~/.claude/projects/F--AI/memory/BOARD.md"',
+      `rm "${storeDir.replace(/\//g, "\\\\")}\\\\BOARD.md"`,
+    ];
+    for (const command of commands) {
+      const res = runPreTool({
+        stdinJson: JSON.stringify({
+          tool_name: "Bash",
+          tool_input: { command },
+          cwd: "E:/AI/Research and Development",
+        }),
+        seatsPath,
+        logPath,
+      });
+      assert.equal(res.exitCode, 2, `Expected P2.8 block for: ${command}`);
+      assert.ok(res.logEntry?.matched.some((m) => m.id === "memory-shell-write"));
+    }
+  });
+
+  it("P2.9: allows `sed -i` on a non-store file even when the sed expression mentions a memory store path", () => {
+    const storeSlash = storeDir.replace(/\\/g, "/");
+    const cmd = `sed -i "s|${storeSlash}|/new/path|g" README.md`;
+    const res = runPreTool({
+      stdinJson: JSON.stringify({
+        tool_name: "Bash",
+        tool_input: { command: cmd },
+        cwd: "E:/AI/Research and Development",
+      }),
+      seatsPath,
+      logPath,
+    });
+    assert.equal(res.exitCode, 0, "sed -i on non-store file should be allowed");
+    assert.equal(res.outcome, "allow");
+  });
+
+  it("P3.10: blocks an Edit that replaces only the time substring (`old_string: '15:03 ET'` -> `new_string: '23:59 ET'`) by reconstructing the edited line from the file on disk", () => {
+    const boardPath = join(storeDir, "BOARD.md");
+    writeFileSync(
+      boardPath,
+      "# R&D Board\n\n**Last updated:** 2026-11-08 15:03 ET (clock-checked).\n",
+      "utf-8",
+    );
+
+    // Substring edit to future time 23:59 ET -> blocked!
+    const blockRes = runPreTool({
+      stdinJson: JSON.stringify({
+        tool_name: "Edit",
+        tool_input: {
+          file_path: boardPath,
+          old_string: "15:03 ET",
+          new_string: "23:59 ET",
+        },
+        cwd: "E:/AI/Research and Development",
+      }),
+      seatsPath,
+      logPath,
+      nowMs: fixedClockMs,
+    });
+    assert.equal(blockRes.exitCode, 2, "Substring edit to future time must be blocked");
+    assert.equal(blockRes.outcome, "block");
+    assert.ok(blockRes.logEntry?.matched.some((m) => m.id === "future-stamp"));
+
+    // Substring edit to current time 15:44 ET -> allowed!
+    const allowRes = runPreTool({
+      stdinJson: JSON.stringify({
+        tool_name: "Edit",
+        tool_input: {
+          file_path: boardPath,
+          old_string: "15:03 ET",
+          new_string: "15:44 ET",
+        },
+        cwd: "E:/AI/Research and Development",
+      }),
+      seatsPath,
+      logPath,
+      nowMs: fixedClockMs,
+    });
+    assert.equal(allowRes.exitCode, 0, "Substring edit to current time must be allowed");
+    assert.equal(allowRes.outcome, "allow");
+  });
+
+  it("P3.11 & P3.12 & P3.13: handles non-bold `Last updated:`, time-only `~HH:MM` without zone, heading `updated 2026-12-01 schedule` (no time -> allowed), and midnight wrap (`~23:58 ET` at `00:02 ET`)", () => {
+    const boardPath = join(storeDir, "BOARD.md");
+
+    // P3.11: non-bold `Last updated: 2026-11-08 23:59 ET` and time-only `~19:30` without zone -> blocked
+    for (const line of [
+      "Last updated: 2026-11-08 23:59 ET",
+      "**Last updated:** ~19:30",
+    ]) {
+      const res = runPreTool({
+        stdinJson: JSON.stringify({
+          tool_name: "Edit",
+          tool_input: {
+            file_path: boardPath,
+            old_string: "old",
+            new_string: line,
+          },
+          cwd: "E:/AI/Research and Development",
+        }),
+        seatsPath,
+        logPath,
+        nowMs: fixedClockMs,
+      });
+      assert.equal(res.exitCode, 2, `Expected P3.11 block for: ${line}`);
+    }
+
+    // P3.12: `### Milestones — updated 2026-12-01 schedule` (no time component on heading) -> allowed
+    const headingDateOnlyRes = runPreTool({
+      stdinJson: JSON.stringify({
+        tool_name: "Edit",
+        tool_input: {
+          file_path: boardPath,
+          old_string: "old",
+          new_string: "### Milestones — updated 2026-12-01 schedule",
+        },
+        cwd: "E:/AI/Research and Development",
+      }),
+      seatsPath,
+      logPath,
+      nowMs: fixedClockMs,
+    });
+    assert.equal(headingDateOnlyRes.exitCode, 0);
+    assert.equal(headingDateOnlyRes.outcome, "allow");
+
+    // P3.13: Same-day bare date `created_at: 2026-11-08` at 15:44 ET -> allowed; `created_at: 2026-11-09` -> blocked
+    const sameDayBareRes = runPreTool({
+      stdinJson: JSON.stringify({
+        tool_name: "Write",
+        tool_input: {
+          file_path: boardPath,
+          content: "---\ncreated_at: 2026-11-08\n---\n# Board\n",
+        },
+        cwd: "E:/AI/Research and Development",
+      }),
+      seatsPath,
+      logPath,
+      nowMs: fixedClockMs,
+    });
+    assert.equal(sameDayBareRes.exitCode, 0, "Same-day bare date must be allowed");
+
+    // P3.13: Midnight wrap (`~23:58 ET` when clock is `00:02 ET` on 2026-11-09 = 05:02 UTC) -> allowed (yesterday's 23:58 ET, 4 min ago)
+    const clock0002NextDayMs = Date.UTC(2026, 10, 9, 5, 2, 0, 0);
+    const midnightWrapRes = runPreTool({
+      stdinJson: JSON.stringify({
+        tool_name: "Edit",
+        tool_input: {
+          file_path: boardPath,
+          old_string: "old",
+          new_string: "**Last updated:** ~23:58 ET",
+        },
+        cwd: "E:/AI/Research and Development",
+      }),
+      seatsPath,
+      logPath,
+      nowMs: clock0002NextDayMs,
+    });
+    assert.equal(midnightWrapRes.exitCode, 0, "Midnight wrap ~23:58 ET at 00:02 ET must pass");
+  });
+
+  it("Ruling 1: resolves per-seat memory IDs for all 5 rules (`rnd` vs `publisher`) and formats seat-specific memory IDs in messages", () => {
+    const expectedMap: Record<string, { rnd: string; publisher: string }> = {
+      "unreviewed-merge": {
+        rnd: "publisher-merges",
+        publisher: "publisher-merges-as-coordinator",
+      },
+      "director-quote": {
+        rnd: "never-quote-director-in-public",
+        publisher: "feedback-never-quote-director",
+      },
+      "memory-shell-write": {
+        rnd: "build-in-studio-tools-not-side-scripts",
+        publisher: "project-memory-system",
+      },
+      "future-stamp": {
+        rnd: "rnd-memory-system",
+        publisher: "feedback-eastern-time",
+      },
+      "release-reminder": {
+        rnd: "publisher-approves-every-publish",
+        publisher: "publishing-tags-need-publisher-ok",
+      },
+    };
+
+    for (const rule of PRETOOL_RULES) {
+      assert.equal(resolveRuleMemory(rule, "rnd"), expectedMap[rule.id]!.rnd);
+      assert.equal(resolveRuleMemory(rule, "publisher"), expectedMap[rule.id]!.publisher);
+    }
   });
 });
 

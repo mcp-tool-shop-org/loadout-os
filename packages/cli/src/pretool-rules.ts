@@ -1,24 +1,42 @@
 /**
  * Pre-tool rule table — Part 3 (Layer A hard blocks and Layer B soft reminders).
  *
- * Rules in this PR (Part 3 & Part 4.3):
- *   1. unreviewed-merge   | Layer A | memory: publisher-merges                 | skill: remote-argon
- *   2. director-quote     | Layer A | memory: never-quote-director-in-public   | skill: none (with reason)
- *   3. memory-shell-write | Layer A | memory: build-in-studio-tools-not-side-scripts | skill: loadout-os
- *   4. future-stamp       | Layer A | memory: rnd-memory-system                | skill: loadout-os
- *   5. release-reminder   | Layer B | memory: publisher-approves-every-publish | skill: full-treatment
+ * Rules in this PR (Part 3, Part 4.3, and #25 enforce-readiness):
+ *   1. unreviewed-merge   | warn-only | memory: { rnd: publisher-merges, publisher: publisher-merges-as-coordinator }
+ *   2. director-quote     | Layer A   | memory: { rnd: never-quote-director-in-public, publisher: feedback-never-quote-director }
+ *   3. memory-shell-write | Layer A   | memory: { rnd: build-in-studio-tools-not-side-scripts, publisher: project-memory-system }
+ *   4. future-stamp       | Layer A   | memory: { rnd: rnd-memory-system, publisher: feedback-eastern-time }
+ *   5. release-reminder   | Layer B   | memory: { rnd: publishing-tags-need-publisher-ok / publisher-approves-every-publish }
  */
 
 import {
+  closeSync,
+  existsSync,
+  openSync,
+  readdirSync,
+  readFileSync,
+  readSync,
+} from "node:fs";
+import { createHash } from "node:crypto";
+import { homedir } from "node:os";
+import { isAbsolute, join, posix, resolve } from "node:path";
+
+import {
+  defaultRepliesDir,
   normalizePreToolPath,
+  parseBashCommand,
+  prenormalizeStorePaths,
+  resolveRuleMemory,
   type CommandSegment,
   type PreToolRule,
   type RuleMatchInput,
   type RuleMatchResult,
 } from "./pretool.js";
 
+const HOMEDIR_SLASH = homedir().replace(/\\/g, "/");
+
 // ════════════════════════════════════════════════════════════════
-// Rule 1: unreviewed-merge (Layer A)
+// Rule 1: unreviewed-merge (warn-only on every seat permanently — #25 ruling 2)
 // ════════════════════════════════════════════════════════════════
 
 function isExecutableNamed(token: string, expectedName: string): boolean {
@@ -28,17 +46,59 @@ function isExecutableNamed(token: string, expectedName: string): boolean {
   return stripped === expectedName.toLowerCase();
 }
 
-function segmentMatchesUnreviewedMerge(seg: CommandSegment): string | null {
+export interface UnreviewedMergeHit {
+  detail: string;
+  headSha?: string;
+}
+
+const HEX_SHA_RE = /^[0-9a-f]{7,40}$/i;
+
+function extractMergeHitFromSegment(seg: CommandSegment): UnreviewedMergeHit | null {
   if (seg.tokens.length === 0) return null;
 
-  // Check if any token invokes `gatemerge` (directly or via pwsh/bash/sh/node wrapper)
-  for (const tok of seg.tokens) {
-    if (isExecutableNamed(tok, "gatemerge")) {
-      return seg.raw || tok;
+  // 1. Check if any token invokes `gatemerge` (directly or via pwsh/bash/sh/node wrapper)
+  let gatemergeIdx = -1;
+  for (let i = 0; i < seg.tokens.length; i++) {
+    if (isExecutableNamed(seg.tokens[i], "gatemerge")) {
+      gatemergeIdx = i;
+      break;
     }
   }
+  if (gatemergeIdx !== -1) {
+    const after = seg.tokens.slice(gatemergeIdx + 1);
+    let headSha: string | undefined;
+    for (let i = 0; i < after.length; i++) {
+      const a = after[i];
+      if (
+        (a === "--head" || a === "-Head" || a === "--match-head-commit") &&
+        after[i + 1] &&
+        HEX_SHA_RE.test(after[i + 1])
+      ) {
+        headSha = after[i + 1].toLowerCase();
+        break;
+      }
+      if (a.startsWith("--head=") || a.startsWith("--match-head-commit=")) {
+        const val = a.slice(a.indexOf("=") + 1);
+        if (HEX_SHA_RE.test(val)) {
+          headSha = val.toLowerCase();
+          break;
+        }
+      }
+    }
+    if (!headSha) {
+      // `gatemerge.sh <owner/repo> <pr> <expected-head-prefix>` -> 3rd positional or any >=7-hex token
+      const positional = after.filter((t) => !t.startsWith("-"));
+      if (positional.length >= 3 && HEX_SHA_RE.test(positional[2])) {
+        headSha = positional[2].toLowerCase();
+      } else {
+        const hexTok = positional.find((t) => /^[0-9a-f]{7,40}$/i.test(t) && !/^\d+$/.test(t));
+        if (hexTok) headSha = hexTok.toLowerCase();
+      }
+    }
+    return { detail: seg.raw || seg.tokens[gatemergeIdx], headSha };
+  }
 
-  // Check `gh [flags] pr merge ...`
+  // 2. Check `gh [flags] pr merge ...`
   if (isExecutableNamed(seg.tokens[0], "gh")) {
     const args = seg.tokens.slice(1);
     let idx = 0;
@@ -53,28 +113,115 @@ function segmentMatchesUnreviewedMerge(seg: CommandSegment): string | null {
       }
     }
     if (args[idx] === "pr" && args[idx + 1] === "merge") {
-      return seg.raw || "gh pr merge";
+      let headSha: string | undefined;
+      for (let i = idx + 2; i < args.length; i++) {
+        const a = args[i];
+        if (
+          (a === "--match-head-commit" || a === "--head") &&
+          args[i + 1] &&
+          HEX_SHA_RE.test(args[i + 1])
+        ) {
+          headSha = args[i + 1].toLowerCase();
+          break;
+        }
+        if (a.startsWith("--match-head-commit=") || a.startsWith("--head=")) {
+          const val = a.slice(a.indexOf("=") + 1);
+          if (HEX_SHA_RE.test(val)) {
+            headSha = val.toLowerCase();
+            break;
+          }
+        }
+      }
+      return { detail: seg.raw || "gh pr merge", headSha };
     }
   }
 
   return null;
 }
 
+/**
+ * Scan `repliesDir` for any `.md` review reply whose first line contains `PASS at <head8>`
+ * matching `headSha` (comparing at least 7–8 leading hex chars).
+ */
+export function hasReviewPassAtHead(
+  repliesDir: string,
+  headSha: string,
+): boolean {
+  const cleanHead = headSha.trim().toLowerCase();
+  if (!HEX_SHA_RE.test(cleanHead)) return false;
+  const head8 = cleanHead.slice(0, 8);
+
+  let entries: string[];
+  try {
+    entries = readdirSync(repliesDir);
+  } catch {
+    return false;
+  }
+
+  const buf = Buffer.allocUnsafe(256);
+  for (const name of entries) {
+    if (!name.endsWith(".md")) continue;
+    const fullPath = join(repliesDir, name);
+    let fd: number | null = null;
+    try {
+      fd = openSync(fullPath, "r");
+      const bytesRead = readSync(fd, buf, 0, 256, 0);
+      if (bytesRead <= 0) continue;
+      const headText = buf.subarray(0, bytesRead).toString("utf-8");
+      const nlIdx = headText.indexOf("\n");
+      const firstLine = (nlIdx === -1 ? headText : headText.slice(0, nlIdx)).trim();
+      const m = firstLine.match(/\bPASS\s+at\s+([0-9a-f]{7,40})\b/i);
+      if (m && m[1]) {
+        const replySha = m[1].toLowerCase();
+        const cmpLen = Math.min(8, head8.length, replySha.length);
+        if (cmpLen >= 7 && replySha.slice(0, cmpLen) === head8.slice(0, cmpLen)) {
+          return true;
+        }
+      }
+    } catch {
+      /* ignore unreadable file */
+    } finally {
+      if (fd !== null) {
+        try {
+          closeSync(fd);
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+  }
+  return false;
+}
+
 export function matchUnreviewedMerge(ctx: RuleMatchInput): RuleMatchResult {
+  const rawCmd =
+    typeof ctx.toolInput.command === "string" ? ctx.toolInput.command : "";
+  if (rawCmd && !/merge/i.test(rawCmd)) {
+    return { matched: false };
+  }
+
+  const repliesDir = ctx.repliesDir ?? defaultRepliesDir();
   const segments = ctx.parsedCommand?.segments ?? [];
   for (const seg of segments) {
-    const hit = segmentMatchesUnreviewedMerge(seg);
+    const hit = extractMergeHitFromSegment(seg);
     if (hit) {
-      return { matched: true, detail: hit };
+      if (hit.headSha && hasReviewPassAtHead(repliesDir, hit.headSha)) {
+        return { matched: false };
+      }
+      return { matched: true, detail: hit.detail };
     }
   }
 
-  const rawCmd =
-    typeof ctx.toolInput.command === "string" ? ctx.toolInput.command : "";
   if (
     /\bgh\s+(?:-[^\s]+\s+)*pr\s+merge\b/i.test(rawCmd) ||
     /(?:^|[\s/\\'"`])gatemerge(?:\.[a-z0-9]+)?\b/i.test(rawCmd)
   ) {
+    const shaMatch =
+      rawCmd.match(/--(?:match-head-commit|head)(?:=|\s+)([0-9a-f]{7,40})\b/i) ??
+      rawCmd.match(/\bgatemerge(?:\.[a-z0-9]+)?\s+\S+\s+\d+\s+([0-9a-f]{7,40})\b/i);
+    if (shaMatch?.[1] && hasReviewPassAtHead(repliesDir, shaMatch[1])) {
+      return { matched: false };
+    }
     return { matched: true, detail: rawCmd.trim().slice(0, 120) };
   }
 
@@ -87,21 +234,26 @@ export const UNREVIEWED_MERGE_RULE: PreToolRule = {
   tools: ["Bash"],
   action: {
     default: "warn",
-    rnd: "block",
+    rnd: "warn",
     publisher: "warn",
   },
-  memory: "publisher-merges",
+  memory: {
+    default: "publisher-merges",
+    rnd: "publisher-merges",
+    publisher: "publisher-merges-as-coordinator",
+  },
   skill: "remote-argon",
   message: (_res, ctx) => {
+    const memId = resolveRuleMemory(UNREVIEWED_MERGE_RULE, ctx.seat);
     if (ctx.seat === "rnd") {
       return [
-        "[unreviewed-merge] BLOCKED: R&D never merges PRs (memory: publisher-merges).",
-        "Hand the branch and PR back to the Publisher after review (skill: remote-argon).",
+        `[unreviewed-merge] REMINDER: R&D hands reviewed PRs to the Publisher to merge; merge only with an Argon-verdict sha (memory: ${memId}, skill: remote-argon).`,
+        "Pass `--match-head-commit <head8>` (or `gatemerge <repo> <pr> <head8>`) with a matching `PASS at <head8>` reply to suppress.",
       ].join("\n");
     }
     return [
-      "[unreviewed-merge] REMINDER: Merge only with an Argon-verdict sha (memory: publisher-merges, skill: remote-argon).",
-      "Note: automated verdict-sha verification arrives with the commitment ledger in step 2.",
+      `[unreviewed-merge] REMINDER: Merge only with an Argon-verdict sha (memory: ${memId}, skill: remote-argon, ledger step 2).`,
+      "Pass `--match-head-commit <head8>` (or `gatemerge <repo> <pr> <head8>`) with a matching `PASS at <head8>` reply to suppress.",
     ].join("\n");
   },
   match: matchUnreviewedMerge,
@@ -113,11 +265,13 @@ export const UNREVIEWED_MERGE_RULE: PreToolRule = {
 
 /**
  * Files that legitimately contain the patterns because they document or test them
- * (ported from `quote-gate.py:58-61`).
+ * (ported from `quote-gate.py:58-61`, plus loadout-os's own quote-gate rule/test files).
  */
 export const QUOTE_GATE_ALLOWLIST_SUFFIXES: readonly string[] = [
   "feedback/feedback_never_quote_the_director.md",
   ".claude/hooks/quote-gate.py",
+  "packages/cli/src/pretool-rules.ts",
+  "packages/cli/src/tests/pretool.test.ts",
 ];
 
 const PUBLISHING_CMD =
@@ -130,6 +284,9 @@ const P1_SOURCE =
   String.raw`\b(?:his|her|their)\s+words` +
   String.raw`|(?:Director|Mike)'s\s+words` +
   String.raw`|Director'?s?-word\s+block`;
+
+const P1_QUICK_RE = /\b(?:words|block)\b/i;
+const P1_RE = new RegExp(P1_SOURCE, "gi");
 
 // Negation in the 70-char run-up (`quote-gate.py:80-84`)
 const NEGATION = new RegExp(
@@ -152,8 +309,11 @@ const ATTRIBUTION_SOURCE =
   String.raw`(?:20\d\d-\d\d-\d\d|\d\d-\d\d)\b[^\"\u201c\n:]{0,40}?\)?(?:\*\*)?\s*[:\u2014-]?` +
   String.raw`\s*(?:\*{1,2})?\s*(?=[\"\u201c][^\s\"\u201d])`;
 
+const ATTRIBUTION_RE = new RegExp(ATTRIBUTION_SOURCE, "gim");
+
 // P3 - emphasised markdown block quote (`quote-gate.py:110`)
 const P3_SOURCE = String.raw`^\s*>\s*\*{1,2}[\"\u201c]`;
+const P3_RE = new RegExp(P3_SOURCE, "gm");
 
 const FIRST_PERSON =
   /\b(?:I|I'?m|I'?ve|I'?ll|I'?d|my|me|myself|mine|we|we'?re|we'?ve|our|us|let'?s)\b/i;
@@ -200,33 +360,41 @@ export function findQuoteViolations(text: string): QuoteViolation[] {
   if (!text) return [];
   const hits: QuoteViolation[] = [];
 
-  const p1Re = new RegExp(P1_SOURCE, "gi");
-  for (const m of text.matchAll(p1Re)) {
-    const start = m.index ?? 0;
-    const runUp = text.slice(Math.max(0, start - 70), start);
-    if (NEGATION.test(runUp)) continue;
-    hits.push({ rule: "P1", line: lineOf(text, start) });
-  }
-
-  const attrRe = new RegExp(ATTRIBUTION_SOURCE, "gim");
-  for (const m of text.matchAll(attrRe)) {
-    const start = m.index ?? 0;
-    const end = start + m[0].length;
-    const span = quotedSpanAfter(text, end);
-    if (span && isSpeechSpan(span)) {
-      hits.push({ rule: "P2", line: lineOf(text, start) });
+  if (P1_QUICK_RE.test(text)) {
+    P1_RE.lastIndex = 0;
+    for (const m of text.matchAll(P1_RE)) {
+      const start = m.index ?? 0;
+      const runUp = text.slice(Math.max(0, start - 70), start);
+      if (NEGATION.test(runUp)) continue;
+      hits.push({ rule: "P1", line: lineOf(text, start) });
     }
   }
 
-  const p3Re = new RegExp(P3_SOURCE, "gm");
-  for (const m of text.matchAll(p3Re)) {
-    const start = m.index ?? 0;
-    const end = start + m[0].length;
-    const span = quotedSpanAfter(text, end - 1);
-    if (span && FIRST_PERSON.test(span)) {
-      hits.push({ rule: "P3", line: lineOf(text, start) });
+  if (OPEN_QUOTE.test(text)) {
+    ATTRIBUTION_RE.lastIndex = 0;
+    for (const m of text.matchAll(ATTRIBUTION_RE)) {
+      const start = m.index ?? 0;
+      const end = start + m[0].length;
+      const span = quotedSpanAfter(text, end);
+      if (span && isSpeechSpan(span)) {
+        hits.push({ rule: "P2", line: lineOf(text, start) });
+      }
+    }
+
+    if (text.includes(">")) {
+      P3_RE.lastIndex = 0;
+      for (const m of text.matchAll(P3_RE)) {
+        const start = m.index ?? 0;
+        const end = start + m[0].length;
+        const span = quotedSpanAfter(text, end - 1);
+        if (span && FIRST_PERSON.test(span)) {
+          hits.push({ rule: "P3", line: lineOf(text, start) });
+        }
+      }
     }
   }
+
+  if (hits.length === 0) return [];
 
   const seen = new Set<string>();
   const out: QuoteViolation[] = [];
@@ -315,17 +483,23 @@ export const DIRECTOR_QUOTE_RULE: PreToolRule = {
     rnd: "block",
     publisher: "block",
   },
-  memory: "never-quote-director-in-public",
+  memory: {
+    default: "never-quote-director-in-public",
+    rnd: "never-quote-director-in-public",
+    publisher: "feedback-never-quote-director",
+  },
   skill: "none",
   skillNoneReason:
     "Inward/outward speech prohibition enforced at write/commit time; no procedural skill workflow applies.",
-  message: (res) =>
-    [
-      "[director-quote] BLOCKED: Never reproduce the Director's words verbatim in any artifact (memory: never-quote-director-in-public).",
+  message: (res, ctx) => {
+    const memId = resolveRuleMemory(DIRECTOR_QUOTE_RULE, ctx.seat);
+    return [
+      `[director-quote] BLOCKED: Never reproduce the Director's words verbatim in any artifact (memory: ${memId}).`,
       `  ${res.detail ?? "[P1/P2/P3] quote violation"}`,
       'THE FIX: Write the decision or ruling ("He chose X because Y"), never the utterance.',
       "Carve-outs: present-tense trigger phrases (<=6 words), labelled Director-authored specs, plain non-emphasised block quotes.",
-    ].join("\n"),
+    ].join("\n");
+  },
   match: matchDirectorQuote,
 };
 
@@ -336,41 +510,38 @@ export const DIRECTOR_QUOTE_RULE: PreToolRule = {
 const CLAUDE_PROJECT_MEMORY_RE =
   /(?:^|[\s'"`=:(/\\~])(?:\.claude\/projects\/[^/\s'"]+\/memory)(?:$|\/|[\s'"`):;])/i;
 
-function normalizeStoreList(storePaths: string[]): string[] {
-  const out: string[] = [];
-  for (const sp of storePaths) {
-    if (!sp || sp.includes("*")) continue;
-    const norm = normalizePreToolPath(sp).toLowerCase();
-    if (norm) out.push(norm);
-  }
-  return out;
+function expandEnvHomeInText(s: string): string {
+  return s
+    .replace(/%USERPROFILE%/gi, HOMEDIR_SLASH)
+    .replace(/\$\{?USERPROFILE\}?/g, HOMEDIR_SLASH)
+    .replace(/\$\{?HOME\}?/g, HOMEDIR_SLASH)
+    .replace(/(^|[\s'"`=:(])~\//g, `$1${HOMEDIR_SLASH}/`);
 }
 
-/**
- * True if `candidatePath` is inside `~/.claude/projects/<slug>/memory/**`
- * or inside any configured store path from `seats.json` / `storePaths`.
- */
-export function isMemoryStorePath(
+function resolveCandidateWithCwd(
   candidatePath: string,
-  storePaths: string[],
-): boolean {
-  if (!candidatePath || !candidatePath.trim()) return false;
-  const rawNorm = candidatePath.trim().replace(/\\/g, "/");
-  if (CLAUDE_PROJECT_MEMORY_RE.test(rawNorm)) {
-    return true;
+  effectiveCwd?: string,
+): string {
+  const normCandidate = normalizePreToolPath(candidatePath);
+  if (!normCandidate) return "";
+  // Already absolute (POSIX `/` or Windows `x:/`)
+  if (normCandidate.startsWith("/") || /^[a-zA-Z]:\//.test(normCandidate)) {
+    return posix.normalize(normCandidate);
   }
+  if (!effectiveCwd) return normCandidate;
+  const normCwd = normalizePreToolPath(effectiveCwd);
+  if (!normCwd) return normCandidate;
+  return posix.normalize(`${normCwd}/${normCandidate}`);
+}
 
-  const normCandidate = normalizePreToolPath(candidatePath).toLowerCase();
+function matchesStoreNorm(normCandidate: string, normStores: string[]): boolean {
   if (!normCandidate) return false;
-  if (/\/\.claude\/projects\/[^/]+\/memory(?:$|\/)/i.test(normCandidate)) {
+  const lower = normCandidate.toLowerCase();
+  if (/\/\.claude\/projects\/[^/]+\/memory(?:$|\/)/i.test(lower)) {
     return true;
   }
-
-  for (const normStore of normalizeStoreList(storePaths)) {
-    if (
-      normCandidate === normStore ||
-      normCandidate.startsWith(normStore + "/")
-    ) {
+  for (const normStore of normStores) {
+    if (lower === normStore || lower.startsWith(normStore + "/")) {
       return true;
     }
   }
@@ -378,20 +549,65 @@ export function isMemoryStorePath(
 }
 
 /**
+ * True if `candidatePath` is inside `~/.claude/projects/<slug>/memory/**`
+ * or inside any configured store path from `seats.json` / `storePaths`
+ * (resolving relative candidates against `effectiveCwd` when provided — #25 P2.6).
+ */
+export function isMemoryStorePath(
+  candidatePath: string,
+  storePaths: string[],
+  effectiveCwd?: string,
+  prenormalizedStores?: string[],
+): boolean {
+  if (!candidatePath || !candidatePath.trim()) return false;
+  const trimmed = candidatePath.trim();
+
+  // #25 P2.9: A sed substitution expression `s/.../.../` or `s|...|...|` is not a file path
+  if (/^s[\/|#@!,;]/i.test(trimmed)) {
+    return false;
+  }
+
+  const expanded = expandEnvHomeInText(trimmed).replace(/\\/g, "/").replace(/\/+/g, "/");
+  if (CLAUDE_PROJECT_MEMORY_RE.test(expanded)) {
+    return true;
+  }
+
+  const normStores = prenormalizedStores ?? prenormalizeStorePaths(storePaths);
+  const directNorm = normalizePreToolPath(trimmed);
+  if (matchesStoreNorm(directNorm, normStores)) {
+    return true;
+  }
+
+  if (effectiveCwd) {
+    const resolvedNorm = resolveCandidateWithCwd(trimmed, effectiveCwd);
+    if (matchesStoreNorm(resolvedNorm, normStores)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
  * True if arbitrary script text (e.g. a `python -c` or heredoc body) mentions
- * a memory store path.
+ * a memory store path (or writes to a relative file while `effectiveCwd` is inside a store — #25 P2.6, P2.8).
  */
 export function textMentionsMemoryStorePath(
   text: string,
   storePaths: string[],
+  effectiveCwd?: string,
+  prenormalizedStores?: string[],
 ): boolean {
   if (!text) return false;
-  const slashText = text.replace(/\\/g, "/");
+  const slashText = expandEnvHomeInText(text)
+    .replace(/\\/g, "/")
+    .replace(/\/+/g, "/");
   if (CLAUDE_PROJECT_MEMORY_RE.test(slashText)) {
     return true;
   }
+  const normStores = prenormalizedStores ?? prenormalizeStorePaths(storePaths);
   const lowerText = slashText.toLowerCase();
-  for (const normStore of normalizeStoreList(storePaths)) {
+  for (const normStore of normStores) {
     if (normStore.length >= 4 && lowerText.includes(normStore)) {
       return true;
     }
@@ -401,12 +617,45 @@ export function textMentionsMemoryStorePath(
       if (lowerText.includes(msysStore)) return true;
     }
   }
+
+  // #25 P2.6: If `effectiveCwd` is itself inside a memory store, check whether quoted literals
+  // in the script reference relative store files (e.g. `'BOARD.md'`, `'MEMORY.md'`, `'./foo.md'`)
+  if (
+    effectiveCwd &&
+    isMemoryStorePath(effectiveCwd, storePaths, undefined, normStores)
+  ) {
+    const quotedLiterals = text.matchAll(/['"]([^'"\n]{1,200})['"]/g);
+    for (const m of quotedLiterals) {
+      const lit = (m[1] ?? "").trim();
+      if (!lit || /^[waxr+b]+$/i.test(lit) || lit === "utf-8" || lit === "utf8") {
+        continue;
+      }
+      if (
+        /(?:\.(?:md|json|yaml|yml|txt|bak)$|^(?:BOARD|MEMORY|index)\b|^\.\.?\/)/i.test(
+          lit,
+        )
+      ) {
+        const resolved = resolveCandidateWithCwd(lit, effectiveCwd);
+        if (matchesStoreNorm(resolved, normStores)) {
+          return true;
+        }
+      }
+    }
+  }
+
   return false;
 }
 
+// #25 P2.5: Expanded Python/Node write calls including nested parens inside `open(...)`,
+// `shutil.copy|move`, `os.replace|remove|unlink|rename`, `Path.unlink|rename|replace|write_bytes|write_text`,
+// and `fs.unlink|unlinkSync|copyFile|copyFileSync|rename|renameSync|rm|rmSync|truncate|truncateSync`.
 const INLINE_SCRIPT_WRITE_CALL_RE =
-  /\bopen\s*\([^)]*,\s*(?:mode\s*=\s*)?['"][wax+][b+]*['"]|\bwrite_text\s*\(|\bwrite_bytes\s*\(|\b(?:writeFile|writeFileSync|appendFile|appendFileSync|createWriteStream)\s*\(/i;
+  /\bopen\s*\([\s\S]{1,240}?,\s*(?:mode\s*=\s*)?['"](?:[wax+]|r\+[b]*)[b+]*['"]|\.(?:write_text|write_bytes|unlink|rename|replace)\s*\(|\bshutil\s*\.\s*(?:copy|copy2|copyfile|copytree|move|rmtree)\s*\(|\bos\s*\.\s*(?:replace|remove|unlink|rename|renames)\s*\(|\b(?:fs|fsp|fsPromises)\s*\.\s*(?:writeFile|writeFileSync|appendFile|appendFileSync|createWriteStream|unlink|unlinkSync|copyFile|copyFileSync|cp|cpSync|rename|renameSync|rm|rmSync|truncate|truncateSync)\s*\(|\b(?:writeFile|writeFileSync|appendFile|appendFileSync|createWriteStream|unlinkSync|copyFileSync|renameSync|rmSync)\s*\(/i;
 
+const POWERSHELL_WRITE_RE =
+  /\b(?:Set-Content|Add-Content|Out-File|Remove-Item|Copy-Item|Move-Item|Rename-Item|New-Item|Clear-Content|sc|ac|ri|del|erase)\b|\[System\.IO\.File\]\s*::\s*(?:WriteAllText|WriteAllLines|WriteAllBytes|AppendAllText|Copy|Move|Delete|Replace)/i;
+
+// #25 P2.7: Added `restore`, `switch`, `apply`, `am`, `cherry-pick`, `pull`
 const GIT_STORE_WRITE_SUBCOMMANDS = new Set([
   "commit",
   "checkout",
@@ -418,25 +667,204 @@ const GIT_STORE_WRITE_SUBCOMMANDS = new Set([
   "merge",
   "rebase",
   "stash",
+  "restore",
+  "switch",
+  "apply",
+  "am",
+  "cherry-pick",
+  "pull",
 ]);
+
+const MUTATING_FIND_FLAGS = new Set([
+  "-delete",
+  "-exec",
+  "-execdir",
+  "-ok",
+  "-okdir",
+  "-fprint",
+  "-fprint0",
+  "-fls",
+  "-fprintf",
+]);
+
+/**
+ * Unwrap leading command wrappers (`env`, `command`, `nohup`, `nice`, `time`, `xargs`)
+ * so wrapped commands like `env rm <store>/x` or `xargs rm <store>/x` are inspected (#25 P2.4).
+ */
+function unwrapSegmentTokens(
+  tokens: string[],
+  rawTokens: string[],
+): { tokens: string[]; rawTokens: string[]; usedXargs: boolean } {
+  let idx = 0;
+  let usedXargs = false;
+
+  while (idx < tokens.length) {
+    const t = tokens[idx];
+    if (isExecutableNamed(t, "env")) {
+      idx++;
+      while (idx < tokens.length) {
+        const a = tokens[idx];
+        if (a === "-u" || a === "--unset" || a === "-C" || a === "--chdir" || a === "-S") {
+          idx += 2;
+        } else if (a.startsWith("-")) {
+          idx++;
+        } else if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(a)) {
+          idx++;
+        } else {
+          break;
+        }
+      }
+      continue;
+    }
+    if (
+      isExecutableNamed(t, "command") ||
+      isExecutableNamed(t, "nohup") ||
+      isExecutableNamed(t, "time")
+    ) {
+      idx++;
+      while (idx < tokens.length && tokens[idx].startsWith("-")) {
+        idx++;
+      }
+      continue;
+    }
+    if (isExecutableNamed(t, "nice")) {
+      idx++;
+      while (idx < tokens.length) {
+        if (tokens[idx] === "-n" || tokens[idx] === "--adjustment") {
+          idx += 2;
+        } else if (tokens[idx].startsWith("-")) {
+          idx++;
+        } else {
+          break;
+        }
+      }
+      continue;
+    }
+    if (isExecutableNamed(t, "xargs")) {
+      usedXargs = true;
+      idx++;
+      while (idx < tokens.length) {
+        const a = tokens[idx];
+        if (
+          a === "-I" ||
+          a === "-L" ||
+          a === "-n" ||
+          a === "-P" ||
+          a === "-s" ||
+          a === "-a" ||
+          a === "--arg-file" ||
+          a === "-d" ||
+          a === "--delimiter"
+        ) {
+          idx += 2;
+        } else if (a.startsWith("-")) {
+          idx++;
+        } else {
+          break;
+        }
+      }
+      continue;
+    }
+    break;
+  }
+
+  return {
+    tokens: tokens.slice(idx),
+    rawTokens: rawTokens.slice(idx),
+    usedXargs,
+  };
+}
+
+function extractSedTargetFilesAndWriteTargets(args: string[]): {
+  hasInPlace: boolean;
+  candidates: string[];
+} {
+  let hasInPlace = false;
+  let hasExplicitExprOrFile = false;
+  const positional: string[] = [];
+  const scripts: string[] = [];
+
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (a === "-i" || a === "--in-place" || a.startsWith("--in-place=")) {
+      hasInPlace = true;
+    } else if (a.startsWith("-i") && a.length > 2) {
+      hasInPlace = true;
+    } else if (a === "-e" || a === "--expression") {
+      hasExplicitExprOrFile = true;
+      if (i + 1 < args.length) scripts.push(args[++i]);
+    } else if (a.startsWith("--expression=")) {
+      hasExplicitExprOrFile = true;
+      scripts.push(a.slice("--expression=".length));
+    } else if (a.startsWith("-e") && a.length > 2) {
+      hasExplicitExprOrFile = true;
+      scripts.push(a.slice(2));
+    } else if (a === "-f" || a === "--file") {
+      hasExplicitExprOrFile = true;
+      i++;
+    } else if (a.startsWith("--file=") || (a.startsWith("-f") && a.length > 2)) {
+      hasExplicitExprOrFile = true;
+    } else if (a.startsWith("-") && !a.startsWith("--")) {
+      const flags = a.slice(1);
+      if (flags.includes("i")) hasInPlace = true;
+      if (flags.includes("e")) {
+        hasExplicitExprOrFile = true;
+        if (i + 1 < args.length) scripts.push(args[++i]);
+      } else if (flags.includes("f")) {
+        hasExplicitExprOrFile = true;
+        if (i + 1 < args.length) i++;
+      }
+    } else if (!a.startsWith("-")) {
+      positional.push(a);
+    }
+  }
+
+  // #25 P2.9: When no `-e` or `-f` flag was given, the first positional arg is the sed script expression,
+  // and only subsequent positional args are target files.
+  const targetFiles = hasExplicitExprOrFile ? positional : positional.slice(1);
+  if (!hasExplicitExprOrFile && positional.length > 0) {
+    scripts.push(positional[0]);
+  }
+
+  // Also extract any `w <file>` target inside sed scripts
+  for (const sc of scripts) {
+    const wMatch = sc.match(/(?:^|[;}\n]|\d+|\$|[\/][^\/]*[\/]|[gipmI0-9])[wW]\s+(\S+)/);
+    if (wMatch?.[1]) {
+      targetFiles.push(wMatch[1]);
+    }
+  }
+
+  return { hasInPlace, candidates: targetFiles };
+}
 
 function checkSegmentMemoryShellWrite(
   seg: CommandSegment,
   fullRawCommand: string,
   heredocBodies: string[],
   storePaths: string[],
+  effectiveCwd: string,
+  normStores: string[],
 ): string | null {
+  const isStore = (p: string) =>
+    isMemoryStorePath(p, storePaths, effectiveCwd, normStores);
+  const mentionsStore = (t: string) =>
+    textMentionsMemoryStorePath(t, storePaths, effectiveCwd, normStores);
+
   // 1. Check output redirections `>` / `>>` / `&>` / `>|` on any segment
   for (const r of seg.redirections) {
-    if (r.op.includes(">") && isMemoryStorePath(r.target, storePaths)) {
+    if (r.op.includes(">") && isStore(r.target)) {
       return `redirection ${r.op} ${r.target}`;
     }
   }
 
   if (seg.tokens.length === 0) return null;
 
-  const cmd0 = seg.tokens[0];
-  const args = seg.tokens.slice(1);
+  const unwrapped = unwrapSegmentTokens(seg.tokens, seg.rawTokens);
+  if (unwrapped.tokens.length === 0) return null;
+
+  const cmd0 = unwrapped.tokens[0];
+  const args = unwrapped.tokens.slice(1);
+  const rawArgs = unwrapped.rawTokens.slice(1);
 
   // Allowed: any `loadout-os ...` command (without output redirection to store)
   if (
@@ -448,43 +876,123 @@ function checkSegmentMemoryShellWrite(
     return null;
   }
 
-  // 2. `tee` targeting a memory store path
-  if (isExecutableNamed(cmd0, "tee")) {
-    for (const a of args) {
-      if (!a.startsWith("-") && isMemoryStorePath(a, storePaths)) {
-        return `tee ${a}`;
-      }
-    }
-  }
-
-  // 3. `sed -i` / `--in-place` targeting a memory store path
-  if (isExecutableNamed(cmd0, "sed")) {
-    const hasInPlace = args.some(
-      (a) =>
-        a === "-i" ||
-        a.startsWith("-i") ||
-        a === "--in-place" ||
-        a.startsWith("--in-place=") ||
-        (a.startsWith("-") && !a.startsWith("--") && a.slice(1).includes("i")),
-    );
-    if (hasInPlace) {
-      for (const a of args) {
-        if (!a.startsWith("-") && isMemoryStorePath(a, storePaths)) {
-          return `sed -i ${a}`;
+  // #25 P2.4: Shell wrappers (`bash -c "..."`, `sh -c "..."`, `zsh -c "..."`, `dash -c "..."`, `ksh -c "..."`)
+  if (
+    isExecutableNamed(cmd0, "bash") ||
+    isExecutableNamed(cmd0, "sh") ||
+    isExecutableNamed(cmd0, "zsh") ||
+    isExecutableNamed(cmd0, "dash") ||
+    isExecutableNamed(cmd0, "ksh")
+  ) {
+    for (let i = 0; i < args.length; i++) {
+      const a = args[i];
+      if ((a === "-c" || (a.startsWith("-") && !a.startsWith("--") && a.slice(1).includes("c"))) && args[i + 1]) {
+        const innerScript = args[i + 1];
+        const innerParsed = parseBashCommand(innerScript, true);
+        let innerCwd = effectiveCwd;
+        for (const innerSeg of innerParsed.segments) {
+          if (
+            innerSeg.tokens.length >= 2 &&
+            (innerSeg.tokens[0] === "cd" || innerSeg.tokens[0] === "pushd")
+          ) {
+            innerCwd = resolveCandidateWithCwd(innerSeg.tokens[1], innerCwd) || innerCwd;
+          }
+          const innerHit = checkSegmentMemoryShellWrite(
+            innerSeg,
+            innerScript,
+            innerParsed.heredocBodies,
+            storePaths,
+            innerCwd,
+            normStores,
+          );
+          if (innerHit) return `${cmd0} -c (${innerHit})`;
         }
       }
     }
   }
 
-  // 4. `rm`, `touch`, `mv`, `cp` targeting a memory store path
+  // #25 P2.4: PowerShell (`pwsh`, `powershell`) targeting a memory store path
+  if (isExecutableNamed(cmd0, "pwsh") || isExecutableNamed(cmd0, "powershell")) {
+    const psText = [seg.raw, ...args, ...rawArgs, ...heredocBodies].join("\n");
+    if (
+      mentionsStore(psText) &&
+      (POWERSHELL_WRITE_RE.test(psText) || /(?:^|[^-])>{1,2}\s*\S/.test(psText))
+    ) {
+      return `${cmd0} write to memory store`;
+    }
+  }
+
+  // #25 P2.4: `find <store> ... -delete|-exec`
+  if (isExecutableNamed(cmd0, "find")) {
+    const hasMutatingFlag = args.some((a) => MUTATING_FIND_FLAGS.has(a));
+    if (hasMutatingFlag) {
+      for (let i = 0; i < args.length; i++) {
+        const a = args[i];
+        if (!a.startsWith("-") && (isStore(a) || (rawArgs[i] && isStore(rawArgs[i])))) {
+          return `find ${a} (mutating flag)`;
+        }
+      }
+      // `find` with no path arg defaults to `.` (`effectiveCwd`)
+      if (isStore(".")) {
+        return `find . (mutating flag in store cwd)`;
+      }
+    }
+  }
+
+  // 2. `tee` targeting a memory store path
+  if (isExecutableNamed(cmd0, "tee")) {
+    for (let i = 0; i < args.length; i++) {
+      const a = args[i];
+      if (!a.startsWith("-") && (isStore(a) || (rawArgs[i] && isStore(rawArgs[i])))) {
+        return `tee ${a}`;
+      }
+    }
+  }
+
+  // 3. `sed -i` / `--in-place` (or `sed` with `w <store-file>`) targeting a memory store path (#25 P2.9)
+  if (isExecutableNamed(cmd0, "sed")) {
+    const { hasInPlace, candidates } = extractSedTargetFilesAndWriteTargets(args);
+    const rawExtracted = extractSedTargetFilesAndWriteTargets(rawArgs);
+    const allCandidates = [...candidates, ...rawExtracted.candidates];
+    if (hasInPlace || allCandidates.length > 0) {
+      for (const c of allCandidates) {
+        if (isStore(c)) {
+          return `sed ${hasInPlace ? "-i " : ""}${c}`;
+        }
+      }
+      if (hasInPlace && unwrapped.usedXargs && mentionsStore(fullRawCommand)) {
+        return `xargs sed -i (store pipeline)`;
+      }
+    }
+  }
+
+  // 4. `rm`, `touch`, `mv`, `cp`, `truncate`, `dd` targeting a memory store path
   if (
     isExecutableNamed(cmd0, "rm") ||
     isExecutableNamed(cmd0, "touch") ||
-    isExecutableNamed(cmd0, "mv")
+    isExecutableNamed(cmd0, "mv") ||
+    isExecutableNamed(cmd0, "truncate")
   ) {
-    for (const a of args) {
-      if (!a.startsWith("-") && isMemoryStorePath(a, storePaths)) {
+    for (let i = 0; i < args.length; i++) {
+      const a = args[i];
+      if (!a.startsWith("-") && (isStore(a) || (rawArgs[i] && isStore(rawArgs[i])))) {
         return `${cmd0} ${a}`;
+      }
+    }
+    // #25 P2.4: `find <store> | xargs rm` where store path was in upstream pipeline segment
+    if (unwrapped.usedXargs && mentionsStore(fullRawCommand)) {
+      return `xargs ${cmd0} (store pipeline)`;
+    }
+  }
+
+  if (isExecutableNamed(cmd0, "dd")) {
+    for (let i = 0; i < args.length; i++) {
+      const a = args[i];
+      if (a.startsWith("of=") && isStore(a.slice(3))) {
+        return `dd ${a}`;
+      }
+      if (rawArgs[i]?.startsWith("of=") && isStore(rawArgs[i].slice(3))) {
+        return `dd ${rawArgs[i]}`;
       }
     }
   }
@@ -495,7 +1003,7 @@ function checkSegmentMemoryShellWrite(
       const a = args[i];
       if (a === "-t" || a === "--target-directory") {
         const targetDir = args[i + 1];
-        if (targetDir && isMemoryStorePath(targetDir, storePaths)) {
+        if (targetDir && isStore(targetDir)) {
           return `cp -t ${targetDir}`;
         }
         i++;
@@ -503,24 +1011,28 @@ function checkSegmentMemoryShellWrite(
       }
       if (a.startsWith("--target-directory=")) {
         const targetDir = a.slice("--target-directory=".length);
-        if (isMemoryStorePath(targetDir, storePaths)) {
+        if (isStore(targetDir)) {
           return `cp ${a}`;
         }
         continue;
       }
       if (!a.startsWith("-")) {
         positional.push(a);
+        if (rawArgs[i] && !rawArgs[i].startsWith("-")) {
+          positional.push(rawArgs[i]);
+        }
       }
     }
     if (positional.length >= 2) {
-      const dest = positional[positional.length - 1];
-      if (isMemoryStorePath(dest, storePaths)) {
-        return `cp -> ${dest}`;
+      const lastArg = args.filter((x) => !x.startsWith("-")).pop();
+      const lastRawArg = rawArgs.filter((x) => !x.startsWith("-")).pop();
+      if ((lastArg && isStore(lastArg)) || (lastRawArg && isStore(lastRawArg))) {
+        return `cp -> ${lastArg ?? lastRawArg}`;
       }
     }
   }
 
-  // 5. `git -C <store> commit|checkout|reset`
+  // 5. `git -C <store> commit|checkout|reset|restore|switch|apply|am|cherry-pick|pull` (#25 P2.7)
   if (isExecutableNamed(cmd0, "git")) {
     let idx = 0;
     const gitDirs: string[] = [];
@@ -528,6 +1040,7 @@ function checkSegmentMemoryShellWrite(
       const a = args[idx];
       if (a === "-C" || a === "--git-dir" || a === "--work-tree") {
         if (args[idx + 1]) gitDirs.push(args[idx + 1]);
+        if (rawArgs[idx + 1]) gitDirs.push(rawArgs[idx + 1]);
         idx += 2;
       } else if (a.startsWith("--git-dir=")) {
         gitDirs.push(a.slice("--git-dir=".length));
@@ -544,30 +1057,53 @@ function checkSegmentMemoryShellWrite(
       }
     }
     const sub = args[idx];
-    if (
-      sub &&
-      GIT_STORE_WRITE_SUBCOMMANDS.has(sub) &&
-      gitDirs.some((d) => isMemoryStorePath(d, storePaths))
-    ) {
-      return `git -C <store> ${sub}`;
+    if (sub && GIT_STORE_WRITE_SUBCOMMANDS.has(sub)) {
+      if (gitDirs.length > 0) {
+        if (gitDirs.some((d) => isStore(d))) {
+          return `git -C <store> ${sub}`;
+        }
+      } else if (isStore(".")) {
+        return `git ${sub} (in store cwd)`;
+      }
     }
   }
 
-  // 6. `python` / `python3` / `py` / `node` with `-c` / `-e` or heredoc naming store + write call
+  // 6. `python` / `python3` / `py` / `node` (#25 P2.5, P2.6, P2.8)
   if (
     isExecutableNamed(cmd0, "python") ||
     isExecutableNamed(cmd0, "python3") ||
     isExecutableNamed(cmd0, "py") ||
     isExecutableNamed(cmd0, "node")
   ) {
+    // Check if running a script file passed a store path as an argument (`python x.py <store>/BOARD.md`)
+    const hasInlineFlag = args.some(
+      (a) =>
+        a === "-c" ||
+        a === "-e" ||
+        a === "--eval" ||
+        a === "-" ||
+        (a.startsWith("-") && !a.startsWith("--") && (a.slice(1).includes("c") || a.slice(1).includes("e"))),
+    );
+    if (!hasInlineFlag && heredocBodies.length === 0) {
+      const nonFlagArgs = args.filter((a) => !a.startsWith("-"));
+      const rawNonFlagArgs = rawArgs.filter((a) => !a.startsWith("-"));
+      if (nonFlagArgs.length >= 2) {
+        for (const a of [...nonFlagArgs.slice(1), ...rawNonFlagArgs.slice(1)]) {
+          if (isStore(a) || mentionsStore(a)) {
+            return `${cmd0} script targeting memory store (${a})`;
+          }
+        }
+      }
+    }
+
     const combinedScript = [
       seg.raw,
-      ...seg.tokens,
+      ...args,
+      ...rawArgs,
       ...heredocBodies,
-      fullRawCommand,
     ].join("\n");
     if (
-      textMentionsMemoryStorePath(combinedScript, storePaths) &&
+      mentionsStore(combinedScript) &&
       INLINE_SCRIPT_WRITE_CALL_RE.test(combinedScript)
     ) {
       return `${cmd0} inline/heredoc write to memory store`;
@@ -582,14 +1118,36 @@ export function matchMemoryShellWrite(ctx: RuleMatchInput): RuleMatchResult {
   const rawCmd =
     typeof ctx.toolInput.command === "string" ? ctx.toolInput.command : "";
   const heredocBodies = parsed?.heredocBodies ?? [];
+  const normStores =
+    ctx.normalizedStorePaths ?? prenormalizeStorePaths(ctx.storePaths);
 
   if (parsed) {
+    let effectiveCwd = ctx.cwd;
     for (const seg of parsed.segments) {
+      // #25 P2.6: Track `cd <dir>` / `pushd <dir>` across segments so subsequent relative paths resolve
+      if (
+        seg.tokens.length >= 2 &&
+        (seg.tokens[0] === "cd" || seg.tokens[0] === "pushd")
+      ) {
+        const targetDir = seg.tokens[1];
+        const rawTargetDir = seg.rawTokens[1];
+        const candidate =
+          rawTargetDir && /^[A-Za-z]:\\/.test(rawTargetDir)
+            ? rawTargetDir
+            : targetDir;
+        const resolved = resolveCandidateWithCwd(candidate, effectiveCwd);
+        if (resolved) {
+          effectiveCwd = resolved;
+        }
+      }
+
       const hit = checkSegmentMemoryShellWrite(
         seg,
         rawCmd,
         heredocBodies,
         ctx.storePaths,
+        effectiveCwd,
+        normStores,
       );
       if (hit) {
         return { matched: true, detail: hit };
@@ -609,14 +1167,20 @@ export const MEMORY_SHELL_WRITE_RULE: PreToolRule = {
     rnd: "block",
     publisher: "block",
   },
-  memory: "build-in-studio-tools-not-side-scripts",
+  memory: {
+    default: "build-in-studio-tools-not-side-scripts",
+    rnd: "build-in-studio-tools-not-side-scripts",
+    publisher: "project-memory-system",
+  },
   skill: "loadout-os",
-  message: (res) =>
-    [
-      "[memory-shell-write] BLOCKED: Direct shell write into a memory store path is forbidden (memory: build-in-studio-tools-not-side-scripts).",
+  message: (res, ctx) => {
+    const memId = resolveRuleMemory(MEMORY_SHELL_WRITE_RULE, ctx.seat);
+    return [
+      `[memory-shell-write] BLOCKED: Direct shell write into a memory store path is forbidden (memory: ${memId}).`,
       `  Matched: ${res.detail ?? "shell write targeting memory store"}`,
       "Use `loadout-os memories place|move|sync-summaries` or Claude Code's Write/Edit tools instead (skill: loadout-os).",
-    ].join("\n"),
+    ].join("\n");
+  },
   match: matchMemoryShellWrite,
 };
 
@@ -629,9 +1193,13 @@ const FIVE_MINUTES_MS = 5 * 60 * 1000;
 export function isStoreOrBoardFile(
   filePath: string | undefined,
   storePaths: string[],
+  effectiveCwd?: string,
+  prenormalizedStores?: string[],
 ): boolean {
   if (!filePath || !filePath.trim()) return false;
-  if (isMemoryStorePath(filePath, storePaths)) return true;
+  if (isMemoryStorePath(filePath, storePaths, effectiveCwd, prenormalizedStores)) {
+    return true;
+  }
   const norm = filePath.replace(/\\/g, "/");
   const base = norm.slice(norm.lastIndexOf("/") + 1);
   return /^(?:board|.*[-_]board)\.md$/i.test(base);
@@ -697,7 +1265,6 @@ function resolveZoneOffsetMs(
 ): number | null {
   const z = (zoneRaw ?? "ET").trim().toUpperCase();
   if (!z || z === "ET") {
-    // Check with EDT assumption first (standard US DST boundary check)
     const offsetWithEdtGuess = americaNewYorkOffsetMs(
       year,
       utcGuessMs + 4 * 3_600_000,
@@ -760,8 +1327,9 @@ function calendarDateInZone(
  * Accepts at the start of the value (with optional leading `~`):
  *   - `YYYY-MM-DD HH:MM` (plus optional `:SS` and optional zone `ET`, `EST`, `EDT`, `UTC`, `Z`, or `±HH:MM`);
  *   - ISO 8601 with a `T` (`YYYY-MM-DDTHH:MM...` with optional zone);
- *   - time-only `~HH:MM ET` anchored to the calendar date of `nowMs` in that zone;
- *   - a bare `YYYY-MM-DD` (compared at its end of day `23:59:59.999 ET` against the clock).
+ *   - time-only `~HH:MM` (with optional zone, defaulting to `ET`) or `HH:MM <zone>`, anchored to the
+ *     nearest calendar day (`yesterday`, `today`, `tomorrow`) within ±12h of `nowMs` (#25 P3.11, P3.13);
+ *   - a bare `YYYY-MM-DD` (compared at start of day `00:00:00.000 ET` so same-day bare dates pass — #25 P3.13).
  * `ET` (and omitted zones) mean `America/New_York` (handling EST/EDT).
  * Returns `null` if the string has no valid leading timestamp.
  */
@@ -818,23 +1386,68 @@ export function parseToolStampedTime(
     return zonedWallTimeToUtcMs(year, month, day, hour, minute, second, 0, zone);
   }
 
-  // Form 3: Leading time-only `~15:05 ET` / `~19:30 ET` (anchored to calendar date of `nowMs` in that zone)
+  // Form 3: Leading time-only `~15:05 ET` / `~19:30` / `15:05 ET` (#25 P3.11 & P3.13 midnight wrap)
+  // Requires either a leading `~` or an explicit zone token so bare ratios/numbers in headings aren't misread.
   const hmOnlyMatch = s.match(
-    /^~?\s*(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(ET|EST|EDT|UTC|Z|[+-]\d{2}:?\d{2})(?=$|[\s.,;()[\]\u2013\u2014"'-])/i,
+    /^(?:(~)\s*(\d{1,2}):(\d{2})(?::(\d{2}))?(?:\s*(ET|EST|EDT|UTC|Z|[+-]\d{2}:?\d{2}))?|(\d{1,2}):(\d{2})(?::(\d{2}))?\s+(ET|EST|EDT|UTC|Z|[+-]\d{2}:?\d{2}))(?=$|[\s.,;()[\]\u2013\u2014"'-])/i,
   );
   if (hmOnlyMatch) {
-    const hour = Number(hmOnlyMatch[1]);
-    const minute = Number(hmOnlyMatch[2]);
-    const second = hmOnlyMatch[3] !== undefined ? Number(hmOnlyMatch[3]) : 0;
-    const zone = hmOnlyMatch[4];
+    const hasTilde = Boolean(hmOnlyMatch[1]);
+    const hour = Number(hasTilde ? hmOnlyMatch[2] : hmOnlyMatch[6]);
+    const minute = Number(hasTilde ? hmOnlyMatch[3] : hmOnlyMatch[7]);
+    const secStr = hasTilde ? hmOnlyMatch[4] : hmOnlyMatch[8];
+    const second = secStr !== undefined ? Number(secStr) : 0;
+    const zone = (hasTilde ? hmOnlyMatch[5] : hmOnlyMatch[9]) ?? "ET";
     const { year, month, day } = calendarDateInZone(nowMs, zone);
     if (!isValidYmdHms(year, month, day, hour, minute, second)) {
       return null;
     }
-    return zonedWallTimeToUtcMs(year, month, day, hour, minute, second, 0, zone);
+    const todayMs = zonedWallTimeToUtcMs(year, month, day, hour, minute, second, 0, zone);
+    if (todayMs === null) return null;
+
+    // #25 P3.13: Handle midnight wrap (e.g. `~23:58 ET` written at `00:02 ET` is 4 minutes ago, not +23h 56m ahead)
+    if (nowMs > 0) {
+      const prevDate = new Date(Date.UTC(year, month - 1, day - 1));
+      const prevMs = zonedWallTimeToUtcMs(
+        prevDate.getUTCFullYear(),
+        prevDate.getUTCMonth() + 1,
+        prevDate.getUTCDate(),
+        hour,
+        minute,
+        second,
+        0,
+        zone,
+      );
+      if (
+        prevMs !== null &&
+        todayMs > nowMs + 12 * 3_600_000 &&
+        Math.abs(nowMs - prevMs) < Math.abs(todayMs - nowMs)
+      ) {
+        return prevMs;
+      }
+      const nextDate = new Date(Date.UTC(year, month - 1, day + 1));
+      const nextMs = zonedWallTimeToUtcMs(
+        nextDate.getUTCFullYear(),
+        nextDate.getUTCMonth() + 1,
+        nextDate.getUTCDate(),
+        hour,
+        minute,
+        second,
+        0,
+        zone,
+      );
+      if (
+        nextMs !== null &&
+        nowMs - todayMs > 12 * 3_600_000 &&
+        Math.abs(nextMs - nowMs) < Math.abs(nowMs - todayMs)
+      ) {
+        return nextMs;
+      }
+    }
+    return todayMs;
   }
 
-  // Form 4: Leading bare `YYYY-MM-DD` (date only: compare its end of day `23:59:59.999 ET` with the clock)
+  // Form 4: Leading bare `YYYY-MM-DD` (#25 P3.13: compare start of day `00:00:00.000 ET` so same-day bare dates pass)
   const ymdOnlyMatch = s.match(
     /^~?\s*(\d{4})-(\d{2})-(\d{2})(?![T\s]+~?\s*\d{1,2}:\d{2})(?=$|[\s.,;()[\]\u2013\u2014"'-])/,
   );
@@ -842,10 +1455,10 @@ export function parseToolStampedTime(
     const year = Number(ymdOnlyMatch[1]);
     const month = Number(ymdOnlyMatch[2]);
     const day = Number(ymdOnlyMatch[3]);
-    if (!isValidYmdHms(year, month, day, 23, 59, 59)) {
+    if (!isValidYmdHms(year, month, day, 0, 0, 0)) {
       return null;
     }
-    return zonedWallTimeToUtcMs(year, month, day, 23, 59, 59, 999, "ET");
+    return zonedWallTimeToUtcMs(year, month, day, 0, 0, 0, 0, "ET");
   }
 
   return null;
@@ -856,48 +1469,122 @@ interface ExtractedStampField {
   rawValue: string;
 }
 
+// #25 P3.11: Match both bold `**Last updated:**` and non-bold `Last updated:`
+const LAST_UPDATED_RE =
+  /^\s*(?:[-*>]\s*)?(?:\*\*Last updated(?::\*\*|\*\*:)|Last updated:)\s*(.+?)\s*$/gim;
+
+const HEADING_LINE_RE = /^[ \t]*#{1,6}[ \t]+(.+?)[ \t]*$/gm;
+const UPDATED_TOKEN_RE = /\bupdated\b(?::\*\*|\*\*:|:)?[ \t]+/gi;
+
+// #25 P3.12: Heading `updated` stamps must carry a time component (`YYYY-MM-DD HH:MM`, `YYYY-MM-DDTHH:MM`, or `~HH:MM` / `HH:MM <zone>`),
+// preventing false positives on prose headings like `### Milestones — updated 2026-12-01 schedule`.
+const HEADING_TIME_STAMP_RE =
+  /^~?\s*(?:\d{4}-\d{2}-\d{2}(?:T|\s+~?\s*)\d{1,2}:\d{2}|~\s*\d{1,2}:\d{2}|\d{1,2}:\d{2}(?::\d{2})?\s+(?:ET|EST|EDT|UTC|Z|[+-]\d{2}:?\d{2}))/i;
+
+const FM_FIELD_RE = /^\s*(created_at|modified|verified_at)\s*:\s*(.+?)\s*$/gm;
+
 export function extractToolStampedFields(text: string): ExtractedStampField[] {
   const out: ExtractedStampField[] = [];
   if (!text) return out;
 
-  // `**Last updated:** <value>` or `**Last updated**: <value>`
-  const lastUpdatedRe =
-    /^\s*(?:[-*>]\s*)?\*\*Last updated(?::\*\*|\*\*:)\s*(.+?)\s*$/gim;
-  for (const m of text.matchAll(lastUpdatedRe)) {
-    const val = (m[1] ?? "").trim();
-    if (val) {
-      out.push({ field: "Last updated", rawValue: val });
-    }
-  }
+  const hasUpdatedWord = /updated/i.test(text);
 
-  // Markdown heading lines (`^#{1,6} `) whose text contains `updated` (any case)
-  // followed by a leading timestamp (e.g. `# Publisher BOARD — updated 2026-11-08 17:55 ET (stamped from date)`
-  // or `## Status — Updated 2026-11-09 08:00 ET`).
-  const headingLineRe = /^[ \t]*#{1,6}[ \t]+(.+?)[ \t]*$/gm;
-  for (const hm of text.matchAll(headingLineRe)) {
-    const headingBody = hm[1] ?? "";
-    const updatedTokenRe = /\bupdated\b(?::\*\*|\*\*:|:)?[ \t]+/gi;
-    for (const um of headingBody.matchAll(updatedTokenRe)) {
-      const idx = (um.index ?? 0) + um[0].length;
-      const afterUpdated = headingBody.slice(idx).trim();
-      if (afterUpdated && parseToolStampedTime(afterUpdated, 0) !== null) {
-        out.push({ field: "heading updated", rawValue: afterUpdated });
-        break;
+  if (hasUpdatedWord) {
+    LAST_UPDATED_RE.lastIndex = 0;
+    for (const m of text.matchAll(LAST_UPDATED_RE)) {
+      const val = (m[1] ?? "").trim();
+      if (val) {
+        out.push({ field: "Last updated", rawValue: val });
+      }
+    }
+
+    if (text.includes("#")) {
+      HEADING_LINE_RE.lastIndex = 0;
+      for (const hm of text.matchAll(HEADING_LINE_RE)) {
+        const headingBody = hm[1] ?? "";
+        if (!/updated/i.test(headingBody)) continue;
+        UPDATED_TOKEN_RE.lastIndex = 0;
+        for (const um of headingBody.matchAll(UPDATED_TOKEN_RE)) {
+          const idx = (um.index ?? 0) + um[0].length;
+          const afterUpdated = headingBody.slice(idx).trim();
+          if (
+            afterUpdated &&
+            HEADING_TIME_STAMP_RE.test(afterUpdated) &&
+            parseToolStampedTime(afterUpdated, 0) !== null
+          ) {
+            out.push({ field: "heading updated", rawValue: afterUpdated });
+            break;
+          }
+        }
       }
     }
   }
 
-  // Frontmatter keys `created_at`, `modified`, `verified_at`
-  const fmFieldRe = /^\s*(created_at|modified|verified_at)\s*:\s*(.+?)\s*$/gm;
-  for (const m of text.matchAll(fmFieldRe)) {
-    const key = m[1];
-    const val = (m[2] ?? "").trim();
-    if (key && val) {
-      out.push({ field: key, rawValue: val });
+  if (/(?:created_at|modified|verified_at)\s*:/.test(text)) {
+    FM_FIELD_RE.lastIndex = 0;
+    for (const m of text.matchAll(FM_FIELD_RE)) {
+      const key = m[1];
+      const val = (m[2] ?? "").trim();
+      if (key && val) {
+        out.push({ field: key, rawValue: val });
+      }
     }
   }
 
   return out;
+}
+
+/**
+ * #25 P3.10: When an `Edit` or `MultiEdit` replaces only the time substring
+ * (e.g. `old_string: "15:03 ET"` -> `new_string: "23:59 ET"`), reconstruct the edited
+ * line(s) from the on-disk target file before extracting tool-stamped fields.
+ */
+function reconstructEditedLinesFromDisk(
+  filePath: string,
+  cwd: string,
+  toolName: string,
+  oldString?: string,
+  newString?: string,
+  edits?: Array<{ old_string?: string; new_string: string }>,
+): string[] {
+  if (toolName !== "Edit" && toolName !== "MultiEdit") return [];
+  const resolvedPath = isAbsolute(filePath)
+    ? filePath
+    : resolve(cwd || process.cwd(), filePath);
+  if (!existsSync(resolvedPath)) return [];
+
+  let fileContent: string;
+  try {
+    fileContent = readFileSync(resolvedPath, "utf-8");
+  } catch {
+    return [];
+  }
+
+  const editList: Array<{ old_string?: string; new_string: string }> = [];
+  if (toolName === "Edit" && typeof oldString === "string" && typeof newString === "string") {
+    editList.push({ old_string: oldString, new_string: newString });
+  } else if (toolName === "MultiEdit" && edits) {
+    editList.push(...edits);
+  }
+
+  const reconstructedSnippets: string[] = [];
+  let working = fileContent;
+
+  for (const ed of editList) {
+    if (!ed.old_string || !ed.new_string) continue;
+    const pos = working.indexOf(ed.old_string);
+    if (pos === -1) continue;
+    const lineStart = working.lastIndexOf("\n", pos) + 1;
+    const matchEnd = pos + ed.old_string.length;
+    const lineEndIdx = working.indexOf("\n", matchEnd);
+    const lineEnd = lineEndIdx === -1 ? working.length : lineEndIdx;
+    const reconstructedLine =
+      working.slice(lineStart, pos) + ed.new_string + working.slice(matchEnd, lineEnd);
+    reconstructedSnippets.push(reconstructedLine);
+    working = working.slice(0, pos) + ed.new_string + working.slice(matchEnd);
+  }
+
+  return reconstructedSnippets;
 }
 
 export function matchFutureStamp(ctx: RuleMatchInput): RuleMatchResult {
@@ -908,11 +1595,32 @@ export function matchFutureStamp(ctx: RuleMatchInput): RuleMatchResult {
       ? ctx.toolInput.file_path
       : undefined);
 
-  if (!isStoreOrBoardFile(filePath, ctx.storePaths)) {
+  if (
+    !isStoreOrBoardFile(
+      filePath,
+      ctx.storePaths,
+      ctx.cwd,
+      ctx.normalizedStorePaths,
+    )
+  ) {
     return { matched: false };
   }
 
-  const texts = wp?.texts ?? [];
+  const texts = [...(wp?.texts ?? [])];
+  if (filePath && (ctx.toolName === "Edit" || ctx.toolName === "MultiEdit")) {
+    const reconstructed = reconstructEditedLinesFromDisk(
+      filePath,
+      ctx.cwd,
+      ctx.toolName,
+      wp?.old_string,
+      wp?.new_string,
+      wp?.edits,
+    );
+    for (const r of reconstructed) {
+      if (!texts.includes(r)) texts.push(r);
+    }
+  }
+
   const maxAllowedMs = ctx.nowMs + FIVE_MINUTES_MS;
 
   for (const text of texts) {
@@ -920,8 +1628,13 @@ export function matchFutureStamp(ctx: RuleMatchInput): RuleMatchResult {
     for (const item of fields) {
       const parsedMs = parseToolStampedTime(item.rawValue, ctx.nowMs);
       if (parsedMs === null) {
+        // #25 P4.14: Hash the unparseable value instead of recording raw text in `notes`
+        const valHash = createHash("sha256")
+          .update(item.rawValue, "utf-8")
+          .digest("hex")
+          .slice(0, 12);
         ctx.recordNote(
-          `unparseable_timestamp:${item.field}=${item.rawValue.slice(0, 40)}`,
+          `unparseable_timestamp:${item.field}=sha256:${valHash}(len=${item.rawValue.length})`,
         );
         continue;
       }
@@ -946,14 +1659,20 @@ export const FUTURE_STAMP_RULE: PreToolRule = {
     rnd: "block",
     publisher: "block",
   },
-  memory: "rnd-memory-system",
+  memory: {
+    default: "rnd-memory-system",
+    rnd: "rnd-memory-system",
+    publisher: "feedback-eastern-time",
+  },
   skill: "loadout-os",
-  message: (res) =>
-    [
-      "[future-stamp] BLOCKED: Tool-stamped field is more than 5 minutes ahead of the OS clock (memory: rnd-memory-system).",
+  message: (res, ctx) => {
+    const memId = resolveRuleMemory(FUTURE_STAMP_RULE, ctx.seat);
+    return [
+      `[future-stamp] BLOCKED: Tool-stamped field is more than 5 minutes ahead of the OS clock (memory: ${memId}).`,
       `  Field: ${res.detail ?? "future timestamp"}`,
       "Stamp times from the real OS clock or let `loadout-os` stamp them (skill: loadout-os).",
-    ].join("\n"),
+    ].join("\n");
+  },
   match: matchFutureStamp,
 };
 
@@ -1018,6 +1737,12 @@ function segmentMatchesReleaseReminder(seg: CommandSegment): string | null {
 }
 
 export function matchReleaseReminder(ctx: RuleMatchInput): RuleMatchResult {
+  const rawCmd =
+    typeof ctx.toolInput.command === "string" ? ctx.toolInput.command : "";
+  if (rawCmd && !/\b(?:publish|release|push)\b/i.test(rawCmd)) {
+    return { matched: false };
+  }
+
   const segments = ctx.parsedCommand?.segments ?? [];
   for (const seg of segments) {
     const hit = segmentMatchesReleaseReminder(seg);
@@ -1037,13 +1762,19 @@ export const RELEASE_REMINDER_RULE: PreToolRule = {
     rnd: "warn",
     publisher: "warn",
   },
-  memory: "publisher-approves-every-publish",
+  memory: {
+    default: "publisher-approves-every-publish",
+    rnd: "publisher-approves-every-publish",
+    publisher: "publishing-tags-need-publisher-ok",
+  },
   skill: "full-treatment",
-  message: (res) =>
-    [
-      "[release-reminder] REMINDER: Every publish/release requires Publisher approval and the release checklist (memory: publisher-approves-every-publish, skill: full-treatment).",
+  message: (res, ctx) => {
+    const memId = resolveRuleMemory(RELEASE_REMINDER_RULE, ctx.seat);
+    return [
+      `[release-reminder] REMINDER: Every publish/release requires Publisher approval and the release checklist (memory: ${memId}, skill: full-treatment).`,
       `  Command: ${res.detail ?? "publish/release"}`,
-    ].join("\n"),
+    ].join("\n");
+  },
   match: matchReleaseReminder,
 };
 

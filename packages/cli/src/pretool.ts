@@ -64,6 +64,12 @@ export interface SeatConfig {
   seats: Record<string, string>;
   /** Additional memory store paths configured in seats.json or env. */
   storePaths: string[];
+  /** Seat name -> primary store path mapping from seats.json. */
+  seatStores?: Record<string, string>;
+  /** Raw project prefix -> store path mapping from seats.json. */
+  projectStores?: Record<string, string>;
+  /** Configured Argon review replies directory from seats.json. */
+  repliesDir?: string;
 }
 
 export interface CommandRedirection {
@@ -131,6 +137,8 @@ export interface RuleMatchInput {
   parsedCommand?: ParsedBashCommand;
   writePayload?: WritePayload;
   storePaths: string[];
+  normalizedStorePaths?: string[];
+  repliesDir?: string;
   nowMs: number;
   recordNote: (note: string) => void;
 }
@@ -138,6 +146,13 @@ export interface RuleMatchInput {
 export interface RuleMatchResult {
   matched: boolean;
   detail?: string;
+}
+
+export interface RuleMemoryMap {
+  default: string;
+  rnd?: string;
+  publisher?: string;
+  [seat: string]: string | undefined;
 }
 
 export interface PreToolRule {
@@ -150,7 +165,7 @@ export interface PreToolRule {
     publisher?: RuleAction;
     [seat: string]: RuleAction | undefined;
   };
-  memory: string;
+  memory: RuleMemoryMap | string;
   skill: string;
   /** Required when `skill === "none"`: explains why no skill applies. */
   skillNoneReason?: string;
@@ -190,6 +205,8 @@ export interface PreToolOptions {
   logPath?: string;
   /** Additional store paths (merged with default `~/.claude/projects/<project>/memory` and seat map stores). */
   storePaths?: string[];
+  /** Override Argon review replies directory (defaults to `seats.json` `repliesDir`, `AI_LOADOUT_REPLIES_DIR`, or `E:/AI/rnd-local/projects/antigravity/replies`). */
+  repliesDir?: string;
   /** Custom rule table override for tests (defaults to `PRETOOL_RULES`). */
   rules?: readonly PreToolRule[];
   /** Hard internal timeout in milliseconds (default 300 ms). */
@@ -276,6 +293,11 @@ const OUTPUT_REDIRECT_OPS = new Set([
 
 // ── Default Paths ─────────────────────────────────────────────
 
+const HOMEDIR_SLASH = homedir().replace(/\\/g, "/");
+
+export const DEFAULT_REPLIES_DIR =
+  "E:/AI/rnd-local/projects/antigravity/replies";
+
 export function defaultSeatsPath(): string {
   const envPath = process.env.AI_LOADOUT_SEATS_PATH?.trim();
   if (envPath) return resolve(envPath);
@@ -288,19 +310,35 @@ export function defaultDecisionLogPath(): string {
   return join(homedir(), ".ai-loadout", "hook-decisions.jsonl");
 }
 
+export function defaultRepliesDir(): string {
+  const envPath = process.env.AI_LOADOUT_REPLIES_DIR?.trim();
+  if (envPath) return resolve(envPath);
+  return DEFAULT_REPLIES_DIR;
+}
+
 // ── Path Normalization & Seat Resolution ──────────────────────
 
 /**
  * Normalize a path for prefix comparison:
- * - Converts `\` to `/`
+ * - Strips surrounding quotes (`"..."` or `'...'`)
+ * - Converts `\` to `/` and collapses duplicate slashes
  * - Strips Windows extended-length prefixes (`\\?\`, `//?/`)
- * - Expands leading `~`
+ * - Expands leading `~`, `%USERPROFILE%`, `$USERPROFILE`, `${USERPROFILE}`, `$HOME`, `${HOME}`
  * - Converts MSYS `/e/...` drive prefixes to `e:/...`
  * - Folds case to lowercase on Windows or whenever a drive-letter prefix is present
  * - Strips trailing slashes (keeping `"/"` for POSIX root)
  */
 export function normalizePreToolPath(rawPath: string): string {
-  let p = rawPath.trim().replace(/\\/g, "/");
+  let p = rawPath.trim();
+  if (!p) return "";
+
+  if (
+    (p.startsWith('"') && p.endsWith('"')) ||
+    (p.startsWith("'") && p.endsWith("'"))
+  ) {
+    p = p.slice(1, -1).trim();
+  }
+  p = p.replace(/\\/g, "/");
   if (!p) return "";
 
   if (p.startsWith("//?/") || p.startsWith("//./")) {
@@ -308,10 +346,25 @@ export function normalizePreToolPath(rawPath: string): string {
     p = /^UNC\//i.test(rest) ? "//" + rest.slice(4) : rest;
   }
 
+  // Collapse duplicate slashes (except leading UNC `//`)
+  if (p.startsWith("//")) {
+    p = "//" + p.slice(2).replace(/\/+/g, "/");
+  } else {
+    p = p.replace(/\/+/g, "/");
+  }
+
   if (p === "~") {
-    p = homedir().replace(/\\/g, "/");
+    p = HOMEDIR_SLASH;
   } else if (p.startsWith("~/")) {
-    p = join(homedir(), p.slice(2)).replace(/\\/g, "/");
+    p = `${HOMEDIR_SLASH}/${p.slice(2)}`.replace(/\/+/g, "/");
+  } else {
+    const envHomeMatch = p.match(
+      /^(?:%USERPROFILE%|\$\{?USERPROFILE\}?|\$\{?HOME\}?)(?:\/(.*))?$/i,
+    );
+    if (envHomeMatch) {
+      const tail = envHomeMatch[1] ?? "";
+      p = tail ? `${HOMEDIR_SLASH}/${tail}`.replace(/\/+/g, "/") : HOMEDIR_SLASH;
+    }
   }
 
   const msysMatch = p.match(/^\/([a-zA-Z])(\/.*|$)/);
@@ -344,14 +397,16 @@ export function loadSeatConfig(seatsPath?: string): SeatConfig {
   );
   const resolvedPath = seatsPath ? resolve(seatsPath) : defaultSeatsPath();
 
-  if (!existsSync(resolvedPath)) {
-    if (explicitOverride) {
-      throw new Error(`Seat map not found at explicit path: ${resolvedPath}`);
+  let raw: string;
+  try {
+    raw = readFileSync(resolvedPath, "utf-8");
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT" && !explicitOverride) {
+      return { seats: {}, storePaths: [], seatStores: {}, projectStores: {} };
     }
-    return { seats: {}, storePaths: [] };
+    throw new Error(`Seat map not found at explicit path: ${resolvedPath}`);
   }
 
-  const raw = readFileSync(resolvedPath, "utf-8");
   const parsed: unknown = JSON.parse(raw);
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
     throw new Error(`Seat map at ${resolvedPath} must be a JSON object`);
@@ -360,9 +415,24 @@ export function loadSeatConfig(seatsPath?: string): SeatConfig {
   const obj = parsed as Record<string, unknown>;
   const seats: Record<string, string> = {};
   const storePaths: string[] = [];
+  const seatStores: Record<string, string> = {};
+  const projectStores: Record<string, string> = {};
+  let repliesDir: string | undefined;
+
+  if (typeof obj.repliesDir === "string" && obj.repliesDir.trim()) {
+    repliesDir = obj.repliesDir.trim();
+  } else if (typeof obj.replies_dir === "string" && obj.replies_dir.trim()) {
+    repliesDir = obj.replies_dir.trim();
+  }
 
   const parseSeatEntries = (mapObj: Record<string, unknown>) => {
     for (const [key, val] of Object.entries(mapObj)) {
+      if (key === "repliesDir" || key === "replies_dir") {
+        if (typeof val === "string" && val.trim()) {
+          repliesDir = val.trim();
+        }
+        continue;
+      }
       if (key === "stores" && Array.isArray(val)) {
         for (const item of val) {
           if (typeof item === "string" && item.trim()) {
@@ -380,14 +450,37 @@ export function loadSeatConfig(seatsPath?: string): SeatConfig {
         if (typeof rec.seat !== "string" || !rec.seat.trim()) {
           throw new Error(`Seat entry for '${key}' is missing a non-empty 'seat' string`);
         }
-        seats[key] = rec.seat.trim();
+        const seatName = rec.seat.trim();
+        seats[key] = seatName;
+
+        // Support additional worktree / prefix roots per seat (P1.2)
+        for (const extraList of [rec.worktrees, rec.prefixes]) {
+          if (Array.isArray(extraList)) {
+            for (const pfx of extraList) {
+              if (typeof pfx === "string" && pfx.trim()) {
+                seats[pfx.trim()] = seatName;
+              }
+            }
+          }
+        }
+
+        if (typeof rec.repliesDir === "string" && rec.repliesDir.trim() && !repliesDir) {
+          repliesDir = rec.repliesDir.trim();
+        }
+
         if (typeof rec.store === "string" && rec.store.trim()) {
-          storePaths.push(rec.store.trim());
+          const st = rec.store.trim();
+          storePaths.push(st);
+          if (!seatStores[seatName]) seatStores[seatName] = st;
+          projectStores[key] = st;
         }
         if (Array.isArray(rec.stores)) {
           for (const s of rec.stores) {
             if (typeof s === "string" && s.trim()) {
-              storePaths.push(s.trim());
+              const st = s.trim();
+              storePaths.push(st);
+              if (!seatStores[seatName]) seatStores[seatName] = st;
+              if (!projectStores[key]) projectStores[key] = st;
             }
           }
         }
@@ -408,7 +501,13 @@ export function loadSeatConfig(seatsPath?: string): SeatConfig {
     parseSeatEntries(obj);
   }
 
-  return { seats, storePaths };
+  return {
+    seats,
+    storePaths,
+    seatStores,
+    projectStores,
+    ...(repliesDir ? { repliesDir } : {}),
+  };
 }
 
 /**
@@ -591,6 +690,14 @@ function extractHeredocs(raw: string): {
   heredocBodies: string[];
   hasHeredoc: boolean;
 } {
+  if (!raw.includes("<<")) {
+    return {
+      strippedCommand: raw,
+      heredocBodies: [],
+      hasHeredoc: false,
+    };
+  }
+
   const lines = raw.split(/\r?\n/);
   const keptLines: string[] = [];
   const heredocBodies: string[] = [];
@@ -602,9 +709,11 @@ function extractHeredocs(raw: string): {
     keptLines.push(line);
 
     // Detect `<<` (but not `<<<` here-string) outside single/double quotes on `line`
+    // (taking `$(` command substitutions inside double quotes into account)
     const delims: string[] = [];
     let inSingle = false;
     let inDouble = false;
+    const doubleQuoteStack: boolean[] = [];
     for (let c = 0; c < line.length; c++) {
       const ch = line[c];
       if (ch === "\\" && !inSingle && c + 1 < line.length) {
@@ -613,6 +722,16 @@ function extractHeredocs(raw: string): {
       }
       if (ch === "'" && !inDouble) {
         inSingle = !inSingle;
+        continue;
+      }
+      if (ch === "$" && line[c + 1] === "(" && !inSingle) {
+        doubleQuoteStack.push(inDouble);
+        inDouble = false;
+        c++;
+        continue;
+      }
+      if (ch === ")" && !inSingle && !inDouble && doubleQuoteStack.length > 0) {
+        inDouble = doubleQuoteStack.pop()!;
         continue;
       }
       if (ch === '"' && !inSingle) {
@@ -1123,17 +1242,32 @@ export function parseBashCommand(
   };
 }
 
+function sedScriptHasWriteCommand(script: string): boolean {
+  // Match `s<delim>...<delim>...<delim>[flags]*w` or address/command `w <file>` / `W <file>`
+  const s = script.trim();
+  if (!s) return false;
+  if (/^s(.)(?:\\.|(?!\1).)*\1(?:\\.|(?!\1).)*\1[gipmI0-9]*[wW](?:\s|$)/.test(s)) {
+    return true;
+  }
+  if (/(?:^|[;}\n]|\d+|\$|[\/][^\/]*[\/])\s*[wW](?:\s+\S|$)/.test(s)) {
+    return true;
+  }
+  return false;
+}
+
 /**
  * Check whether a single parsed command segment is strictly read-only per Part 1.3:
- *   - `git status|diff|log|show`
+ *   - `git status|diff|log|show` (without `-c` or leading env prefixes — #25 P1.1)
  *   - `gh … view|list`
- *   - `ls`, `cat`, `head`, `tail`, `grep`, `rg`, `sed -n`, `sha256sum`, `wc`
+ *   - `ls`, `cat`, `head`, `tail`, `grep`, `rg`, `sed -n` (without `w` command — #25 P1.3), `sha256sum`, `wc`
  *   - `find` without `-delete`/`-exec`
  *   - `loadout-os … --dry-run`
  */
 export function isSegmentReadOnly(seg: CommandSegment): boolean {
   if (seg.tokens.length === 0) return false;
   if (seg.redirections.length > 0) return false;
+  // #25 P1.1: Any leading environment variable prefix (`GIT_PAGER=…`, `VAR=val`) is not read-only
+  if (seg.envAssignments.length > 0) return false;
 
   const cmd = seg.tokens[0];
   const args = seg.tokens.slice(1);
@@ -1147,7 +1281,8 @@ export function isSegmentReadOnly(seg: CommandSegment): boolean {
     let idx = 0;
     while (idx < args.length) {
       const a = args[idx];
-      if (a === "-C" || a === "-c") {
+      // #25 P1.1: Only `-C <dir>` is allowed before the subcommand; `-c <key>=<val>` is rejected
+      if (a === "-C") {
         if (idx + 1 >= args.length) return false;
         idx += 2;
       } else if (
@@ -1205,13 +1340,33 @@ export function isSegmentReadOnly(seg: CommandSegment): boolean {
 
   if (cmd === "sed") {
     let hasQuiet = false;
-    for (const a of args) {
+    let hasExplicitExpr = false;
+    const scripts: string[] = [];
+    const positional: string[] = [];
+
+    for (let i = 0; i < args.length; i++) {
+      const a = args[i];
       if (a === "-n" || a === "--quiet" || a === "--silent") {
         hasQuiet = true;
+      } else if (a === "-e" || a === "--expression") {
+        hasExplicitExpr = true;
+        if (i + 1 >= args.length) return false;
+        scripts.push(args[++i]);
+      } else if (a.startsWith("--expression=")) {
+        hasExplicitExpr = true;
+        scripts.push(a.slice("--expression=".length));
+      } else if (a.startsWith("-e") && a.length > 2) {
+        hasExplicitExpr = true;
+        scripts.push(a.slice(2));
       } else if (a.startsWith("-") && !a.startsWith("--")) {
         const flags = a.slice(1);
         if (flags.includes("i") || flags.includes("f")) return false;
         if (flags.includes("n")) hasQuiet = true;
+        if (flags.includes("e")) {
+          hasExplicitExpr = true;
+          if (i + 1 >= args.length) return false;
+          scripts.push(args[++i]);
+        }
       } else if (
         a === "-i" ||
         a.startsWith("-i") ||
@@ -1222,9 +1377,18 @@ export function isSegmentReadOnly(seg: CommandSegment): boolean {
         a.startsWith("--file=")
       ) {
         return false;
+      } else {
+        positional.push(a);
       }
     }
-    return hasQuiet;
+    if (!hasQuiet) return false;
+    if (!hasExplicitExpr && positional.length > 0) {
+      scripts.push(positional[0]);
+    }
+    for (const sc of scripts) {
+      if (sedScriptHasWriteCommand(sc)) return false;
+    }
+    return true;
   }
 
   if (cmd === "find") {
@@ -1282,6 +1446,17 @@ export function resolveRuleAction(rule: PreToolRule, seat: SeatName): RuleAction
   return rule.action.default;
 }
 
+export function resolveRuleMemory(rule: PreToolRule, seat: SeatName): string {
+  if (typeof rule.memory === "string") {
+    return rule.memory;
+  }
+  const seatMemory = rule.memory[seat];
+  if (typeof seatMemory === "string" && seatMemory.trim()) {
+    return seatMemory.trim();
+  }
+  return rule.memory.default;
+}
+
 /**
  * Enforce the `<= 5`-line message cap on every rule message (Part 1.4 / §2.3).
  */
@@ -1309,8 +1484,7 @@ export function collectStorePaths(
   extraStorePaths?: string[],
 ): string[] {
   const out = new Set<string>();
-  const home = homedir().replace(/\\/g, "/");
-  out.add(`${home}/.claude/projects/*/memory`);
+  out.add(`${HOMEDIR_SLASH}/.claude/projects/*/memory`);
 
   for (const p of seatConfig.storePaths) {
     if (p.trim()) out.add(p.trim());
@@ -1329,6 +1503,16 @@ export function collectStorePaths(
   return [...out];
 }
 
+export function prenormalizeStorePaths(storePaths: string[]): string[] {
+  const out: string[] = [];
+  for (const sp of storePaths) {
+    if (!sp || sp.includes("*")) continue;
+    const norm = normalizePreToolPath(sp).toLowerCase();
+    if (norm) out.push(norm);
+  }
+  return out;
+}
+
 /**
  * Execute the PreToolUse hook pipeline in-process.
  *
@@ -1343,8 +1527,6 @@ export function collectStorePaths(
 export function runPreTool(opts: PreToolOptions = {}): PreToolResult {
   const startPerf = performance.now();
   const nowMs = opts.nowMs ?? Date.now();
-  const ts = new Date(nowMs).toISOString();
-  const logPath = opts.logPath ? resolve(opts.logPath) : defaultDecisionLogPath();
   const writeLog = opts.logWriter ?? appendDecisionLog;
 
   const envTimeout = Number(process.env.AI_LOADOUT_PRETOOL_TIMEOUT_MS);
@@ -1355,7 +1537,7 @@ export function runPreTool(opts: PreToolOptions = {}): PreToolResult {
       : DEFAULT_PRETOOL_TIMEOUT_MS);
 
   const rawStdin = opts.stdinJson ?? "";
-  let inputHash = hashToolInput(rawStdin);
+  let inputHash = "";
   let seat: SeatName = "default";
   let session = "";
   let toolName = "unknown";
@@ -1374,8 +1556,12 @@ export function runPreTool(opts: PreToolOptions = {}): PreToolResult {
     outcome: DecisionOutcome,
     latency: number,
   ): { entry: DecisionLogEntry; logFailed: boolean } => {
+    if (!inputHash) {
+      inputHash = hashToolInput(rawStdin);
+    }
+    const logPath = opts.logPath ? resolve(opts.logPath) : defaultDecisionLogPath();
     const entry: DecisionLogEntry = {
-      ts,
+      ts: new Date(nowMs).toISOString(),
       seat,
       session,
       tool: toolName,
@@ -1484,6 +1670,9 @@ export function runPreTool(opts: PreToolOptions = {}): PreToolResult {
   // ── 4. Evaluate rule table ──────────────────────────────────
   const rules = opts.rules ?? PRETOOL_RULES;
   const storePaths = collectStorePaths(seatConfig, opts.storePaths);
+  const normalizedStorePaths = prenormalizeStorePaths(storePaths);
+  const repliesDir =
+    opts.repliesDir ?? seatConfig.repliesDir ?? defaultRepliesDir();
   const matchInput: RuleMatchInput = {
     toolName,
     toolInput: payload.tool_input,
@@ -1492,6 +1681,8 @@ export function runPreTool(opts: PreToolOptions = {}): PreToolResult {
     parsedCommand,
     writePayload,
     storePaths,
+    normalizedStorePaths,
+    repliesDir,
     nowMs,
     recordNote: (n: string) => {
       notes.push(n);

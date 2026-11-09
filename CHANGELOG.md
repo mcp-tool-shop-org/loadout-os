@@ -7,6 +7,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Pre-tool hook enforce-readiness & issue #25** (`packages/cli`, closes #25) —
+  - **Read-only pass-through & seat map hardening (P1.1–P1.3):** rejected `git -c <key>=<val>`
+    and leading `VAR=val` environment variable prefixes on read-only pass-through segments;
+    rejected `sed -n` scripts containing `w`/`W` write commands; added `worktrees` and
+    `prefixes` arrays per seat in `seats.json`.
+  - **`memory-shell-write` coverage & false-positive fix (P2.4–P2.9):** expanded detection to
+    `pwsh`/`powershell`, `bash -c`/`sh -c`, `env`/`command`/`nohup`/`nice`/`time`/`xargs`
+    wrappers, and `find <store> -delete|-exec`; expanded Python/Node write APIs (`shutil.copy|move`,
+    `os.replace|remove|unlink|rename`, `Path.unlink|rename|replace|write_bytes`,
+    `fs.unlinkSync|copyFileSync|renameSync|rmSync`, nested `open(..., 'w')`, and script file
+    invocations `python x.py <store>/...`); tracked `cd`/`pushd` segments and resolved relative
+    target paths against `cwd`; added `restore`, `switch`, `apply`, `am`, `cherry-pick`, and
+    `pull` to `GIT_STORE_WRITE_SUBCOMMANDS`; expanded `%USERPROFILE%`, `$USERPROFILE`, `$HOME`,
+    quoted `~`, and doubled backslashes `\\`; and avoided false positives on `sed -i` when a
+    store path appears only inside the substitution pattern on a non-store target file.
+  - **`future-stamp` reconstruction, forms, and privacy (P3.10–P3.13, P4.14):** reconstructed
+    edited lines from disk on `Edit`/`MultiEdit` so substring time replacements (`15:03 ET` →
+    `23:59 ET`) are caught; matched non-bold `Last updated:` and time-only `~HH:MM` without a
+    zone token; required a time component on heading `updated` stamps so date-only headings
+    (`### Milestones — updated 2026-12-01 schedule`) pass; evaluated bare `YYYY-MM-DD` stamps at
+    start-of-day (`00:00:00.000 ET`) so same-day bare dates pass and handled midnight wrap on
+    time-only stamps (`~23:58 ET` at `00:02 ET`); and hashed unparseable timestamp values in
+    `notes` (`sha256:<hash12>(len=<n>)`) instead of logging raw prose.
+  - **Per-seat memory IDs & per-seat `doctor` triad check (Ruling 1):** `PRETOOL_RULES` now
+    maps `memory` per seat (`rnd` vs `publisher`), rule messages cite the active seat's memory
+    ID, and `doctor`'s `triad-memories` check validates each configured seat against its own
+    store/index and names the failing seat on mismatch.
+  - **`unreviewed-merge` warn-only with Argon `PASS at <head8>` suppression (Ruling 2):**
+    `unreviewed-merge` is permanently `warn` on all seats (never `block`) and suppresses its
+    warning when a review reply in `repliesDir` (configurable in `seats.json`) has
+    `PASS at <head8>` on its first line matching `--match-head-commit <sha>`, `--head <sha>`,
+    or `gatemerge <repo> <pr> <head8>`.
+  - **Pre-tool latency tail under p99 ≤ 10 ms (Ruling 3):** fixed `extractHeredocs` quote-stack
+    tracking inside `"$(cat <<'EOF' ... EOF)"` so multi-hundred-line PR bodies and commit
+    messages strip heredocs on the first pass instead of spawning recursive backtick subshell
+    parses and triple regex scans; added fast pre-checks, pre-compiled regexes in
+    `findQuoteViolations`, pre-normalized store paths, and eliminated redundant input hashing
+    and `existsSync` stat calls.
+  - **`refresh --project` store resolution, `source_store` guard, and cross-store `.bak`
+    preservation:** `loadout-os refresh --project <root>` without `--store` now resolves the
+    project's store from `seats.json` or refuses with `PROJECT_STORE_REQUIRED` instead of
+    falling back to `DEFAULT_STORE`; stamps `source_store` in generated indexes and refuses
+    cross-store overwrites with `STORE_MISMATCH` unless `--allow-store-change` is passed; and
+    never overwrites an existing `<dest>.bak` whose `source_store` differs (preserving both
+    backups).
+
 ## [1.1.1] - 2026-11-08
 
 ### Fixed
