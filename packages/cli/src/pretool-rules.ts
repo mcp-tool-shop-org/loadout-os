@@ -50,6 +50,8 @@ function isExecutableNamed(token: string, expectedName: string): boolean {
 export interface UnreviewedMergeHit {
   detail: string;
   headSha?: string;
+  repo?: string;
+  prNumber?: string;
 }
 
 const HEX_SHA_RE = /^[0-9a-f]{7,40}$/i;
@@ -68,27 +70,43 @@ function extractMergeHitFromSegment(seg: CommandSegment): UnreviewedMergeHit | n
   if (gatemergeIdx !== -1) {
     const after = seg.tokens.slice(gatemergeIdx + 1);
     let headSha: string | undefined;
+    let repo: string | undefined;
+    let prNumber: string | undefined;
+    const positional: string[] = [];
+
     for (let i = 0; i < after.length; i++) {
       const a = after[i];
       if (
         (a === "--head" || a === "-Head" || a === "--match-head-commit") &&
-        after[i + 1] &&
-        HEX_SHA_RE.test(after[i + 1])
+        after[i + 1]
       ) {
-        headSha = after[i + 1].toLowerCase();
-        break;
-      }
-      if (a.startsWith("--head=") || a.startsWith("--match-head-commit=")) {
+        const val = after[++i];
+        if (HEX_SHA_RE.test(val)) headSha = val.toLowerCase();
+      } else if (a.startsWith("--head=") || a.startsWith("--match-head-commit=")) {
         const val = a.slice(a.indexOf("=") + 1);
-        if (HEX_SHA_RE.test(val)) {
-          headSha = val.toLowerCase();
-          break;
-        }
+        if (HEX_SHA_RE.test(val)) headSha = val.toLowerCase();
+      } else if ((a === "--repo" || a === "-Repo" || a === "-R") && after[i + 1]) {
+        repo = after[++i];
+      } else if (a.startsWith("--repo=")) {
+        repo = a.slice("--repo=".length);
+      } else if ((a === "--pr" || a === "-Pr") && after[i + 1]) {
+        prNumber = after[++i].replace(/^#/, "");
+      } else if (a.startsWith("--pr=")) {
+        prNumber = a.slice("--pr=".length).replace(/^#/, "");
+      } else if (!a.startsWith("-")) {
+        positional.push(a);
       }
     }
+
+    // `gatemerge.sh <owner/repo> <pr> <expected-head-prefix>`
+    if (!repo && positional.length >= 1 && !/^\d+$/.test(positional[0])) {
+      repo = positional[0];
+    }
+    if (!prNumber) {
+      const prTok = positional.find((t) => /^#?\d+$/.test(t));
+      if (prTok) prNumber = prTok.replace(/^#/, "");
+    }
     if (!headSha) {
-      // `gatemerge.sh <owner/repo> <pr> <expected-head-prefix>` -> 3rd positional or any >=7-hex token
-      const positional = after.filter((t) => !t.startsWith("-"));
       if (positional.length >= 3 && HEX_SHA_RE.test(positional[2])) {
         headSha = positional[2].toLowerCase();
       } else {
@@ -96,16 +114,26 @@ function extractMergeHitFromSegment(seg: CommandSegment): UnreviewedMergeHit | n
         if (hexTok) headSha = hexTok.toLowerCase();
       }
     }
-    return { detail: seg.raw || seg.tokens[gatemergeIdx], headSha };
+    return { detail: seg.raw || seg.tokens[gatemergeIdx], headSha, repo, prNumber };
   }
 
   // 2. Check `gh [flags] pr merge ...`
   if (isExecutableNamed(seg.tokens[0], "gh")) {
     const args = seg.tokens.slice(1);
     let idx = 0;
+    let repo: string | undefined;
     while (idx < args.length) {
       const a = args[idx];
-      if (a === "-R" || a === "--repo" || a === "--hostname") {
+      if ((a === "-R" || a === "--repo") && args[idx + 1]) {
+        repo = args[idx + 1];
+        idx += 2;
+      } else if (a.startsWith("--repo=")) {
+        repo = a.slice("--repo=".length);
+        idx += 1;
+      } else if (a.startsWith("-R") && a.length > 2) {
+        repo = a.slice(2);
+        idx += 1;
+      } else if (a === "--hostname") {
         idx += 2;
       } else if (a.startsWith("-")) {
         idx += 1;
@@ -115,25 +143,46 @@ function extractMergeHitFromSegment(seg: CommandSegment): UnreviewedMergeHit | n
     }
     if (args[idx] === "pr" && args[idx + 1] === "merge") {
       let headSha: string | undefined;
+      let prNumber: string | undefined;
       for (let i = idx + 2; i < args.length; i++) {
         const a = args[i];
         if (
           (a === "--match-head-commit" || a === "--head") &&
-          args[i + 1] &&
-          HEX_SHA_RE.test(args[i + 1])
+          args[i + 1]
         ) {
-          headSha = args[i + 1].toLowerCase();
-          break;
-        }
-        if (a.startsWith("--match-head-commit=") || a.startsWith("--head=")) {
+          const val = args[++i];
+          if (HEX_SHA_RE.test(val)) headSha = val.toLowerCase();
+        } else if (a.startsWith("--match-head-commit=") || a.startsWith("--head=")) {
           const val = a.slice(a.indexOf("=") + 1);
-          if (HEX_SHA_RE.test(val)) {
-            headSha = val.toLowerCase();
-            break;
+          if (HEX_SHA_RE.test(val)) headSha = val.toLowerCase();
+        } else if ((a === "-R" || a === "--repo") && args[i + 1]) {
+          repo = args[++i];
+        } else if (a.startsWith("--repo=")) {
+          repo = a.slice("--repo=".length);
+        } else if (a.startsWith("-R") && a.length > 2) {
+          repo = a.slice(2);
+        } else if (
+          a === "-t" ||
+          a === "--subject" ||
+          a === "-b" ||
+          a === "--body" ||
+          a === "-F" ||
+          a === "--body-file" ||
+          a === "-A" ||
+          a === "--author-email"
+        ) {
+          i++;
+        } else if (!a.startsWith("-")) {
+          const urlMatch = a.match(/(?:^|\/)([^/]+)\/([^/]+)\/pull\/(\d+)(?:$|\/|\?)/i);
+          if (urlMatch) {
+            if (!repo) repo = `${urlMatch[1]}/${urlMatch[2]}`;
+            if (!prNumber) prNumber = urlMatch[3];
+          } else if (/^#?\d+$/.test(a) && !prNumber) {
+            prNumber = a.replace(/^#/, "");
           }
         }
       }
-      return { detail: seg.raw || "gh pr merge", headSha };
+      return { detail: seg.raw || "gh pr merge", headSha, repo, prNumber };
     }
   }
 
@@ -141,16 +190,33 @@ function extractMergeHitFromSegment(seg: CommandSegment): UnreviewedMergeHit | n
 }
 
 /**
- * Scan `repliesDir` for any `.md` review reply whose first line contains `PASS at <head8>`
- * matching `headSha` (comparing at least 7–8 leading hex chars).
+ * Scan `repliesDir` for any `.md` review reply whose first line names the same
+ * repository and PR number (`#<pr>`) and contains `PASS at <head8>` matching `headSha`
+ * (comparing at least 7–8 leading hex chars).
  */
 export function hasReviewPassAtHead(
-  repliesDir: string,
+  repliesDir: string | undefined,
   headSha: string,
+  repo?: string,
+  prNumber?: string,
 ): boolean {
+  if (!repliesDir || !repliesDir.trim()) return false;
   const cleanHead = headSha.trim().toLowerCase();
   if (!HEX_SHA_RE.test(cleanHead)) return false;
   const head8 = cleanHead.slice(0, 8);
+
+  const repoShort = (repo ?? "")
+    .trim()
+    .replace(/\\/g, "/")
+    .replace(/\.git$/i, "")
+    .split("/")
+    .filter(Boolean)
+    .pop()
+    ?.toLowerCase();
+  const cleanPr = (prNumber ?? "").trim().replace(/^#/, "");
+  if (!repoShort || !/^\d+$/.test(cleanPr)) {
+    return false;
+  }
 
   let entries: string[];
   try {
@@ -158,6 +224,10 @@ export function hasReviewPassAtHead(
   } catch {
     return false;
   }
+
+  const escapedRepo = repoShort.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const repoRe = new RegExp(`(?:^|[^a-z0-9_-])${escapedRepo}(?:$|[^a-z0-9_-])`, "i");
+  const prRe = new RegExp(`(?:#|\\bPR\\s*#?)${cleanPr}\\b`, "i");
 
   const buf = Buffer.allocUnsafe(256);
   for (const name of entries) {
@@ -175,7 +245,12 @@ export function hasReviewPassAtHead(
       if (m && m[1]) {
         const replySha = m[1].toLowerCase();
         const cmpLen = Math.min(8, head8.length, replySha.length);
-        if (cmpLen >= 7 && replySha.slice(0, cmpLen) === head8.slice(0, cmpLen)) {
+        if (
+          cmpLen >= 7 &&
+          replySha.slice(0, cmpLen) === head8.slice(0, cmpLen) &&
+          repoRe.test(firstLine) &&
+          prRe.test(firstLine)
+        ) {
           return true;
         }
       }
@@ -206,7 +281,16 @@ export function matchUnreviewedMerge(ctx: RuleMatchInput): RuleMatchResult {
   for (const seg of segments) {
     const hit = extractMergeHitFromSegment(seg);
     if (hit) {
-      if (hit.headSha && hasReviewPassAtHead(repliesDir, hit.headSha)) {
+      const effectiveRepo =
+        hit.repo ??
+        (ctx.cwd
+          ? normalizePreToolPath(ctx.cwd).split("/").filter(Boolean).pop()
+          : undefined);
+      if (
+        repliesDir &&
+        hit.headSha &&
+        hasReviewPassAtHead(repliesDir, hit.headSha, effectiveRepo, hit.prNumber)
+      ) {
         return { matched: false };
       }
       return { matched: true, detail: hit.detail };
@@ -638,7 +722,7 @@ export function textMentionsMemoryStorePath(
 // `shutil.copy|move`, `os.replace|remove|unlink|rename`, `Path.unlink|rename|replace|write_bytes|write_text`,
 // and `fs.unlink|unlinkSync|copyFile|copyFileSync|rename|renameSync|rm|rmSync|truncate|truncateSync`.
 const INLINE_SCRIPT_WRITE_CALL_RE =
-  /\bopen\s*\([\s\S]{1,240}?,\s*(?:mode\s*=\s*)?['"](?:[wax+]|r\+[b]*)[b+]*['"]|\.(?:write_text|write_bytes|unlink|rename|replace)\s*\(|\bshutil\s*\.\s*(?:copy|copy2|copyfile|copytree|move|rmtree)\s*\(|\bos\s*\.\s*(?:replace|remove|unlink|rename|renames)\s*\(|\b(?:fs|fsp|fsPromises)\s*\.\s*(?:writeFile|writeFileSync|appendFile|appendFileSync|createWriteStream|unlink|unlinkSync|copyFile|copyFileSync|cp|cpSync|rename|renameSync|rm|rmSync|truncate|truncateSync)\s*\(|\b(?:writeFile|writeFileSync|appendFile|appendFileSync|createWriteStream|unlinkSync|copyFileSync|renameSync|rmSync)\s*\(/i;
+  /\bopen\s*\((?:[^();\r\n]|\([^();\r\n]*\)){1,240}?,\s*(?:mode\s*=\s*)?['"](?:[wax+]|r\+[b]*)[b+]*['"]|\.(?:write_text|write_bytes|unlink|rename|replace)\s*\(|\bshutil\s*\.\s*(?:copy|copy2|copyfile|copytree|move|rmtree)\s*\(|\bos\s*\.\s*(?:replace|remove|unlink|rename|renames)\s*\(|\b(?:fs|fsp|fsPromises)\s*\.\s*(?:writeFile|writeFileSync|appendFile|appendFileSync|createWriteStream|unlink|unlinkSync|copyFile|copyFileSync|cp|cpSync|rename|renameSync|rm|rmSync|truncate|truncateSync)\s*\(|\b(?:writeFile|writeFileSync|appendFile|appendFileSync|createWriteStream|unlinkSync|copyFileSync|renameSync|rmSync)\s*\(/i;
 
 const POWERSHELL_WRITE_RE =
   /\b(?:Set-Content|Add-Content|Out-File|Remove-Item|Copy-Item|Move-Item|Rename-Item|New-Item|Clear-Content|sc|ac|ri|del|erase)\b|\[System\.IO\.File\]\s*::\s*(?:WriteAllText|WriteAllLines|WriteAllBytes|AppendAllText|Copy|Move|Delete|Replace)/i;
@@ -826,6 +910,323 @@ function extractSedTargetFilesAndWriteTargets(args: string[]): {
   return { hasInPlace, candidates: targetFiles };
 }
 
+interface CwdTracker {
+  current: string;
+  previous: string;
+  stack: string[];
+}
+
+function advanceCwdTracker(
+  seg: CommandSegment,
+  tracker: CwdTracker,
+  initialCwd: string,
+): void {
+  if (seg.tokens.length === 0) return;
+  const cmd = seg.tokens[0];
+  if (cmd === "popd") {
+    tracker.previous = tracker.current;
+    tracker.current = tracker.stack.pop() ?? initialCwd;
+    return;
+  }
+  if (cmd === "cd") {
+    if (seg.tokens.length === 1 || seg.tokens[1] === "~") {
+      tracker.previous = tracker.current;
+      tracker.current = HOMEDIR_SLASH;
+      return;
+    }
+    if (seg.tokens[1] === "-") {
+      const prev = tracker.previous;
+      tracker.previous = tracker.current;
+      tracker.current = prev;
+      return;
+    }
+    const targetDir = seg.tokens[1];
+    const rawTargetDir = seg.rawTokens[1];
+    const candidate =
+      rawTargetDir && /^[A-Za-z]:\\/.test(rawTargetDir) ? rawTargetDir : targetDir;
+    const resolved = resolveCandidateWithCwd(candidate, tracker.current);
+    if (resolved) {
+      tracker.previous = tracker.current;
+      tracker.current = resolved;
+    }
+    return;
+  }
+  if (cmd === "pushd" && seg.tokens.length >= 2) {
+    const targetDir = seg.tokens[1];
+    const rawTargetDir = seg.rawTokens[1];
+    const candidate =
+      rawTargetDir && /^[A-Za-z]:\\/.test(rawTargetDir) ? rawTargetDir : targetDir;
+    const resolved = resolveCandidateWithCwd(candidate, tracker.current);
+    if (resolved) {
+      tracker.stack.push(tracker.current);
+      tracker.previous = tracker.current;
+      tracker.current = resolved;
+    }
+  }
+}
+
+const INLINE_WRITE_CALL_GLOBAL_RE = new RegExp(
+  INLINE_SCRIPT_WRITE_CALL_RE.source,
+  "gi",
+);
+
+/**
+ * FP-MSW-1: Inspect inline Python/Node script text that mentions a store path and
+ * contains write API calls. Returns `false` only when every write call in the script
+ * has an explicit string-literal write target and none of those targets is a memory store.
+ */
+function inlineScriptWritesToStore(
+  scriptText: string,
+  isStore: (p: string) => boolean,
+  mentionsStore: (t: string) => boolean,
+): boolean {
+  if (!mentionsStore(scriptText) || !INLINE_SCRIPT_WRITE_CALL_RE.test(scriptText)) {
+    return false;
+  }
+
+  INLINE_WRITE_CALL_GLOBAL_RE.lastIndex = 0;
+  let inspectedCount = 0;
+
+  for (const m of scriptText.matchAll(INLINE_WRITE_CALL_GLOBAL_RE)) {
+    inspectedCount++;
+    const matchText = m[0];
+    const startIdx = m.index ?? 0;
+
+    // 1. `open(<arg1>, <write-mode>)`
+    if (/^open\b/i.test(matchText)) {
+      const openLit = matchText.match(
+        /^open\s*\(\s*(?:str\s*\(\s*|Path\s*\(\s*)?(['"])([^'"\n]+)\1\s*\)?\s*,/i,
+      );
+      if (!openLit) return true;
+      const target = openLit[2]!;
+      if (isStore(target) || mentionsStore(target)) return true;
+      continue;
+    }
+
+    // 2. `.write_text(`, `.write_bytes(`, `.unlink(`, `.rename(`, `.replace(`
+    if (matchText.startsWith(".")) {
+      const before = scriptText.slice(Math.max(0, startIdx - 240), startIdx);
+      const recvMatch = before.match(/\bPath\s*\(\s*(['"])([^'"\n]+)\1\s*\)\s*$/);
+      if (!recvMatch) return true;
+      const recvTarget = recvMatch[2]!;
+      if (isStore(recvTarget) || mentionsStore(recvTarget)) return true;
+      if (/^\.(?:rename|replace)\s*\(/i.test(matchText)) {
+        const after = scriptText.slice(
+          startIdx + matchText.length,
+          startIdx + matchText.length + 240,
+        );
+        const dstMatch = after.match(/^\s*(?:Path\s*\(\s*)?(['"])([^'"\n]+)\1/);
+        if (!dstMatch) return true;
+        const dstTarget = dstMatch[2]!;
+        if (isStore(dstTarget) || mentionsStore(dstTarget)) return true;
+      }
+      continue;
+    }
+
+    const afterCall = scriptText.slice(
+      startIdx + matchText.length,
+      startIdx + matchText.length + 400,
+    );
+
+    // 3. Copy calls (`shutil.copy*`, `fs.copyFile*`, `fs.cp*`): 1st arg is read (src), 2nd arg is write (dst)
+    if (
+      /^(?:shutil\s*\.\s*(?:copy|copy2|copyfile|copytree)|(?:(?:fs|fsp|fsPromises)\s*\.\s*)?(?:copyFile|copyFileSync|cp|cpSync))\s*\($/i.test(
+        matchText,
+      )
+    ) {
+      const twoArg = afterCall.match(
+        /^\s*(['"])([^'"\n]+)\1\s*,\s*(['"])([^'"\n]+)\3/,
+      );
+      if (!twoArg) return true;
+      const dstTarget = twoArg[4]!;
+      if (isStore(dstTarget) || mentionsStore(dstTarget)) return true;
+      continue;
+    }
+
+    // 4. Move / rename / replace calls (`shutil.move`, `os.replace|rename|renames`, `fs.rename*`): mutates both src and dst
+    if (
+      /^(?:shutil\s*\.\s*move|os\s*\.\s*(?:replace|rename|renames)|(?:(?:fs|fsp|fsPromises)\s*\.\s*)?(?:rename|renameSync))\s*\($/i.test(
+        matchText,
+      )
+    ) {
+      const twoArg = afterCall.match(
+        /^\s*(['"])([^'"\n]+)\1\s*,\s*(['"])([^'"\n]+)\3/,
+      );
+      if (!twoArg) return true;
+      const srcTarget = twoArg[2]!;
+      const dstTarget = twoArg[4]!;
+      if (
+        isStore(srcTarget) ||
+        mentionsStore(srcTarget) ||
+        isStore(dstTarget) ||
+        mentionsStore(dstTarget)
+      ) {
+        return true;
+      }
+      continue;
+    }
+
+    // 5. Single-target write/delete calls (`shutil.rmtree`, `os.remove|unlink`, `fs.writeFile*`, `fs.unlink*`, `fs.rm*`, `fs.truncate*`, etc.)
+    const oneArg = afterCall.match(/^\s*(['"])([^'"\n]+)\1/);
+    if (!oneArg) return true;
+    const target = oneArg[2]!;
+    if (isStore(target) || mentionsStore(target)) return true;
+  }
+
+  return inspectedCount === 0;
+}
+
+const READONLY_SCRIPT_NAME_RE =
+  /(?:^|[/\\_-])(?:count|check|validate|lint|inspect|verify|analyze|report|stats|list|show|scan|audit|read|get|find|search|dump|parse|diff|status|health)(?:$|[_.-])/i;
+const MUTATING_SCRIPT_NAME_RE =
+  /(?:^|[/\\_-])(?:mutate|write|edit|delete|remove|rm|patch|update|overwrite|wipe|clean|clear|truncate|modify|rewrite|fix|create|add|insert|append|drop|reset|mv|move|copy|cp)(?:$|[_.-])/i;
+
+/**
+ * FP-MSW-2: Determine whether a script file invocation (`python <script> <store>` or `node <script> <store>`)
+ * is read-only.
+ */
+function isReadOnlyScriptInvocation(
+  scriptArg: string,
+  allArgs: string[],
+  effectiveCwd: string,
+): boolean {
+  if (
+    allArgs.includes("--dry-run") ||
+    allArgs.includes("--check") ||
+    allArgs.includes("--read-only")
+  ) {
+    return true;
+  }
+
+  const resolvedScript = isAbsolute(scriptArg)
+    ? scriptArg
+    : resolve(effectiveCwd || process.cwd(), scriptArg);
+  if (existsSync(resolvedScript)) {
+    try {
+      const content = readFileSync(resolvedScript, "utf-8");
+      return !INLINE_SCRIPT_WRITE_CALL_RE.test(content);
+    } catch {
+      /* fall through to name heuristic */
+    }
+  }
+
+  const base = scriptArg.replace(/\\/g, "/").split("/").pop() ?? "";
+  if (
+    READONLY_SCRIPT_NAME_RE.test(base) &&
+    !MUTATING_SCRIPT_NAME_RE.test(base)
+  ) {
+    return true;
+  }
+  return false;
+}
+
+const POWERSHELL_NON_COPY_WRITE_RE =
+  /\b(?:Set-Content|Add-Content|Out-File|Remove-Item|Move-Item|Rename-Item|New-Item|Clear-Content|sc|ac|ri|del|erase)\b|\[System\.IO\.File\]\s*::\s*(?:WriteAllText|WriteAllLines|WriteAllBytes|AppendAllText|Move|Delete|Replace)/i;
+
+/**
+ * FP-MSW-3: Inspect PowerShell script text for writes to a memory store while allowing
+ * `Copy-Item` / `[System.IO.File]::Copy` from a memory store to a non-store destination.
+ */
+function powershellScriptWritesToStore(
+  psText: string,
+  isStore: (p: string) => boolean,
+  mentionsStore: (t: string) => boolean,
+): boolean {
+  if (!mentionsStore(psText)) return false;
+  if (!POWERSHELL_WRITE_RE.test(psText) && !/(?:^|[^-])>{1,2}\s*\S/.test(psText)) {
+    return false;
+  }
+
+  const stmts = psText
+    .split(/[;\r\n|]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  for (const stmt of stmts) {
+    // 1. Check redirection `>` / `>>` in this statement
+    for (const rm of stmt.matchAll(/(?:^|[^-])>{1,2}\s*(['"]?[^'"\s;|]+['"]?)/g)) {
+      const target = (rm[1] ?? "").replace(/^['"]|['"]$/g, "");
+      if (!target || isStore(target) || mentionsStore(target)) {
+        return true;
+      }
+    }
+
+    // 2. Check non-copy mutating cmdlets / .NET calls
+    if (POWERSHELL_NON_COPY_WRITE_RE.test(stmt)) {
+      if (mentionsStore(stmt)) return true;
+      const withoutEnvVars = stmt.replace(/\$env:[A-Za-z_]\w*/gi, "");
+      if (/\$[A-Za-z_]\w*/.test(withoutEnvVars)) return true;
+    }
+
+    // 3. Check `Copy-Item` (allow when copying FROM store TO an explicit non-store destination)
+    if (/\bCopy-Item\b/i.test(stmt)) {
+      const destNamed = stmt.match(
+        /(?:^|\s)-(?:Destination|Dest)\s+(['"][^'"]+['"]|\S+)/i,
+      );
+      if (destNamed) {
+        const dest = destNamed[1]!.replace(/^['"]|['"]$/g, "");
+        if (isStore(dest) || mentionsStore(dest)) return true;
+        continue;
+      }
+      const tokens = stmt.match(/'[^']*'|"[^"]*"|\S+/g) ?? [];
+      const copyIdx = tokens.findIndex((t) => /^Copy-Item$/i.test(t));
+      const pathArgs: string[] = [];
+      for (let i = copyIdx + 1; i < tokens.length; i++) {
+        const tok = tokens[i]!;
+        if (/^-(?:Path|LiteralPath)$/i.test(tok)) {
+          if (tokens[i + 1]) pathArgs.push(tokens[++i]!.replace(/^['"]|['"]$/g, ""));
+        } else if (/^-(?:Filter|Include|Exclude|ErrorAction|WarningAction)$/i.test(tok)) {
+          i++;
+        } else if (tok.startsWith("-")) {
+          continue;
+        } else {
+          pathArgs.push(tok.replace(/^['"]|['"]$/g, ""));
+        }
+      }
+      if (pathArgs.length < 2) return true;
+      const dest = pathArgs[pathArgs.length - 1]!;
+      if (isStore(dest) || mentionsStore(dest)) return true;
+      continue;
+    }
+
+    // 4. Check `[System.IO.File]::Copy(src, dst)`
+    if (/\[System\.IO\.File\]\s*::\s*Copy\b/i.test(stmt)) {
+      const m = stmt.match(
+        /\[System\.IO\.File\]\s*::\s*Copy\s*\(\s*(['"])([^'"\n]+)\1\s*,\s*(['"])([^'"\n]+)\3/i,
+      );
+      if (!m) return true;
+      const dst = m[4]!;
+      if (isStore(dst) || mentionsStore(dst)) return true;
+      continue;
+    }
+  }
+
+  return false;
+}
+
+const STUDIO_CLI_SUBCOMMANDS = new Set([
+  "memories",
+  "rules",
+  "doctor",
+  "refresh",
+  "report",
+  "hook",
+  "resolve",
+  "explain",
+  "usage",
+  "dead",
+  "overlaps",
+  "budget",
+  "validate",
+  "index",
+  "stats",
+  "health",
+  "sync-summaries",
+  "place",
+  "move",
+  "split",
+]);
+
 function checkSegmentMemoryShellWrite(
   seg: CommandSegment,
   fullRawCommand: string,
@@ -855,12 +1256,17 @@ function checkSegmentMemoryShellWrite(
   const args = unwrapped.tokens.slice(1);
   const rawArgs = unwrapped.rawTokens.slice(1);
 
-  // Allowed: any `loadout-os ...` command (without output redirection to store)
+  // Allowed: any `loadout-os` / `claude-memories` CLI command (directly or via `node <.../cli.js>`)
   if (
     isExecutableNamed(cmd0, "loadout-os") ||
+    isExecutableNamed(cmd0, "claude-memories") ||
     (isExecutableNamed(cmd0, "node") &&
       args[0] &&
-      args[0].replace(/\\/g, "/").endsWith("loadout-os.js"))
+      (/(?:^|\/)(?:loadout-os|claude-memories)\.[cm]?[jt]s$/i.test(
+        args[0].replace(/\\/g, "/"),
+      ) ||
+        (/(?:^|\/)cli\.[cm]?[jt]s$/i.test(args[0].replace(/\\/g, "/")) &&
+          Boolean(args[1] && STUDIO_CLI_SUBCOMMANDS.has(args[1])))))
   ) {
     return null;
   }
@@ -878,20 +1284,19 @@ function checkSegmentMemoryShellWrite(
       if ((a === "-c" || (a.startsWith("-") && !a.startsWith("--") && a.slice(1).includes("c"))) && args[i + 1]) {
         const innerScript = args[i + 1];
         const innerParsed = parseBashCommand(innerScript, true);
-        let innerCwd = effectiveCwd;
+        const innerTracker: CwdTracker = {
+          current: effectiveCwd,
+          previous: effectiveCwd,
+          stack: [],
+        };
         for (const innerSeg of innerParsed.segments) {
-          if (
-            innerSeg.tokens.length >= 2 &&
-            (innerSeg.tokens[0] === "cd" || innerSeg.tokens[0] === "pushd")
-          ) {
-            innerCwd = resolveCandidateWithCwd(innerSeg.tokens[1], innerCwd) || innerCwd;
-          }
+          advanceCwdTracker(innerSeg, innerTracker, effectiveCwd);
           const innerHit = checkSegmentMemoryShellWrite(
             innerSeg,
             innerScript,
             innerParsed.heredocBodies,
             storePaths,
-            innerCwd,
+            innerTracker.current,
             normStores,
           );
           if (innerHit) return `${cmd0} -c (${innerHit})`;
@@ -900,13 +1305,13 @@ function checkSegmentMemoryShellWrite(
     }
   }
 
-  // #25 P2.4: PowerShell (`pwsh`, `powershell`) targeting a memory store path
+  // #25 P2.4 & FP-MSW-3: PowerShell (`pwsh`, `powershell`) targeting a memory store path
   if (isExecutableNamed(cmd0, "pwsh") || isExecutableNamed(cmd0, "powershell")) {
-    const psText = [seg.raw, ...args, ...rawArgs, ...heredocBodies].join("\n");
-    if (
-      mentionsStore(psText) &&
-      (POWERSHELL_WRITE_RE.test(psText) || /(?:^|[^-])>{1,2}\s*\S/.test(psText))
-    ) {
+    const segHeredocs = seg.redirections.some((r) => r.op.includes("<<"))
+      ? heredocBodies
+      : [];
+    const psText = [...args, ...segHeredocs].join("\n");
+    if (powershellScriptWritesToStore(psText, isStore, mentionsStore)) {
       return `${cmd0} write to memory store`;
     }
   }
@@ -1057,7 +1462,7 @@ function checkSegmentMemoryShellWrite(
     }
   }
 
-  // 6. `python` / `python3` / `py` / `node` (#25 P2.5, P2.6, P2.8)
+  // 6. `python` / `python3` / `py` / `node` (#25 P2.5, P2.6, P2.8, FP-MSW-1, FP-MSW-2)
   if (
     isExecutableNamed(cmd0, "python") ||
     isExecutableNamed(cmd0, "python3") ||
@@ -1073,13 +1478,20 @@ function checkSegmentMemoryShellWrite(
         a === "-" ||
         (a.startsWith("-") && !a.startsWith("--") && (a.slice(1).includes("c") || a.slice(1).includes("e"))),
     );
-    if (!hasInlineFlag && heredocBodies.length === 0) {
+    const segHeredocs =
+      seg.redirections.some((r) => r.op.includes("<<")) || args.includes("-")
+        ? heredocBodies
+        : [];
+    if (!hasInlineFlag && segHeredocs.length === 0) {
       const nonFlagArgs = args.filter((a) => !a.startsWith("-"));
       const rawNonFlagArgs = rawArgs.filter((a) => !a.startsWith("-"));
       if (nonFlagArgs.length >= 2) {
-        for (const a of [...nonFlagArgs.slice(1), ...rawNonFlagArgs.slice(1)]) {
-          if (isStore(a) || mentionsStore(a)) {
-            return `${cmd0} script targeting memory store (${a})`;
+        const scriptArg = nonFlagArgs[0]!;
+        if (!isReadOnlyScriptInvocation(scriptArg, args, effectiveCwd)) {
+          for (const a of [...nonFlagArgs.slice(1), ...rawNonFlagArgs.slice(1)]) {
+            if (isStore(a) || mentionsStore(a)) {
+              return `${cmd0} script targeting memory store (${a})`;
+            }
           }
         }
       }
@@ -1089,12 +1501,9 @@ function checkSegmentMemoryShellWrite(
       seg.raw,
       ...args,
       ...rawArgs,
-      ...heredocBodies,
+      ...segHeredocs,
     ].join("\n");
-    if (
-      mentionsStore(combinedScript) &&
-      INLINE_SCRIPT_WRITE_CALL_RE.test(combinedScript)
-    ) {
+    if (inlineScriptWritesToStore(combinedScript, isStore, mentionsStore)) {
       return `${cmd0} inline/heredoc write to memory store`;
     }
   }
@@ -1111,31 +1520,21 @@ export function matchMemoryShellWrite(ctx: RuleMatchInput): RuleMatchResult {
     ctx.normalizedStorePaths ?? prenormalizeStorePaths(ctx.storePaths);
 
   if (parsed) {
-    let effectiveCwd = ctx.cwd;
+    const tracker: CwdTracker = {
+      current: ctx.cwd,
+      previous: ctx.cwd,
+      stack: [],
+    };
     for (const seg of parsed.segments) {
-      // #25 P2.6: Track `cd <dir>` / `pushd <dir>` across segments so subsequent relative paths resolve
-      if (
-        seg.tokens.length >= 2 &&
-        (seg.tokens[0] === "cd" || seg.tokens[0] === "pushd")
-      ) {
-        const targetDir = seg.tokens[1];
-        const rawTargetDir = seg.rawTokens[1];
-        const candidate =
-          rawTargetDir && /^[A-Za-z]:\\/.test(rawTargetDir)
-            ? rawTargetDir
-            : targetDir;
-        const resolved = resolveCandidateWithCwd(candidate, effectiveCwd);
-        if (resolved) {
-          effectiveCwd = resolved;
-        }
-      }
+      // #25 P2.6 & FP-MSW-4: Track `cd`, `pushd`, and `popd` across segments
+      advanceCwdTracker(seg, tracker, ctx.cwd);
 
       const hit = checkSegmentMemoryShellWrite(
         seg,
         rawCmd,
         heredocBodies,
         ctx.storePaths,
-        effectiveCwd,
+        tracker.current,
         normStores,
       );
       if (hit) {
@@ -1186,12 +1585,8 @@ export function isStoreOrBoardFile(
   prenormalizedStores?: string[],
 ): boolean {
   if (!filePath || !filePath.trim()) return false;
-  if (isMemoryStorePath(filePath, storePaths, effectiveCwd, prenormalizedStores)) {
-    return true;
-  }
-  const norm = filePath.replace(/\\/g, "/");
-  const base = norm.slice(norm.lastIndexOf("/") + 1);
-  return /^(?:board|.*[-_]board)\.md$/i.test(base);
+  // FP-FS-3: Only files inside a memory store are subject to future-stamp; non-store `*board.md` files are ignored.
+  return isMemoryStorePath(filePath, storePaths, effectiveCwd, prenormalizedStores);
 }
 
 function isValidYmdHms(
@@ -1394,7 +1789,9 @@ export function parseToolStampedTime(
     const todayMs = zonedWallTimeToUtcMs(year, month, day, hour, minute, second, 0, zone);
     if (todayMs === null) return null;
 
-    // #25 P3.13: Handle midnight wrap (e.g. `~23:58 ET` written at `00:02 ET` is 4 minutes ago, not +23h 56m ahead)
+    // #25 P3.13 & FP-FS-1: Handle midnight wrap only when `todayMs` appears in the far future
+    // because the stamp is from just before midnight (`prevMs` within 6h in the past).
+    // Never wrap an earlier same-day time (`todayMs <= nowMs`) forward to tomorrow (`nextDate`).
     if (nowMs > 0) {
       const prevDate = new Date(Date.UTC(year, month - 1, day - 1));
       const prevMs = zonedWallTimeToUtcMs(
@@ -1410,27 +1807,10 @@ export function parseToolStampedTime(
       if (
         prevMs !== null &&
         todayMs > nowMs + 12 * 3_600_000 &&
-        Math.abs(nowMs - prevMs) < Math.abs(todayMs - nowMs)
+        nowMs - prevMs >= 0 &&
+        nowMs - prevMs <= 6 * 3_600_000
       ) {
         return prevMs;
-      }
-      const nextDate = new Date(Date.UTC(year, month - 1, day + 1));
-      const nextMs = zonedWallTimeToUtcMs(
-        nextDate.getUTCFullYear(),
-        nextDate.getUTCMonth() + 1,
-        nextDate.getUTCDate(),
-        hour,
-        minute,
-        second,
-        0,
-        zone,
-      );
-      if (
-        nextMs !== null &&
-        nowMs - todayMs > 12 * 3_600_000 &&
-        Math.abs(nextMs - nowMs) < Math.abs(nowMs - todayMs)
-      ) {
-        return nextMs;
       }
     }
     return todayMs;
@@ -1471,25 +1851,33 @@ const HEADING_TIME_STAMP_RE =
   /^~?\s*(?:\d{4}-\d{2}-\d{2}(?:T|\s+~?\s*)\d{1,2}:\d{2}|~\s*\d{1,2}:\d{2}|\d{1,2}:\d{2}(?::\d{2})?\s+(?:ET|EST|EDT|UTC|Z|[+-]\d{2}:?\d{2}))/i;
 
 const FM_FIELD_RE = /^\s*(created_at|modified|verified_at)\s*:\s*(.+?)\s*$/gm;
+const FENCED_CODE_BLOCK_RE = /^[ \t]*(?:`{3,}|~{3,})[^\r\n]*\r?\n[\s\S]*?^[ \t]*(?:`{3,}|~{3,})[ \t]*$/gm;
+const LEADING_YAML_FRONTMATTER_RE = /^\s*---[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/;
 
 export function extractToolStampedFields(text: string): ExtractedStampField[] {
   const out: ExtractedStampField[] = [];
   if (!text) return out;
 
-  const hasUpdatedWord = /updated/i.test(text);
+  // FP-FS-2: Strip fenced code blocks (` ```...``` ` / `~~~...~~~`) so YAML/markdown examples in the body are not treated as live stamps.
+  const unfenced =
+    text.includes("```") || text.includes("~~~")
+      ? text.replace(FENCED_CODE_BLOCK_RE, "")
+      : text;
+
+  const hasUpdatedWord = /updated/i.test(unfenced);
 
   if (hasUpdatedWord) {
     LAST_UPDATED_RE.lastIndex = 0;
-    for (const m of text.matchAll(LAST_UPDATED_RE)) {
+    for (const m of unfenced.matchAll(LAST_UPDATED_RE)) {
       const val = (m[1] ?? "").trim();
       if (val) {
         out.push({ field: "Last updated", rawValue: val });
       }
     }
 
-    if (text.includes("#")) {
+    if (unfenced.includes("#")) {
       HEADING_LINE_RE.lastIndex = 0;
-      for (const hm of text.matchAll(HEADING_LINE_RE)) {
+      for (const hm of unfenced.matchAll(HEADING_LINE_RE)) {
         const headingBody = hm[1] ?? "";
         if (!/updated/i.test(headingBody)) continue;
         UPDATED_TOKEN_RE.lastIndex = 0;
@@ -1509,9 +1897,12 @@ export function extractToolStampedFields(text: string): ExtractedStampField[] {
     }
   }
 
-  if (/(?:created_at|modified|verified_at)\s*:/.test(text)) {
+  if (/(?:created_at|modified|verified_at)\s*:/.test(unfenced)) {
+    // FP-FS-2: When the payload starts with a `--- ... ---` frontmatter block, restrict frontmatter keys to that block.
+    const fmBlockMatch = unfenced.match(LEADING_YAML_FRONTMATTER_RE);
+    const fmTargetText = fmBlockMatch ? fmBlockMatch[1]! : unfenced;
     FM_FIELD_RE.lastIndex = 0;
-    for (const m of text.matchAll(FM_FIELD_RE)) {
+    for (const m of fmTargetText.matchAll(FM_FIELD_RE)) {
       const key = m[1];
       const val = (m[2] ?? "").trim();
       if (key && val) {

@@ -205,7 +205,7 @@ export interface PreToolOptions {
   logPath?: string;
   /** Additional store paths (merged with default `~/.claude/projects/<project>/memory` and seat map stores). */
   storePaths?: string[];
-  /** Override Argon review replies directory (defaults to `seats.json` `repliesDir`, `AI_LOADOUT_REPLIES_DIR`, or `E:/AI/rnd-local/projects/antigravity/replies`). */
+  /** Override Argon review replies directory (defaults to `seats.json` `repliesDir` or `AI_LOADOUT_REPLIES_DIR`; unset when neither is configured). */
   repliesDir?: string;
   /** Custom rule table override for tests (defaults to `PRETOOL_RULES`). */
   rules?: readonly PreToolRule[];
@@ -295,9 +295,6 @@ const OUTPUT_REDIRECT_OPS = new Set([
 
 const HOMEDIR_SLASH = homedir().replace(/\\/g, "/");
 
-export const DEFAULT_REPLIES_DIR =
-  "E:/AI/rnd-local/projects/antigravity/replies";
-
 export function defaultSeatsPath(): string {
   const envPath = process.env.AI_LOADOUT_SEATS_PATH?.trim();
   if (envPath) return resolve(envPath);
@@ -310,10 +307,10 @@ export function defaultDecisionLogPath(): string {
   return join(homedir(), ".ai-loadout", "hook-decisions.jsonl");
 }
 
-export function defaultRepliesDir(): string {
+export function defaultRepliesDir(): string | undefined {
   const envPath = process.env.AI_LOADOUT_REPLIES_DIR?.trim();
   if (envPath) return resolve(envPath);
-  return DEFAULT_REPLIES_DIR;
+  return undefined;
 }
 
 // ── Path Normalization & Seat Resolution ──────────────────────

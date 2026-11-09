@@ -1779,7 +1779,7 @@ describe("Part 3: the first five rules (unreviewed-merge, director-quote, memory
           stdinJson: JSON.stringify({
             tool_name: "Edit",
             tool_input: {
-              file_path: "E:/AI/Research and Development/BOARD.md",
+              file_path: `${configuredStore}/BOARD.md`,
               old_string: "old",
               new_string: stamp,
             },
@@ -1797,7 +1797,7 @@ describe("Part 3: the first five rules (unreviewed-merge, director-quote, memory
         stdinJson: JSON.stringify({
           tool_name: "Edit",
           tool_input: {
-            file_path: "E:/AI/Research and Development/BOARD.md",
+            file_path: `${configuredStore}/BOARD.md`,
             old_string: "old",
             new_string: "**Last updated:** <stamped-by-cli-later>",
           },
@@ -2405,42 +2405,71 @@ describe("Part 6: Issue #25 (P1.1–P4.15) and log-only rulings", () => {
   });
 
   it("P2.8: normalizes `%USERPROFILE%`, `$USERPROFILE`, `$HOME`, quoted `~`, and doubled backslashes `\\\\` on store paths", () => {
+    // Configure a custom store under ~/custom-seat-store/memory (no .claude/projects fragment)
+    // so each test strictly depends on its corresponding path normalization step.
+    const customSeatsPath = join(tempDir, "seats-p28.json");
+    writeFileSync(
+      customSeatsPath,
+      JSON.stringify({
+        stores: [storeDir],
+        seats: {
+          "E:/AI/Research and Development": {
+            seat: "rnd",
+            store: "~/custom-seat-store/memory",
+          },
+        },
+      }),
+      "utf-8",
+    );
+    assert.equal(
+      normalizePreToolPath("E:\\\\AI\\\\Research and Development"),
+      "e:/ai/research and development",
+    );
     const commands = [
-      'rm "%USERPROFILE%/.claude/projects/F--AI/memory/BOARD.md"',
-      'rm "$HOME/.claude/projects/F--AI/memory/BOARD.md"',
-      'rm "$USERPROFILE/.claude/projects/F--AI/memory/BOARD.md"',
-      'rm "~/.claude/projects/F--AI/memory/BOARD.md"',
-      `rm "${storeDir.replace(/\//g, "\\\\")}\\\\BOARD.md"`,
+      'rm "%USERPROFILE%/custom-seat-store/memory/BOARD.md"',
+      'rm "$HOME/custom-seat-store/memory/BOARD.md"',
+      'rm "$USERPROFILE/custom-seat-store/memory/BOARD.md"',
+      'rm "~/custom-seat-store/memory/BOARD.md"',
+      'python -c "open(\'%USERPROFILE%/custom-seat-store/memory/BOARD.md\', \'w\').write(\'x\')"',
+      `rm "${storeDir.replace(/[\\/]+/g, "\\\\")}\\\\BOARD.md"`,
     ];
     for (const command of commands) {
       const res = runPreTool({
         stdinJson: JSON.stringify({
           tool_name: "Bash",
           tool_input: { command },
-          cwd: "E:/AI/Research and Development",
+          cwd: "E:\\\\AI\\\\Research and Development",
         }),
-        seatsPath,
+        seatsPath: customSeatsPath,
         logPath,
       });
       assert.equal(res.exitCode, 2, `Expected P2.8 block for: ${command}`);
+      assert.equal(res.logEntry?.seat, "rnd");
       assert.ok(res.logEntry?.matched.some((m) => m.id === "memory-shell-write"));
     }
   });
 
   it("P2.9: allows `sed -i` on a non-store file even when the sed expression mentions a memory store path", () => {
     const storeSlash = storeDir.replace(/\\/g, "/");
-    const cmd = `sed -i "s|${storeSlash}|/new/path|g" README.md`;
-    const res = runPreTool({
-      stdinJson: JSON.stringify({
-        tool_name: "Bash",
-        tool_input: { command: cmd },
-        cwd: "E:/AI/Research and Development",
-      }),
-      seatsPath,
-      logPath,
-    });
-    assert.equal(res.exitCode, 0, "sed -i on non-store file should be allowed");
-    assert.equal(res.outcome, "allow");
+    for (const cmd of [
+      `sed -i "s|${storeSlash}|/new/path|g" README.md`,
+      `sed -i "1,10s|${storeSlash}|/new/path|g" README.md`,
+      `sed -i -e "1d" "s|${storeSlash}|/new/path|g"`,
+      'sed -i "s|~/.claude/projects/F--AI/memory/BOARD.md|/new/path|g" README.md',
+      'sed -i "1,10s|~/.claude/projects/F--AI/memory/BOARD.md|/new/path|g" README.md',
+    ]) {
+      const res = runPreTool({
+        stdinJson: JSON.stringify({
+          tool_name: "Bash",
+          tool_input: { command: cmd },
+          cwd: "E:/AI/Research and Development",
+        }),
+        seatsPath,
+        logPath,
+      });
+      assert.equal(res.exitCode, 0, `sed -i on non-store file should be allowed: ${cmd}`);
+      assert.equal(res.outcome, "allow");
+    }
   });
 
   it("P3.10: blocks an Edit that replaces only the time substring (`old_string: '15:03 ET'` -> `new_string: '23:59 ET'`) by reconstructing the edited line from the file on disk", () => {
@@ -2602,7 +2631,11 @@ describe("Part 6: Issue #25 (P1.1–P4.15) and log-only rulings", () => {
     const storeSlash = storeDir.replace(/\\/g, "/");
     const repliesDir = join(tempDir, "replies");
     mkdirSync(repliesDir, { recursive: true });
-    writeFileSync(join(repliesDir, "review.md"), "PASS at d4ddd0e4\n", "utf-8");
+    writeFileSync(
+      join(repliesDir, "review.md"),
+      "LOADOUT-OS #24 REVIEW: PASS at d4ddd0e4\n",
+      "utf-8",
+    );
 
     // 1. Additional sed -n write patterns (`s/a\/b/c/gw out.txt`, `/pat/w out.txt`)
     for (const sedCmd of [
@@ -2658,7 +2691,7 @@ describe("Part 6: Issue #25 (P1.1–P4.15) and log-only rulings", () => {
 
     // 4. `=sha` merge flags (`--match-head-commit=d4ddd0e4`, `gatemerge.sh --head=d4ddd0e4`, `gatemerge.sh --head d4ddd0e4`)
     for (const mergeCmd of [
-      "gh pr merge 24 --squash --match-head-commit=d4ddd0e4",
+      "gh pr merge 24 -R mcp-tool-shop-org/loadout-os --squash --match-head-commit=d4ddd0e4",
       "bash scripts/gatemerge.sh mcp-tool-shop-org/loadout-os 24 --head=d4ddd0e4",
       "bash scripts/gatemerge.sh mcp-tool-shop-org/loadout-os 24 --head d4ddd0e4",
     ]) {
@@ -2676,4 +2709,461 @@ describe("Part 6: Issue #25 (P1.1–P4.15) and log-only rulings", () => {
     }
   });
 });
+
+// ════════════════════════════════════════════════════════════════
+// Part 7: PR #26 Fix 1 — rig-path default removal, 7 FP fixes + 7 TP guards,
+//         hasReviewPassAtHead repo/PR scoping, and doctor --seats help
+// ════════════════════════════════════════════════════════════════
+
+import * as pretoolModule from "../pretool.js";
+import * as pretoolRulesModule from "../pretool-rules.js";
+import * as helpModule from "../help.js";
+import { defaultRepliesDir } from "../pretool.js";
+import { hasReviewPassAtHead } from "../pretool-rules.js";
+import { COMMAND_HELP, renderCommandHelp } from "../help.js";
+
+describe("Part 7: PR #26 Fix 1 — shipped defaults, false-positive fixes, and review-pass scoping", () => {
+  let tempDir: string;
+  let seatsPath: string;
+  let logPath: string;
+  let storeDir: string;
+  const fixedClockMs = Date.UTC(2026, 10, 8, 20, 44, 0, 0); // 2026-11-08 15:44 ET
+
+  beforeEach(() => {
+    tempDir = mkdtempSync(join(tmpdir(), "loadout-pretool-fix1-"));
+    seatsPath = join(tempDir, "seats.json");
+    logPath = join(tempDir, "hook-decisions.jsonl");
+    storeDir = join(tempDir, "store", "memory");
+    mkdirSync(storeDir, { recursive: true });
+
+    writeFileSync(
+      seatsPath,
+      JSON.stringify(
+        {
+          seats: {
+            "E:/AI/Research and Development": {
+              seat: "rnd",
+              store: storeDir,
+            },
+            "E:/AI/Publisher": {
+              seat: "publisher",
+              store: "E:/AI/PublisherStore/memory",
+            },
+          },
+        },
+        null,
+        2,
+      ),
+      "utf-8",
+    );
+  });
+
+  afterEach(() => {
+    delete process.env.AI_LOADOUT_REPLIES_DIR;
+    rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  it("Ask 1: no shipped default (exported constant, default argument, or help text) holds a rig path (`E:/AI`, `rnd-local`, `antigravity`, `mikey`, or any drive letter), and suppression is off when unset", () => {
+    delete process.env.AI_LOADOUT_REPLIES_DIR;
+
+    // 1. defaultRepliesDir() returns undefined when AI_LOADOUT_REPLIES_DIR is not set
+    assert.equal(defaultRepliesDir(), undefined);
+    assert.equal("DEFAULT_REPLIES_DIR" in pretoolModule, false);
+
+    // 2. Inspect all exported string/object constants across pretool, pretool-rules, and help
+    const forbiddenRigPattern = /e:\/ai|e:\\ai|rnd-local|antigravity|mikey|\b[a-zA-Z]:[\\/]/i;
+    for (const [modName, mod] of [
+      ["pretool", pretoolModule],
+      ["pretool-rules", pretoolRulesModule],
+      ["help", helpModule],
+    ] as const) {
+      for (const [key, val] of Object.entries(mod)) {
+        if (typeof val === "function") continue;
+        const serialized = JSON.stringify(val) ?? "";
+        assert.equal(
+          forbiddenRigPattern.test(serialized),
+          false,
+          `Export ${modName}.${key} must not contain a rig path or drive letter: ${serialized}`,
+        );
+      }
+    }
+
+    // 3. Help text (every command's --help) contains no rig path or drive letter
+    for (const cmd of Object.keys(COMMAND_HELP)) {
+      const rendered = renderCommandHelp(cmd) ?? "";
+      assert.equal(
+        forbiddenRigPattern.test(rendered),
+        false,
+        `Help for '${cmd}' must not contain a rig path or drive letter`,
+      );
+    }
+
+    // 4. With neither seats.json repliesDir nor AI_LOADOUT_REPLIES_DIR set, unreviewed-merge suppression is off
+    const res = runPreTool({
+      stdinJson: JSON.stringify({
+        tool_name: "Bash",
+        tool_input: {
+          command:
+            "gh pr merge 24 -R mcp-tool-shop-org/loadout-os --squash --match-head-commit eb90790a",
+        },
+        cwd: "E:/AI/Publisher",
+      }),
+      seatsPath,
+      logPath,
+    });
+    assert.equal(res.outcome, "warn");
+  });
+
+  it("Ask 2 (FP-MSW-1): allows inline python/node/heredoc reading from a memory store and writing to a non-store path, while blocking inline scripts that write to a memory store", () => {
+    const storeSlash = storeDir.replace(/\\/g, "/");
+    const outSlash = join(tempDir, "report.txt").replace(/\\/g, "/");
+
+    // False-positive shape: read from store, write to /tmp/report.txt -> allow
+    for (const allowCmd of [
+      `python -c "data = open('${storeSlash}/MEMORY.md').read(); open('${outSlash}', 'w').write(data)"`,
+      `node -e "const fs=require('fs'); const d=fs.readFileSync('${storeSlash}/MEMORY.md','utf8'); fs.writeFileSync('${outSlash}', d)"`,
+      `python - << 'EOF'\ndata = open('${storeSlash}/MEMORY.md').read()\nopen('${outSlash}', 'w').write(data)\nEOF`,
+    ]) {
+      const allowRes = runPreTool({
+        stdinJson: JSON.stringify({
+          tool_name: "Bash",
+          tool_input: { command: allowCmd },
+          cwd: "E:/AI/Research and Development",
+        }),
+        seatsPath,
+        logPath,
+      });
+      assert.equal(allowRes.exitCode, 0, `Expected FP-MSW-1 allow for: ${allowCmd}`);
+      assert.equal(allowRes.outcome, "allow");
+    }
+
+    // True-positive shape: inline script writing to store -> block
+    for (const blockCmd of [
+      `python -c "open('${storeSlash}/MEMORY.md', 'w').write('x')"`,
+      `python -c "p='${storeSlash}/MEMORY.md'; open(p, 'w').write('x')"`,
+      `node -e "require('fs').writeFileSync('${storeSlash}/MEMORY.md', 'x')"`,
+      `python - << 'EOF'\nfrom pathlib import Path\nPath('${storeSlash}/MEMORY.md').write_text('x')\nEOF`,
+    ]) {
+      const blockRes = runPreTool({
+        stdinJson: JSON.stringify({
+          tool_name: "Bash",
+          tool_input: { command: blockCmd },
+          cwd: "E:/AI/Research and Development",
+        }),
+        seatsPath,
+        logPath,
+      });
+      assert.equal(blockRes.exitCode, 2, `Expected FP-MSW-1 true-positive block for: ${blockCmd}`);
+      assert.ok(blockRes.logEntry?.matched.some((m) => m.id === "memory-shell-write"));
+    }
+  });
+
+  it("Ask 2 (FP-MSW-2): allows studio CLIs (`claude-memories`, `cli.js`) and read-only inspection scripts given a store argument, while blocking mutating script files", () => {
+    const storeSlash = storeDir.replace(/\\/g, "/");
+    const roScript = join(tempDir, "inspect_store.py");
+    writeFileSync(
+      roScript,
+      "import sys, pathlib\np = pathlib.Path(sys.argv[1])\nprint(len(p.read_text().splitlines()))\n",
+      "utf-8",
+    );
+    const rwScript = join(tempDir, "rewrite_store.py");
+    writeFileSync(
+      rwScript,
+      "import sys, pathlib\np = pathlib.Path(sys.argv[1])\np.write_text('mutated')\n",
+      "utf-8",
+    );
+
+    // False-positive shapes -> allow
+    for (const allowCmd of [
+      `claude-memories sync --apply --store "${storeSlash}/MEMORY.md"`,
+      `node packages/cli/dist/cli.js split --store "${storeSlash}/MEMORY.md" --apply`,
+      `python scripts/count_entries.py "${storeSlash}/MEMORY.md"`,
+      `python "${roScript.replace(/\\/g, "/")}" "${storeSlash}/MEMORY.md"`,
+      `python scripts/migrate.py --dry-run "${storeSlash}/MEMORY.md"`,
+    ]) {
+      const allowRes = runPreTool({
+        stdinJson: JSON.stringify({
+          tool_name: "Bash",
+          tool_input: { command: allowCmd },
+          cwd: "E:/AI/Research and Development",
+        }),
+        seatsPath,
+        logPath,
+      });
+      assert.equal(allowRes.exitCode, 0, `Expected FP-MSW-2 allow for: ${allowCmd}`);
+      assert.equal(allowRes.outcome, "allow");
+    }
+
+    // True-positive shapes -> block
+    for (const blockCmd of [
+      `python scripts/mutate.py "${storeSlash}/BOARD.md"`,
+      `python "${rwScript.replace(/\\/g, "/")}" "${storeSlash}/BOARD.md"`,
+    ]) {
+      const blockRes = runPreTool({
+        stdinJson: JSON.stringify({
+          tool_name: "Bash",
+          tool_input: { command: blockCmd },
+          cwd: "E:/AI/Research and Development",
+        }),
+        seatsPath,
+        logPath,
+      });
+      assert.equal(blockRes.exitCode, 2, `Expected FP-MSW-2 true-positive block for: ${blockCmd}`);
+      assert.ok(blockRes.logEntry?.matched.some((m) => m.id === "memory-shell-write"));
+    }
+  });
+
+  it("Ask 2 (FP-MSW-3): allows `pwsh -Command Copy-Item <store>/MEMORY.md <non-store>`, while blocking `Copy-Item` or `Set-Content` targeting a store", () => {
+    const storeSlash = storeDir.replace(/\\/g, "/");
+    const destSlash = join(tempDir, "MEMORY-copy.md").replace(/\\/g, "/");
+
+    // False-positive shape: Copy-Item FROM store TO non-store -> allow
+    for (const allowCmd of [
+      `pwsh -Command "Copy-Item '${storeSlash}/MEMORY.md' '${destSlash}'"`,
+      `pwsh -Command "Copy-Item -Path '${storeSlash}/MEMORY.md' -Destination '${destSlash}'"`,
+    ]) {
+      const allowRes = runPreTool({
+        stdinJson: JSON.stringify({
+          tool_name: "Bash",
+          tool_input: { command: allowCmd },
+          cwd: "E:/AI/Research and Development",
+        }),
+        seatsPath,
+        logPath,
+      });
+      assert.equal(allowRes.exitCode, 0, `Expected FP-MSW-3 allow for: ${allowCmd}`);
+      assert.equal(allowRes.outcome, "allow");
+    }
+
+    // True-positive shape: Copy-Item TO store or Set-Content on store -> block
+    for (const blockCmd of [
+      `pwsh -Command "Copy-Item '${destSlash}' '${storeSlash}/MEMORY.md'"`,
+      `pwsh -Command "Copy-Item -Destination '${storeSlash}/MEMORY.md' -Path '${destSlash}'"`,
+      `pwsh -Command "Set-Content -Path '${storeSlash}/MEMORY.md' -Value 'x'"`,
+    ]) {
+      const blockRes = runPreTool({
+        stdinJson: JSON.stringify({
+          tool_name: "Bash",
+          tool_input: { command: blockCmd },
+          cwd: "E:/AI/Research and Development",
+        }),
+        seatsPath,
+        logPath,
+      });
+      assert.equal(blockRes.exitCode, 2, `Expected FP-MSW-3 true-positive block for: ${blockCmd}`);
+      assert.ok(blockRes.logEntry?.matched.some((m) => m.id === "memory-shell-write"));
+    }
+  });
+
+  it("Ask 2 (FP-MSW-4): tracks `pushd`/`popd` and `cd ~` so `pushd <store> && ls && popd && rm scratch.txt` is allowed while `pushd <store> && rm scratch.txt && popd` is blocked", () => {
+    const storeSlash = storeDir.replace(/\\/g, "/");
+
+    // False-positive shapes: popd or cd ~ returns to non-store cwd before rm -> allow
+    for (const allowCmd of [
+      `pushd "${storeSlash}" && ls && popd && rm scratch.txt`,
+      `cd "${storeSlash}" && ls && cd ~ && rm scratch.txt`,
+      `cd "${storeSlash}" && ls && cd - && rm scratch.txt`,
+    ]) {
+      const allowRes = runPreTool({
+        stdinJson: JSON.stringify({
+          tool_name: "Bash",
+          tool_input: { command: allowCmd },
+          cwd: "E:/AI/Research and Development",
+        }),
+        seatsPath,
+        logPath,
+      });
+      assert.equal(allowRes.exitCode, 0, `Expected FP-MSW-4 allow for: ${allowCmd}`);
+      assert.equal(allowRes.outcome, "allow");
+    }
+
+    // True-positive shape: rm while still inside pushd <store> -> block
+    const blockCmd = `pushd "${storeSlash}" && rm scratch.txt && popd`;
+    const blockRes = runPreTool({
+      stdinJson: JSON.stringify({
+        tool_name: "Bash",
+        tool_input: { command: blockCmd },
+        cwd: "E:/AI/Research and Development",
+      }),
+      seatsPath,
+      logPath,
+    });
+    assert.equal(blockRes.exitCode, 2, "Expected FP-MSW-4 true-positive block while inside store");
+    assert.ok(blockRes.logEntry?.matched.some((m) => m.id === "memory-shell-write"));
+  });
+
+  it("Ask 2 (FP-FS-1): allows earlier same-day time-only stamps (`~08:30 ET` edited at `21:30 ET`), while blocking genuinely future same-day stamps (`~22:30 ET` at `21:30 ET`)", () => {
+    const boardPath = join(storeDir, "BOARD.md");
+    const clock2130Ms = Date.UTC(2026, 10, 9, 2, 30, 0, 0); // 2026-11-08 21:30 ET (EST = UTC-5)
+
+    // False-positive shape: ~08:30 ET edited at 21:30 ET on the same day -> allow
+    const allowRes = runPreTool({
+      stdinJson: JSON.stringify({
+        tool_name: "Edit",
+        tool_input: {
+          file_path: boardPath,
+          old_string: "old",
+          new_string: "**Last updated:** ~08:30 ET",
+        },
+        cwd: "E:/AI/Research and Development",
+      }),
+      seatsPath,
+      logPath,
+      nowMs: clock2130Ms,
+    });
+    assert.equal(allowRes.exitCode, 0, "Earlier same-day ~08:30 ET at 21:30 ET must be allowed");
+    assert.equal(allowRes.outcome, "allow");
+
+    // True-positive shape: ~22:30 ET edited at 21:30 ET on the same day -> block
+    const blockRes = runPreTool({
+      stdinJson: JSON.stringify({
+        tool_name: "Edit",
+        tool_input: {
+          file_path: boardPath,
+          old_string: "old",
+          new_string: "**Last updated:** ~22:30 ET",
+        },
+        cwd: "E:/AI/Research and Development",
+      }),
+      seatsPath,
+      logPath,
+      nowMs: clock2130Ms,
+    });
+    assert.equal(blockRes.exitCode, 2, "Future same-day ~22:30 ET at 21:30 ET must be blocked");
+    assert.ok(blockRes.logEntry?.matched.some((m) => m.id === "future-stamp"));
+  });
+
+  it("Ask 2 (FP-FS-2): ignores `created_at:` / `modified:` / `verified_at:` inside fenced code blocks in memory files, while blocking future dates in real YAML frontmatter", () => {
+    const memFile = join(storeDir, "Feedback", "example.md");
+
+    // False-positive shape: fenced YAML example in body with future date -> allow
+    const fencedBody = [
+      "---",
+      "created_at: 2026-11-08",
+      "---",
+      "# Schema Example",
+      "",
+      "```yaml",
+      "created_at: 2099-01-01",
+      "verified_at: 2099-12-31",
+      "```",
+      "",
+    ].join("\n");
+    const allowRes = runPreTool({
+      stdinJson: JSON.stringify({
+        tool_name: "Write",
+        tool_input: { file_path: memFile, content: fencedBody },
+        cwd: "E:/AI/Research and Development",
+      }),
+      seatsPath,
+      logPath,
+      nowMs: fixedClockMs,
+    });
+    assert.equal(allowRes.exitCode, 0, "Fenced code block example must not trigger future-stamp");
+    assert.equal(allowRes.outcome, "allow");
+
+    // True-positive shape: future date in actual YAML frontmatter -> block
+    const futureFrontmatter = [
+      "---",
+      "created_at: 2099-01-01",
+      "---",
+      "# Real Entry",
+      "",
+    ].join("\n");
+    const blockRes = runPreTool({
+      stdinJson: JSON.stringify({
+        tool_name: "Write",
+        tool_input: { file_path: memFile, content: futureFrontmatter },
+        cwd: "E:/AI/Research and Development",
+      }),
+      seatsPath,
+      logPath,
+      nowMs: fixedClockMs,
+    });
+    assert.equal(blockRes.exitCode, 2, "Future date in real YAML frontmatter must be blocked");
+    assert.ok(blockRes.logEntry?.matched.some((m) => m.id === "future-stamp"));
+  });
+
+  it("Ask 2 (FP-FS-3): allows edits to non-store `*board.md` files (`docs/job-board.md`), while blocking future stamps on `<store>/BOARD.md`", () => {
+    // False-positive shape: non-store docs/job-board.md with future date -> allow
+    const allowRes = runPreTool({
+      stdinJson: JSON.stringify({
+        tool_name: "Write",
+        tool_input: {
+          file_path: "E:/AI/Research and Development/docs/job-board.md",
+          content: "# Job Board\n\n**Last updated:** 2099-01-01 12:00 ET\n",
+        },
+        cwd: "E:/AI/Research and Development",
+      }),
+      seatsPath,
+      logPath,
+      nowMs: fixedClockMs,
+    });
+    assert.equal(allowRes.exitCode, 0, "Non-store docs/job-board.md must not trigger future-stamp");
+    assert.equal(allowRes.outcome, "allow");
+
+    // True-positive shape: <store>/BOARD.md with future date -> block
+    const blockRes = runPreTool({
+      stdinJson: JSON.stringify({
+        tool_name: "Write",
+        tool_input: {
+          file_path: join(storeDir, "BOARD.md"),
+          content: "# R&D Board\n\n**Last updated:** 2099-01-01 12:00 ET\n",
+        },
+        cwd: "E:/AI/Research and Development",
+      }),
+      seatsPath,
+      logPath,
+      nowMs: fixedClockMs,
+    });
+    assert.equal(blockRes.exitCode, 2, "Store BOARD.md with future date must be blocked");
+    assert.ok(blockRes.logEntry?.matched.some((m) => m.id === "future-stamp"));
+  });
+
+  it("Ask 4: `hasReviewPassAtHead` requires matching repo and PR number on line 1, and `doctor --help` documents `--seats <p>`", () => {
+    const repliesDir = join(tempDir, "replies");
+    mkdirSync(repliesDir, { recursive: true });
+
+    // 1. Reply for different PR number (#99) at same head -> does NOT suppress #24
+    writeFileSync(
+      join(repliesDir, "wrong-pr.md"),
+      "LOADOUT-OS #99 REVIEW: PASS at eb90790a — all green\n",
+      "utf-8",
+    );
+    assert.equal(
+      hasReviewPassAtHead(repliesDir, "eb90790a", "mcp-tool-shop-org/loadout-os", "24"),
+      false,
+    );
+
+    // 2. Reply for different repo (OTHER-REPO #24) at same head -> does NOT suppress loadout-os #24
+    writeFileSync(
+      join(repliesDir, "wrong-repo.md"),
+      "OTHER-REPO #24 REVIEW: PASS at eb90790a — all green\n",
+      "utf-8",
+    );
+    assert.equal(
+      hasReviewPassAtHead(repliesDir, "eb90790a", "mcp-tool-shop-org/loadout-os", "24"),
+      false,
+    );
+
+    // 3. Matching repo and PR number on line 1 -> suppresses warning
+    writeFileSync(
+      join(repliesDir, "matching.md"),
+      "LOADOUT-OS #24 REVIEW: PASS at eb90790a — all green\n",
+      "utf-8",
+    );
+    assert.equal(
+      hasReviewPassAtHead(repliesDir, "eb90790a", "mcp-tool-shop-org/loadout-os", "24"),
+      true,
+    );
+
+    // 4. doctor --help documents --seats <p>
+    const doctorHelp = renderCommandHelp("doctor") ?? "";
+    assert.ok(
+      doctorHelp.includes("--seats <p>"),
+      "doctor --help must document --seats <p>",
+    );
+  });
+});
+
 
