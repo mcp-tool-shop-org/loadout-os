@@ -11,6 +11,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readdirSync,
   readFileSync,
@@ -731,6 +732,202 @@ describe("Item 8: splitMemoryStore (--by <rules.json>) on a temp store of >= 80 
       const badJsonPath = join(tmp, "bad.json");
       writeFileSync(badJsonPath, "{ invalid json", "utf-8");
       assert.throws(() => loadSplitRulesFile(badJsonPath), SplitError);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("Ask 5: stages verification under the store's own directory basename (`memory`) so `memory/<file>.md` links resolve when splitting `.../memory/MEMORY.md`", () => {
+    const tmpRoot = mkdtempSync(join(tmpdir(), "loadout-split-memory-basename-"));
+    const memoryDir = join(tmpRoot, "memory");
+    mkdirSync(memoryDir, { recursive: true });
+    try {
+      for (const item of [
+        { id: "core-law", file: "core_law.md", prio: "core", section: "Core" },
+        { id: "proj-alpha", file: "project_alpha.md", prio: "domain", section: "Projects" },
+        { id: "proj-beta", file: "project_beta.md", prio: "domain", section: "Projects" },
+        { id: "arch-old", file: "archive_old.md", prio: "manual", section: "Archive" },
+      ]) {
+        writeFileSync(
+          join(memoryDir, item.file),
+          [
+            "---",
+            `id: ${item.id}`,
+            `name: ${item.id}`,
+            `description: Description for ${item.id}`,
+            `priority: ${item.prio}`,
+            "---",
+            `# ${item.id}`,
+            "",
+          ].join("\n"),
+          "utf-8",
+        );
+      }
+
+      // Root MEMORY.md inside `.../memory/MEMORY.md` using `memory/<file>.md` parent-relative links
+      const memPath = join(memoryDir, "MEMORY.md");
+      writeFileSync(
+        memPath,
+        [
+          "# Memory",
+          "",
+          "## Core",
+          "- [core-law](memory/core_law.md) — Description for core-law",
+          "",
+          "## Projects",
+          "- [proj-alpha](memory/project_alpha.md) — Description for proj-alpha",
+          "- [proj-beta](memory/project_beta.md) — Description for proj-beta",
+          "",
+          "## Archive",
+          "- [arch-old](memory/archive_old.md) — Description for arch-old",
+          "",
+        ].join("\n"),
+        "utf-8",
+      );
+
+      const dryRes = splitMemoryStore(
+        memPath,
+        {
+          rules: [
+            { subindex: "index-projects.md", section: "Projects" },
+            { subindex: "index-archive.md", section: "Archive" },
+          ],
+        },
+        { dryRun: true },
+      );
+      assert.equal(dryRes.dryRun, true);
+      assert.equal(dryRes.beforeEntryCount, 4);
+      assert.equal(dryRes.afterEntryCount, 4);
+      assert.equal(dryRes.entryCountUnchanged, true);
+      assert.equal(dryRes.prioritiesUnchanged, true);
+      assert.equal(existsSync(join(memoryDir, "index-projects.md")), false);
+
+      const applyRes = splitMemoryStore(
+        memPath,
+        {
+          rules: [
+            { subindex: "index-projects.md", section: "Projects" },
+            { subindex: "index-archive.md", section: "Archive" },
+          ],
+        },
+        { dryRun: false },
+      );
+      assert.equal(applyRes.dryRun, false);
+      assert.equal(applyRes.beforeEntryCount, 4);
+      assert.equal(applyRes.afterEntryCount, 4);
+      assert.equal(applyRes.entryCountUnchanged, true);
+      assert.equal(applyRes.prioritiesUnchanged, true);
+
+      const afterAnalysis = analyzeMemoryMd(memPath);
+      assert.equal(afterAnalysis.missingFiles.length, 0);
+      const afterIdx = generateIndex(afterAnalysis);
+      assert.equal(afterIdx.entries.length, 4);
+    } finally {
+      rmSync(tmpRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("Ask 6: expands a shared sub-index in a diamond DAG once without emitting SUBINDEX_CYCLE, while still emitting SUBINDEX_CYCLE on a true recursion cycle", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "loadout-subindex-dag-"));
+    try {
+      writeFileSync(
+        join(tmp, "shared-topic.md"),
+        "---\nid: shared-topic\nname: Shared Topic\ndescription: Shared entry\n---\n# Shared\n",
+        "utf-8",
+      );
+      writeFileSync(
+        join(tmp, "index-shared.md"),
+        [
+          "---",
+          "name: Shared Subindex",
+          "description: Shared leaf sub-index",
+          "metadata:",
+          "  loadout_role: subindex",
+          "---",
+          "# Shared Subindex",
+          "- [shared-topic](shared-topic.md) — Shared entry",
+          "",
+        ].join("\n"),
+        "utf-8",
+      );
+      writeFileSync(
+        join(tmp, "index-a.md"),
+        [
+          "---",
+          "name: Subindex A",
+          "description: Branch A",
+          "metadata:",
+          "  loadout_role: subindex",
+          "---",
+          "# Subindex A",
+          "- [Shared Subindex](index-shared.md) — Shared leaf sub-index",
+          "",
+        ].join("\n"),
+        "utf-8",
+      );
+      writeFileSync(
+        join(tmp, "index-b.md"),
+        [
+          "---",
+          "name: Subindex B",
+          "description: Branch B",
+          "metadata:",
+          "  loadout_role: subindex",
+          "---",
+          "# Subindex B",
+          "- [Shared Subindex](index-shared.md) — Shared leaf sub-index",
+          "",
+        ].join("\n"),
+        "utf-8",
+      );
+      const memPath = join(tmp, "MEMORY.md");
+      writeFileSync(
+        memPath,
+        [
+          "# Memory",
+          "- [Subindex A](index-a.md) — Branch A",
+          "- [Subindex B](index-b.md) — Branch B",
+          "",
+        ].join("\n"),
+        "utf-8",
+      );
+
+      // 1. Diamond DAG: index-shared.md reached via both index-a.md and index-b.md -> expanded once, zero SUBINDEX_CYCLE warnings
+      const dagAnalysis = analyzeMemoryMd(memPath);
+      assert.equal(
+        dagAnalysis.diagnostics.filter((d) => d.code === "SUBINDEX_CYCLE").length,
+        0,
+        "Diamond DAG must not emit SUBINDEX_CYCLE",
+      );
+      assert.equal(dagAnalysis.refs.length, 1);
+      assert.equal(dagAnalysis.refs[0]!.path, "shared-topic.md");
+      const dagIdx = generateIndex(dagAnalysis);
+      assert.equal(dagIdx.entries.length, 1);
+      assert.equal(dagIdx.entries[0]!.id, "shared-topic");
+
+      // 2. True cycle: index-shared.md links back to index-a.md -> emits SUBINDEX_CYCLE
+      writeFileSync(
+        join(tmp, "index-shared.md"),
+        [
+          "---",
+          "name: Shared Subindex",
+          "description: Shared leaf sub-index",
+          "metadata:",
+          "  loadout_role: subindex",
+          "---",
+          "# Shared Subindex",
+          "- [shared-topic](shared-topic.md) — Shared entry",
+          "- [Subindex A](index-a.md) — Back-edge cycle",
+          "",
+        ].join("\n"),
+        "utf-8",
+      );
+      const cycleAnalysis = analyzeMemoryMd(memPath);
+      assert.equal(
+        cycleAnalysis.diagnostics.filter((d) => d.code === "SUBINDEX_CYCLE").length,
+        1,
+        "True cycle must still emit SUBINDEX_CYCLE",
+      );
     } finally {
       rmSync(tmp, { recursive: true, force: true });
     }

@@ -76,7 +76,9 @@ export function analyzeMemoryMd(filePath: string): MemoryAnalysis {
   const subindexEntryCounts: Record<string, number> = {};
   const expandedRefs: MemoryRef[] = [];
   const referencedBasenames = new Set<string>();
-  const visitedIndexFiles = new Set<string>([resolve(filePath)]);
+  const rootCanonical = resolve(filePath);
+  const activeIndexStack = new Set<string>([rootCanonical]);
+  const expandedIndexFiles = new Set<string>([rootCanonical]);
   let topicTokens = 0;
 
   const recordMissing = (ref: MemoryRef, sourceLabel: string) => {
@@ -139,7 +141,7 @@ export function analyzeMemoryMd(filePath: string): MemoryAnalysis {
       const subCheck = detectSubindex(ref.path, refContent);
       if (subCheck.isSubindex) {
         const canonicalSub = resolve(resolved);
-        if (visitedIndexFiles.has(canonicalSub)) {
+        if (activeIndexStack.has(canonicalSub)) {
           diagnostics.push({
             severity: "warning",
             code: "SUBINDEX_CYCLE",
@@ -150,7 +152,10 @@ export function analyzeMemoryMd(filePath: string): MemoryAnalysis {
           });
           continue;
         }
-        visitedIndexFiles.add(canonicalSub);
+        if (expandedIndexFiles.has(canonicalSub)) {
+          continue;
+        }
+        expandedIndexFiles.add(canonicalSub);
 
         const subLabel = inSubindex
           ? relResolved && !relResolved.startsWith("..")
@@ -167,15 +172,20 @@ export function analyzeMemoryMd(filePath: string): MemoryAnalysis {
         subindexEntryCounts[subLabel] = subRefs.length;
 
         const nextDefaultPriority = subCheck.defaultPriority ?? inheritedDefaultPriority;
-        expandIndexRefs(
-          subRefs,
-          subDir,
-          subParent,
-          subLabel,
-          true,
-          subLabel,
-          nextDefaultPriority,
-        );
+        activeIndexStack.add(canonicalSub);
+        try {
+          expandIndexRefs(
+            subRefs,
+            subDir,
+            subParent,
+            subLabel,
+            true,
+            subLabel,
+            nextDefaultPriority,
+          );
+        } finally {
+          activeIndexStack.delete(canonicalSub);
+        }
       } else {
         expandedRefs.push(effectiveRef);
         topicTokens += estimateTokens(refContent);

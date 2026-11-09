@@ -832,7 +832,7 @@ export function splitMemoryStore(
   const verifyRoot = mkdtempSync(join(tmpdir(), "loadout-split-verify-"));
   let afterEntryCount = 0;
   try {
-    const verifyStoreDir = join(verifyRoot, "store");
+    const verifyStoreDir = join(verifyRoot, basename(storeDir) || "store");
     cpSync(storeDir, verifyStoreDir, { recursive: true });
     const verifyMemoryMd = join(verifyStoreDir, basename(absMemoryMd));
     writeFileSync(verifyMemoryMd, proposed.memoryMdContent, "utf-8");

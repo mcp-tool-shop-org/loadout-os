@@ -17,14 +17,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   flags `--memory-warn-bytes <n>` and `--subindex-warn-entries <n>`.
 - **Recursive nested sub-index expansion with cycle guard** (`packages/memories`) — `analyzeMemoryMd`,
   `syncSummaries`, and `placeOrMoveEntry` now recursively expand nested sub-indexes at arbitrary depth
-  (propagating `defaultPriority` unless overridden and emitting `SUBINDEX_CYCLE` on circular sub-index
-  links) and record per-sub-index entry counts in `analysis.subindexEntryCounts`.
+  (propagating `defaultPriority` unless overridden, skipping duplicate expansion in diamond sub-index
+  DAGs without false warnings, and emitting `SUBINDEX_CYCLE` only on true recursion cycles) and record
+  per-sub-index entry counts in `analysis.subindexEntryCounts`.
 - **Mechanical root-to-sub-index splitter (`loadout-os memories split --by <rules.json>`)**
   (`packages/memories`, `packages/cli`) — splits root `MEMORY.md` entries into `index-*.md` sub-indexes
   (`metadata.loadout_role: subindex`) according to `<rules.json>`, preserves every entry and its priority,
   writes nothing on `--dry-run`, and proves the entry count and per-entry priorities are unchanged in a
-  staged verification pass before committing (refusing with `ENTRY_COUNT_MISMATCH` / `PRIORITY_MISMATCH`
-  if they differ).
+  staged verification pass under `basename(storeDir)` before committing (refusing with
+  `ENTRY_COUNT_MISMATCH` / `PRIORITY_MISMATCH` if they differ).
 
 ## [1.1.1] - 2026-11-08
 
