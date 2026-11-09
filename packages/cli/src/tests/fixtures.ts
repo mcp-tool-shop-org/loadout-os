@@ -377,9 +377,68 @@ export const RND_TRIAD_ENTRIES: LoadoutIndex["entries"] = [
   },
 ];
 
+export const PUBLISHER_TRIAD_ENTRIES: LoadoutIndex["entries"] = [
+  {
+    id: "feedback-eastern-time",
+    path: "memory/feedback-eastern-time.md",
+    keywords: ["eastern", "time", "clock"],
+    patterns: ["feedback_eastern_time"],
+    priority: "domain",
+    summary: "All timestamps use Eastern Time checked against the OS clock",
+    triggers: { task: true, plan: true, edit: false },
+    tokens_est: 200,
+    lines: 14,
+  },
+  {
+    id: "publishing-tags-need-publisher-ok",
+    path: "memory/publishing-tags-need-publisher-ok.md",
+    keywords: ["publish", "tags", "publisher"],
+    patterns: ["publishing_tags_need_publisher_ok"],
+    priority: "domain",
+    summary: "Publishing tags and releases requires Publisher OK and full-treatment",
+    triggers: { task: true, plan: true, edit: false },
+    tokens_est: 220,
+    lines: 15,
+  },
+  {
+    id: "publisher-merges-as-coordinator",
+    path: "memory/publisher-merges-as-coordinator.md",
+    keywords: ["merges", "coordinator", "publisher"],
+    patterns: ["publisher_merges_as_coordinator"],
+    priority: "domain",
+    summary: "Publisher merges PRs as coordinator after Argon PASS at head",
+    triggers: { task: true, plan: true, edit: false },
+    tokens_est: 240,
+    lines: 16,
+  },
+  {
+    id: "feedback-never-quote-director",
+    path: "memory/feedback-never-quote-director.md",
+    keywords: ["director", "never", "quote"],
+    patterns: ["feedback_never_quote_director"],
+    priority: "domain",
+    summary: "Never reproduce the Director's words verbatim in any artifact",
+    triggers: { task: true, plan: true, edit: false },
+    tokens_est: 260,
+    lines: 18,
+  },
+  {
+    id: "project-memory-system",
+    path: "memory/project-memory-system.md",
+    keywords: ["memory", "system", "loadout"],
+    patterns: ["project_memory_system"],
+    priority: "domain",
+    summary: "Publisher project memory system managed via loadout-os",
+    triggers: { task: true, plan: true, edit: false },
+    tokens_est: 300,
+    lines: 20,
+  },
+];
+
 export interface ReplayCasePair {
   id: string;
   ruleId: string;
+  expectedViolatingAction?: "block" | "warn";
   blockedStdin: Record<string, unknown>;
   allowedStdin: Record<string, unknown>;
   expectedAllowedOutcome: "allow" | "warn";
@@ -392,11 +451,14 @@ export const REPLAY_2026_11_08_CLOCK_MS = Date.UTC(2026, 10, 8, 20, 44, 0, 0);
 /**
  * Canned PreToolUse JSON fixture of the four slips from 2026-11-08 and their
  * matching allowed calls (Part 5.1, with a real board line carrying trailing text).
+ * Note: Under Ruling 2 (#25), unreviewed-merge is permanently warn-only on every
+ * seat, and suppressed when a matching Argon `PASS at <head8>` reply exists.
  */
 export const REPLAY_2026_11_08_FIXTURE: readonly ReplayCasePair[] = [
   {
     id: "slip-1-unreviewed-merge",
     ruleId: "unreviewed-merge",
+    expectedViolatingAction: "warn",
     blockedStdin: {
       hook_event_name: "PreToolUse",
       session_id: "replay-2026-11-08",

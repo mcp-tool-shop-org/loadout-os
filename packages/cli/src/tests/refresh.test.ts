@@ -841,3 +841,120 @@ test("Publisher ruling B (CLI): refresh and memories commands honor idSource def
   }
 });
 
+test("Issue #25 Item 5: refresh --project without --store uses seats.json store or refuses with PROJECT_STORE_REQUIRED; checks source_store on refresh; and preserves .bak across stores on the exact two-run sequence", () => {
+  const sbA = makeRefreshSandbox({ valid: true });
+  const sbB = makeRefreshSandbox({ valid: true });
+  try {
+    const projRoot = join(sbA.dir, "publisher-proj");
+    mkdirSync(projRoot, { recursive: true });
+    const seatsFile = join(sbA.dir, "seats.json");
+
+    // Give store B a distinct second entry so we can distinguish store A vs store B indexes
+    writeFileSync(
+      join(sbB.storeDir, "beta-topic.md"),
+      "---\nid: beta-topic\nkeywords: [beta, wrong, store]\npatterns: []\npriority: domain\n---\n# Beta Topic\n",
+      "utf-8",
+    );
+    writeFileSync(
+      sbB.memoryMd,
+      "# MEMORY\n\n## Topics\n\n- Alpha Topic — a scratch topic → `alpha-topic.md`\n- Beta Topic — second topic in store B → `beta-topic.md`\n",
+      "utf-8",
+    );
+
+    // 1. With --project and no --store, when project is NOT in seats.json -> refuses with PROJECT_STORE_REQUIRED (exit 2)
+    writeFileSync(seatsFile, JSON.stringify({ seats: {} }), "utf-8");
+    assert.throws(
+      () => runRefresh({ project: projRoot, seatsPath: seatsFile }),
+      (err: unknown) => {
+        assert.ok(err instanceof RefreshError);
+        assert.equal(err.code, "PROJECT_STORE_REQUIRED");
+        assert.equal(err.exitCode, 2);
+        return true;
+      },
+    );
+
+    // 2. With --project and no --store, when project IS recorded in seats.json -> uses that store and writes source_store into index
+    writeFileSync(
+      seatsFile,
+      JSON.stringify({
+        seats: {
+          [projRoot]: { seat: "publisher", store: sbA.storeDir },
+        },
+      }),
+      "utf-8",
+    );
+    const rInitial = runRefresh({ project: projRoot, seatsPath: seatsFile });
+    assert.equal(rInitial.wrote, true);
+    assert.equal(rInitial.store, resolve(sbA.storeDir));
+    const dest = projectDest(projRoot);
+    const initialIdx = JSON.parse(readFileSync(dest, "utf-8"));
+    assert.equal(initialIdx.source_store, resolve(sbA.storeDir));
+    assert.equal(initialIdx.entries.length, 1);
+
+    // 3. Running refresh against the same dest with a different store (sbB) refuses with STORE_MISMATCH by default
+    assert.throws(
+      () => runRefresh({ project: projRoot, store: sbB.storeDir }),
+      (err: unknown) => {
+        assert.ok(err instanceof RefreshError);
+        assert.equal(err.code, "STORE_MISMATCH");
+        assert.equal(err.exitCode, 2);
+        return true;
+      },
+    );
+
+    // 4. Exact two-run sequence that previously lost .bak:
+    //    Suppose store B overwrites dest (with allowStoreChange: true) -> backs up store A's index to <dest>.bak.
+    //    Then store B runs a SECOND time -> must NOT overwrite <dest>.bak (which holds store A's index);
+    //    it keeps <dest>.bak untouched (still store A) and writes store B's backup to <dest>.<hash>.bak!
+    const run1WrongStore = runRefresh({
+      project: projRoot,
+      store: sbB.storeDir,
+      allowStoreChange: true,
+    });
+    assert.equal(run1WrongStore.backupPath, `${dest}.bak`);
+    const bakAfterRun1 = JSON.parse(readFileSync(`${dest}.bak`, "utf-8"));
+    assert.equal(bakAfterRun1.source_store, resolve(sbA.storeDir));
+    assert.equal(bakAfterRun1.entries.length, 1, ".bak after run 1 holds store A's 1-entry index");
+
+    const run2WrongStore = runRefresh({
+      project: projRoot,
+      store: sbB.storeDir,
+      allowStoreChange: true,
+    });
+    assert.notEqual(
+      run2WrongStore.backupPath,
+      `${dest}.bak`,
+      "Second run from store B must not overwrite <dest>.bak from store A",
+    );
+    assert.ok(run2WrongStore.backupPath && existsSync(run2WrongStore.backupPath));
+
+    // Verify <dest>.bak STILL holds store A's 1-entry index, and the secondary backup holds store B's 2-entry index
+    const bakAfterRun2 = JSON.parse(readFileSync(`${dest}.bak`, "utf-8"));
+    assert.equal(
+      bakAfterRun2.source_store,
+      resolve(sbA.storeDir),
+      "<dest>.bak must still preserve store A's index after store B runs twice",
+    );
+    assert.equal(bakAfterRun2.entries.length, 1);
+
+    const secondBak = JSON.parse(readFileSync(run2WrongStore.backupPath!, "utf-8"));
+    assert.equal(secondBak.source_store, resolve(sbB.storeDir));
+    assert.equal(secondBak.entries.length, 2);
+
+    // 5. Also verify CLI dispatch(["refresh", ...]) with --seats and --allow-store-change
+    dispatch([
+      "refresh",
+      "--project",
+      projRoot,
+      "--seats",
+      seatsFile,
+      "--allow-store-change",
+    ]);
+    const restoredIdx = JSON.parse(readFileSync(dest, "utf-8"));
+    assert.equal(restoredIdx.source_store, resolve(sbA.storeDir));
+  } finally {
+    sbA.cleanup();
+    sbB.cleanup();
+  }
+});
+

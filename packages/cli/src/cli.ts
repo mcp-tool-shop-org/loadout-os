@@ -224,12 +224,16 @@ function dispatchDoctor(args: string[]): void {
   const usage = flagValue(args, "usage");
   const skills = flagValue(args, "skills");
   const projectIndex = flagValue(args, "project-index");
+  const seats = flagValue(args, "seats");
   if (store) paths.store = resolve(store);
   if (index) paths.index = resolve(index);
   if (settings) paths.settings = resolve(settings);
   if (usage) paths.usage = resolve(usage);
   if (skills) paths.skillsDir = resolve(skills);
   if (projectIndex) paths.extraIndexes = [resolve(projectIndex)];
+  if (seats !== undefined) {
+    paths.seatsPath = seats.trim() ? resolve(seats) : undefined;
+  }
 
   const result = runDoctor(paths);
   if (hasFlag(args, "json")) {

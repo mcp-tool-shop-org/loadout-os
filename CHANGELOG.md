@@ -7,6 +7,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Pre-tool hook enforce-readiness & issue #25** (`packages/cli`, closes #25) —
+  - **Read-only pass-through & seat map hardening (P1.1–P1.3):** rejected `git -c <key>=<val>`
+    and leading `VAR=val` environment variable prefixes on read-only pass-through segments;
+    rejected `sed -n` scripts containing `w`/`W` write commands; added `worktrees` and
+    `prefixes` arrays per seat in `seats.json`.
+  - **`memory-shell-write` coverage & false-positive fixes (P2.4–P2.9, FP-MSW-1..4):** expanded
+    detection to `pwsh`/`powershell`, `bash -c`/`sh -c`, `env`/`command`/`nohup`/`nice`/`time`/`xargs`
+    wrappers, and `find <store> -delete|-exec`; expanded Python/Node write APIs (`shutil.copy|move`,
+    `os.replace|remove|unlink|rename`, `Path.unlink|rename|replace|write_bytes`,
+    `fs.unlinkSync|copyFileSync|renameSync|rmSync`, nested `open(..., 'w')`, and script file
+    invocations `python x.py <store>/...`); tracked `cd`/`pushd`/`popd` segments and resolved
+    relative target paths against the active directory stack; added `restore`, `switch`, `apply`,
+    `am`, `cherry-pick`, and `pull` to `GIT_STORE_WRITE_SUBCOMMANDS`; expanded `%USERPROFILE%`,
+    `$USERPROFILE`, `$HOME`, quoted `~`, and doubled backslashes `\\`; and avoided false positives
+    on `sed -i` substitution patterns on non-store files, inline Python/Node scripts that read from
+    a store and write only to non-store literal paths, studio CLIs (`claude-memories`, `cli.js`) and
+    read-only inspection scripts, and PowerShell `Copy-Item` copying from a store to a non-store
+    destination.
+  - **`future-stamp` reconstruction, forms, and privacy (P3.10–P3.13, P4.14, FP-FS-1..3):**
+    reconstructed edited lines from disk on `Edit`/`MultiEdit` so substring time replacements
+    (`15:03 ET` → `23:59 ET`) are caught; matched non-bold `Last updated:` and time-only `~HH:MM`
+    without a zone token; required a time component on heading `updated` stamps so date-only
+    headings (`### Milestones — updated 2026-12-01 schedule`) pass; evaluated bare `YYYY-MM-DD`
+    stamps at start-of-day (`00:00:00.000 ET`) so same-day bare dates pass; allowed earlier
+    same-day time-only stamps (`~08:30 ET` edited at `21:30 ET`) while preserving midnight wrap
+    within 6 hours after midnight (`~23:58 ET` at `00:02 ET`); stripped fenced code blocks and
+    scoped frontmatter date keys (`created_at`, `modified`, `verified_at`) to the YAML frontmatter
+    block; scoped `future-stamp` strictly to configured memory store paths; and hashed unparseable
+    timestamp values in `notes` (`sha256:<hash12>(len=<n>)`) instead of logging raw prose.
+  - **Per-seat memory IDs & per-seat `doctor` triad check (Ruling 1):** `PRETOOL_RULES` now
+    maps `memory` per seat (`rnd` vs `publisher`), rule messages cite the active seat's memory
+    ID, and `doctor`'s `triad-memories` check (`--seats <p>`) validates each configured seat against
+    its own store/index and names the failing seat on mismatch.
+  - **`unreviewed-merge` warn-only with Argon `PASS at <head8>` suppression (Ruling 2):**
+    `unreviewed-merge` is permanently `warn` on all seats (never `block`) and suppresses its
+    warning when `repliesDir` is explicitly configured (`seats.json` or `AI_LOADOUT_REPLIES_DIR`,
+    with no hardcoded path default) and a review reply's first line names the target repo, `#<pr>`,
+    and `PASS at <head8>` matching `--match-head-commit <sha>`, `--head <sha>`, or
+    `gatemerge <repo> <pr> <head8>`.
+  - **Pre-tool latency tail under p99 ≤ 10 ms (Ruling 3):** fixed `extractHeredocs` quote-stack
+    tracking inside `"$(cat <<'EOF' ... EOF)"` so multi-hundred-line PR bodies and commit
+    messages strip heredocs on the first pass instead of spawning recursive backtick subshell
+    parses and triple regex scans; added fast pre-checks, pre-compiled regexes in
+    `findQuoteViolations`, pre-normalized store paths, and eliminated redundant input hashing
+    and `existsSync` stat calls.
+  - **`refresh --project` store resolution, `source_store` guard, and cross-store `.bak`
+    preservation:** `loadout-os refresh --project <root>` without `--store` now resolves the
+    project's store from `seats.json` or refuses with `PROJECT_STORE_REQUIRED` instead of
+    falling back to `DEFAULT_STORE`; stamps `source_store` in generated indexes and refuses
+    cross-store overwrites with `STORE_MISMATCH` unless `--allow-store-change` is passed; and
+    never overwrites an existing `<dest>.bak` whose `source_store` differs (preserving both
+    backups).
+
 ## [1.1.1] - 2026-11-08
 
 ### Fixed
