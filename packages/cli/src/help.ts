@@ -252,7 +252,7 @@ export const COMMAND_HELP: Record<string, HelpEntry> = {
 
   // ── rituals ──────────────────────────────────────────────────
   doctor: {
-    synopsis: "loadout-os doctor [--store <dir>] [--index <p>] [--project-index <p>] [--settings <p>] [--skills <dir>] [--usage <p>] [--repo-root <dir>] [--memory-warn-bytes <n>] [--subindex-warn-entries <n>] [--json]",
+    synopsis: "loadout-os doctor [--store <dir>] [--index <p>] [--project-index <p>] [--settings <p>] [--skills <dir>] [--usage <p>] [--seats <p>] [--repo-root <dir>] [--memory-warn-bytes <n>] [--subindex-warn-entries <n>] [--json]",
     flags: [
       ["--store <dir>", "memory store dir (default canonical store)"],
       ["--index <p>", "global resolver index (default ~/.ai-loadout/index.json)"],
@@ -260,6 +260,7 @@ export const COMMAND_HELP: Record<string, HelpEntry> = {
       ["--settings <p>", "Claude Code settings.json (default ~/.claude/settings.json)"],
       ["--skills <dir>", "skills directory for triad skill checks (default ~/.claude/skills)"],
       ["--usage <p>", "usage.jsonl path (default ~/.ai-loadout/usage.jsonl)"],
+      ["--seats <p>", "override path to seats.json for per-seat triad memory checks (default ~/.ai-loadout/seats.json)"],
       ["--repo-root <dir>", "repo root for the hook-drift check (default cwd)"],
       ["--memory-warn-bytes <n>", "warn threshold in bytes for MEMORY.md size (default 14640 = 60% of 24.4 KB read limit)"],
       ["--subindex-warn-entries <n>", "warn threshold for entries in a sub-index (default 60)"],

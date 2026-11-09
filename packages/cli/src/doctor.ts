@@ -27,6 +27,7 @@ import { homedir } from "node:os";
 import {
   analyzeMemoryMd,
   detectSubindex,
+  generateIndex as generateMemoryIndex,
   parseMemoryMd,
   validateMemory,
 } from "@mcptoolshop/claude-memories";
@@ -38,7 +39,7 @@ import {
 } from "@mcptoolshop/ai-loadout";
 
 import { BOLD, DIM, RESET, GREEN, YELLOW, RED, log } from "./console.js";
-import type { PreToolRule } from "./pretool.js";
+import { loadSeatConfig, resolveRuleMemory, type PreToolRule } from "./pretool.js";
 import { PRETOOL_RULES } from "./pretool-rules.js";
 
 export type CheckStatus = "pass" | "warn" | "fail";
@@ -72,6 +73,10 @@ export interface DoctorPaths {
   skillsDir?: string;
   /** Additional index paths (e.g. project `.claude/loadout/index.json`) searched by the triad memory check. */
   extraIndexes?: string[];
+  /** Optional path to `seats.json` for per-seat triad memory checks. */
+  seatsPath?: string;
+  /** Optional per-seat memory store directory map (`{ rnd: "<store>", publisher: "<store>" }`) for per-seat triad memory checks. */
+  seatStores?: Record<string, string>;
   /** Override pre-tool rule table for the triad check (defaults to `PRETOOL_RULES`). */
   rules?: readonly PreToolRule[];
   /** Warn threshold in bytes for MEMORY.md size (defaults to 60% of 24.4 KB = 14,640 B). */
@@ -200,6 +205,7 @@ export function defaultDoctorPaths(
 ): DoctorPaths {
   const home = homeDir;
   const projectIndex = resolve(repoRoot, ".claude", "loadout", "index.json");
+  const seatsPath = resolve(home, ".ai-loadout", "seats.json");
   return {
     store: resolve(home, ".claude", "projects", "F--AI", "memory"),
     index: resolve(home, ".ai-loadout", "index.json"),
@@ -209,6 +215,7 @@ export function defaultDoctorPaths(
     hookMirror: resolve(home, ".claude", "loadout-hook", "loadout-hook.mjs"),
     skillsDir: resolve(home, ".claude", "skills"),
     extraIndexes: existsSync(projectIndex) ? [projectIndex] : [],
+    ...(existsSync(seatsPath) ? { seatsPath } : {}),
   };
 }
 
@@ -633,41 +640,112 @@ export function runDoctor(paths: DoctorPaths): DoctorResult {
   // ── Part 4.2: Triad checks (memory, skill, pre-tool hook) ─────
   const rules = paths.rules ?? PRETOOL_RULES;
 
-  // (i) triad-memories: every rule in the table names a memory id that exists in some index
-  const knownMemoryIds = new Set<string>();
-  if (index) {
-    for (const e of index.entries) {
-      if (e && typeof e.id === "string") knownMemoryIds.add(e.id);
-    }
-  }
-  for (const extraPath of paths.extraIndexes ?? []) {
-    const extraLoaded = loadIndex(extraPath);
-    if ("index" in extraLoaded) {
-      for (const e of extraLoaded.index.entries) {
-        if (e && typeof e.id === "string") knownMemoryIds.add(e.id);
+  // (i) triad-memories: every rule in the table names a memory id that exists in the seat's store/index
+  const loadStoreMemoryIds = (storeDir: string): Set<string> => {
+    const ids = new Set<string>();
+    const storeIndexFile = join(storeDir, "index.json");
+    if (existsSync(storeIndexFile)) {
+      const loadedStoreIdx = loadIndex(storeIndexFile);
+      if ("index" in loadedStoreIdx) {
+        for (const e of loadedStoreIdx.index.entries) {
+          if (e && typeof e.id === "string") ids.add(e.id);
+        }
       }
+    }
+    const memFile = join(storeDir, "MEMORY.md");
+    if (ids.size === 0 && existsSync(memFile)) {
+      try {
+        const analysis = analyzeMemoryMd(memFile);
+        for (const pm of [false, true]) {
+          for (const e of generateMemoryIndex(analysis, { projectMode: pm }).entries) {
+            if (e && typeof e.id === "string") ids.add(e.id);
+          }
+        }
+      } catch {
+        /* ignore malformed store here; store-validates reports it */
+      }
+    }
+    return ids;
+  };
+
+  let configuredSeatStores: Record<string, string> = {};
+  if (paths.seatStores && Object.keys(paths.seatStores).length > 0) {
+    configuredSeatStores = { ...paths.seatStores };
+  } else if (paths.seatsPath && existsSync(paths.seatsPath)) {
+    try {
+      const sc = loadSeatConfig(paths.seatsPath);
+      if (sc.seatStores && Object.keys(sc.seatStores).length > 0) {
+        configuredSeatStores = { ...sc.seatStores };
+      }
+    } catch {
+      /* ignore unreadable seats.json; falls back to single-store triad check */
     }
   }
 
-  const missingMemoryRules: string[] = [];
-  for (const r of rules) {
-    if (!r.memory || !knownMemoryIds.has(r.memory)) {
-      missingMemoryRules.push(`${r.id} -> ${r.memory || "(empty)"}`);
+  const seatNames = Object.keys(configuredSeatStores);
+  if (seatNames.length > 0) {
+    const missingSeatMemoryRules: string[] = [];
+    for (const seat of seatNames) {
+      const storeDir = configuredSeatStores[seat];
+      const seatKnownIds = loadStoreMemoryIds(storeDir);
+      for (const r of rules) {
+        const memId = resolveRuleMemory(r, seat);
+        if (!memId || !seatKnownIds.has(memId)) {
+          missingSeatMemoryRules.push(`${seat}: ${r.id} -> ${memId || "(empty)"}`);
+        }
+      }
     }
-  }
-  if (missingMemoryRules.length > 0) {
-    checks.push({
-      id: "triad-memories",
-      status: "fail",
-      message: `Triad memory id missing from index(es): ${missingMemoryRules.join(", ")}`,
-      hint: "Ensure every rule in PRETOOL_RULES references a memory id present in the global or project index.json.",
-    });
+    if (missingSeatMemoryRules.length > 0) {
+      checks.push({
+        id: "triad-memories",
+        status: "fail",
+        message: `Triad memory id missing from seat store(s): ${missingSeatMemoryRules.join(", ")}`,
+        hint: "Ensure every rule in PRETOOL_RULES references a memory id present in each configured seat's own store/index.",
+      });
+    } else {
+      checks.push({
+        id: "triad-memories",
+        status: "pass",
+        message: `All ${rules.length} pre-tool rule memory id(s) exist per seat across ${seatNames.length} seat store(s) (${seatNames.join(", ")})`,
+      });
+    }
   } else {
-    checks.push({
-      id: "triad-memories",
-      status: "pass",
-      message: `All ${rules.length} pre-tool rule memory id(s) exist in loaded index(es)`,
-    });
+    const knownMemoryIds = new Set<string>();
+    if (index) {
+      for (const e of index.entries) {
+        if (e && typeof e.id === "string") knownMemoryIds.add(e.id);
+      }
+    }
+    for (const extraPath of paths.extraIndexes ?? []) {
+      const extraLoaded = loadIndex(extraPath);
+      if ("index" in extraLoaded) {
+        for (const e of extraLoaded.index.entries) {
+          if (e && typeof e.id === "string") knownMemoryIds.add(e.id);
+        }
+      }
+    }
+
+    const missingMemoryRules: string[] = [];
+    for (const r of rules) {
+      const memId = resolveRuleMemory(r, "default");
+      if (!memId || !knownMemoryIds.has(memId)) {
+        missingMemoryRules.push(`${r.id} -> ${memId || "(empty)"}`);
+      }
+    }
+    if (missingMemoryRules.length > 0) {
+      checks.push({
+        id: "triad-memories",
+        status: "fail",
+        message: `Triad memory id missing from index(es): ${missingMemoryRules.join(", ")}`,
+        hint: "Ensure every rule in PRETOOL_RULES references a memory id present in the global or project index.json.",
+      });
+    } else {
+      checks.push({
+        id: "triad-memories",
+        status: "pass",
+        message: `All ${rules.length} pre-tool rule memory id(s) exist in loaded index(es)`,
+      });
+    }
   }
 
   // (j) triad-skills: every rule names a skill under ~/.claude/skills/<name>/SKILL.md, or skill: "none" with a reason

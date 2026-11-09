@@ -228,6 +228,7 @@ function dispatchDoctor(args: string[]): void {
   const usage = flagValue(args, "usage");
   const skills = flagValue(args, "skills");
   const projectIndex = flagValue(args, "project-index");
+  const seats = flagValue(args, "seats");
   const memoryWarnBytesRaw = flagValue(args, "memory-warn-bytes");
   const subindexWarnEntriesRaw = flagValue(args, "subindex-warn-entries");
   if (store) paths.store = resolve(store);
@@ -236,6 +237,9 @@ function dispatchDoctor(args: string[]): void {
   if (usage) paths.usage = resolve(usage);
   if (skills) paths.skillsDir = resolve(skills);
   if (projectIndex) paths.extraIndexes = [resolve(projectIndex)];
+  if (seats !== undefined) {
+    paths.seatsPath = seats.trim() ? resolve(seats) : undefined;
+  }
   if (memoryWarnBytesRaw !== undefined) {
     const n = Number(memoryWarnBytesRaw);
     if (!Number.isFinite(n) || n <= 0) {

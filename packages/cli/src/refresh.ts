@@ -63,6 +63,7 @@ import {
   hasFlag,
   flagValue,
 } from "./console.js";
+import { loadSeatConfig, normalizePreToolPath } from "./pretool.js";
 
 /**
  * Canonical memory store (holds MEMORY.md + topic files).
@@ -122,6 +123,10 @@ export interface RefreshOptions {
   idSource?: IdSource;
   /** Subprocess timeout in milliseconds for git commands (default 30,000). */
   gitTimeoutMs?: number;
+  /** Optional path to `seats.json` for resolving `--project` store when `--store` is omitted. */
+  seatsPath?: string;
+  /** Explicit override allowing `refresh` to replace an index whose recorded source store differs. */
+  allowStoreChange?: boolean;
 }
 
 export interface SnapshotResult {
@@ -453,14 +458,15 @@ export function runSnapshotAndMirror(opts: {
 
 /**
  * Rewrite each entry's relative `path` to an absolute path under the store
- * root, and stamp `source` = <store>/MEMORY.md (F-23). Returns a fresh index
- * object (does not mutate the input) plus a count of how many paths were rewritten.
+ * root, and stamp `source` = <store>/MEMORY.md and `source_store` = <store> (F-23).
+ * Returns a fresh index object (does not mutate the input) plus a count of how
+ * many paths were rewritten.
  */
 export function rewritePathsAbsolute(
   index: MemoryIndex,
   storeRoot: string,
   memoryMd: string,
-): { index: MemoryIndex; pathsRewritten: number } {
+): { index: MemoryIndex & { source_store?: string }; pathsRewritten: number } {
   let pathsRewritten = 0;
   const entries = index.entries.map((e) => {
     if (isAbsolute(e.path)) return { ...e };
@@ -468,24 +474,96 @@ export function rewritePathsAbsolute(
     return { ...e, path: resolve(storeRoot, e.path) };
   });
   return {
-    index: { ...index, entries, source: memoryMd },
+    index: {
+      ...index,
+      entries,
+      source: memoryMd,
+      source_store: resolve(storeRoot),
+    },
     pathsRewritten,
   };
+}
+
+/**
+ * Extract the recorded source store directory from a parsed index JSON object,
+ * if `source_store` or `source` (`<store>/MEMORY.md`) was recorded.
+ */
+export function extractIndexSourceStore(rawJson: string): string | null {
+  try {
+    const parsed = JSON.parse(rawJson) as Record<string, unknown>;
+    if (!parsed || typeof parsed !== "object") return null;
+    if (typeof parsed.source_store === "string" && parsed.source_store.trim()) {
+      return resolve(parsed.source_store.trim());
+    }
+    if (typeof parsed.source === "string" && parsed.source.trim()) {
+      return resolve(dirname(parsed.source.trim()));
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Look up the memory store configured for `projectRoot` in `seats.json`.
+ */
+export function resolveStoreForProject(
+  projectRoot: string,
+  seatsPath?: string,
+): string | null {
+  try {
+    const sc = loadSeatConfig(seatsPath);
+    const normProj = normalizePreToolPath(projectRoot).toLowerCase();
+    if (!normProj) return null;
+
+    let bestStore: string | null = null;
+    let bestLen = -1;
+    for (const [rawPrefix, storeDir] of Object.entries(sc.projectStores ?? {})) {
+      const normPrefix = normalizePreToolPath(rawPrefix).toLowerCase();
+      if (!normPrefix) continue;
+      if (
+        (normProj === normPrefix || normProj.startsWith(normPrefix + "/")) &&
+        normPrefix.length > bestLen
+      ) {
+        bestLen = normPrefix.length;
+        bestStore = storeDir;
+      }
+    }
+    return bestStore ? resolve(bestStore) : null;
+  } catch {
+    return null;
+  }
 }
 
 /**
  * Core refresh logic.
  *
  * When `opts.project` is provided (`loadout-os refresh --store <dir> --project <root>`):
- * - Writes `<root>/.claude/loadout/index.json` (with `source: <store>/MEMORY.md` — F-23)
+ * - Writes `<root>/.claude/loadout/index.json` (with `source: <store>/MEMORY.md` and `source_store: <store>` — F-23)
  * - Leaves the global `~/.ai-loadout/index.json` untouched (and does not drop a stale
  *   `index.json` inside the live memory store directory — F-36).
  * - Keeps the ANDON HALT and `<dest>.bak` COMPENSATOR natively (F-16).
  * - Runs under an OS file lock (F-07).
  */
 export function runRefresh(opts: RefreshOptions): RefreshResult {
-  const store = resolve(opts.store ?? DEFAULT_STORE);
   const project = opts.project ? resolve(opts.project) : undefined;
+  let resolvedStorePath: string;
+  if (opts.store && opts.store.trim()) {
+    resolvedStorePath = resolve(opts.store);
+  } else if (project) {
+    const projectStore = resolveStoreForProject(project, opts.seatsPath);
+    if (!projectStore) {
+      throw new RefreshError(
+        "PROJECT_STORE_REQUIRED",
+        `Refusing to refresh --project (${project}) without --store: no store is recorded for this project in seats.json. Pass --store <dir> explicitly or configure the project's store in seats.json.`,
+        2,
+      );
+    }
+    resolvedStorePath = projectStore;
+  } else {
+    resolvedStorePath = resolve(DEFAULT_STORE);
+  }
+  const store = resolvedStorePath;
   const dest = resolve(
     opts.dest ?? (project ? projectDest(project) : defaultDest()),
   );
@@ -513,6 +591,18 @@ export function runRefresh(opts: RefreshOptions): RefreshResult {
         `MEMORY.md not found in store: ${memoryMd}`,
         2,
       );
+    }
+
+    // ── precondition: check existing dest source_store against store ──
+    if (existsSync(dest) && !opts.allowStoreChange) {
+      const existingDestStore = extractIndexSourceStore(readFileSync(dest, "utf-8"));
+      if (existingDestStore && !sameResolvedPath(existingDestStore, store)) {
+        throw new RefreshError(
+          "STORE_MISMATCH",
+          `Destination index (${dest}) was built from store "${existingDestStore}", which differs from requested store "${store}". Refusing to overwrite across stores (pass --allow-store-change to override).`,
+          2,
+        );
+      }
     }
 
     // Optional pre-validation summary sync (--fix)
@@ -560,7 +650,9 @@ export function runRefresh(opts: RefreshOptions): RefreshResult {
       memoryMd,
     );
     const destJson = JSON.stringify(rewritten, null, 2) + "\n";
-    const storeJson = JSON.stringify(storeIndex, null, 2) + "\n";
+    const storeJson =
+      JSON.stringify({ ...storeIndex, source_store: resolve(store) }, null, 2) +
+      "\n";
 
     // re-validate the rewritten dest payload (warn-only) — kernel structure check
     const destIssues = kernelValidateIndex(rewritten as unknown as LoadoutIndex);
@@ -595,7 +687,23 @@ export function runRefresh(opts: RefreshOptions): RefreshResult {
     // ── COMPENSATOR (NAMED, irreversible write to the resolver index) ──
     let backupPath: string | null = null;
     if (existsSync(dest)) {
-      backupPath = `${dest}.bak`;
+      const defaultBak = `${dest}.bak`;
+      if (existsSync(defaultBak)) {
+        const destStore = extractIndexSourceStore(readFileSync(dest, "utf-8")) ?? store;
+        const bakStore = extractIndexSourceStore(readFileSync(defaultBak, "utf-8"));
+        if (bakStore && !sameResolvedPath(bakStore, destStore)) {
+          // Never overwrite an existing .bak whose source store differs: keep both
+          const storeHash = createHash("sha1")
+            .update(process.platform === "win32" ? destStore.toLowerCase() : destStore)
+            .digest("hex")
+            .slice(0, 8);
+          backupPath = `${dest}.${storeHash}.bak`;
+        } else {
+          backupPath = defaultBak;
+        }
+      } else {
+        backupPath = defaultBak;
+      }
       copyFileSync(dest, backupPath);
     }
     const tmpDest = `${dest}.tmp.${process.pid}`;
@@ -769,9 +877,11 @@ export function parseIdSourceFlag(args: string[]): IdSource | undefined {
  *   0 success · 1 andon validation error OR write/git failure · 2 store/MEMORY.md missing or timeout
  */
 export function dispatchRefresh(args: string[]): void {
-  const store = flagValue(args, "store") ?? DEFAULT_STORE;
+  const store = flagValue(args, "store");
   const project = flagValue(args, "project");
   const dest = flagValue(args, "dest");
+  const seatsPath = flagValue(args, "seats");
+  const allowStoreChange = hasFlag(args, "allow-store-change");
   const dryRun = hasFlag(args, "dry-run");
   const fixSummaries = hasFlag(args, "fix") || hasFlag(args, "sync-summaries");
   const snapshotRepo = flagValue(args, "snapshot-repo");
@@ -788,6 +898,8 @@ export function dispatchRefresh(args: string[]): void {
       store,
       project,
       dest,
+      seatsPath,
+      allowStoreChange,
       dryRun,
       fixSummaries,
       snapshotRepo,

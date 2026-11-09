@@ -11,6 +11,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { runDoctor, defaultDoctorPaths, type DoctorPaths } from "../doctor.js";
+import { dispatch } from "../cli.js";
 import { makeSandbox } from "./fixtures.js";
 
 function pathsFor(sb: ReturnType<typeof makeSandbox>): DoctorPaths {
@@ -182,14 +183,13 @@ test("doctor: defaultDoctorPaths points hookSource at bundled apps/hook/dist/loa
     sb.cleanup();
   }
 });
-
 // ════════════════════════════════════════════════════════════════
 // Part 4: provenance frontmatter fields & doctor triad checks
 // ════════════════════════════════════════════════════════════════
 
 import { parseFrontmatter, serializeFrontmatter } from "@mcptoolshop/ai-loadout";
 import { analyzeMemoryMd, generateIndex } from "@mcptoolshop/claude-memories";
-import { RND_TRIAD_ENTRIES } from "./fixtures.js";
+import { RND_TRIAD_ENTRIES, PUBLISHER_TRIAD_ENTRIES } from "./fixtures.js";
 import { PRETOOL_RULES } from "../pretool-rules.js";
 
 test("Part 4.1: provenance & triad frontmatter fields read at top-level or under metadata, and carried into index entries", () => {
@@ -472,6 +472,195 @@ test("Part 4.2 & 4.3: doctor triad check in temp HOME verifies all 5 rules' memo
   }
 });
 
+test("Issue #25 / Ruling 1: doctor triad-memories check runs per seat across two temp seat stores, passing when each seat's ids resolve only in its own store, and failing naming the seat when one id is missing", () => {
+  const sb = makeSandbox({
+    withUsage: true,
+    withSettingsHook: true,
+    withCore: true,
+    observedAvg: 130,
+  });
+  try {
+    const rndStoreDir = join(sb.dir, "rnd-store", "memory");
+    const pubStoreDir = join(sb.dir, "pub-store", "memory");
+    mkdirSync(rndStoreDir, { recursive: true });
+    mkdirSync(pubStoreDir, { recursive: true });
+
+    // Write R&D index.json with ONLY R&D's 5 memory IDs
+    writeFileSync(
+      join(rndStoreDir, "index.json"),
+      JSON.stringify(
+        {
+          version: "1.0.0",
+          generated: "2026-11-09T00:00:00.000Z",
+          entries: RND_TRIAD_ENTRIES,
+          budget: {
+            always_loaded_est: 0,
+            on_demand_total_est: 2293,
+            avg_task_load_est: 458,
+            avg_task_load_observed: null,
+          },
+        },
+        null,
+        2,
+      ),
+      "utf-8",
+    );
+
+    // Write Publisher index.json with ONLY Publisher's 5 memory IDs
+    writeFileSync(
+      join(pubStoreDir, "index.json"),
+      JSON.stringify(
+        {
+          version: "1.0.0",
+          generated: "2026-11-09T00:00:00.000Z",
+          entries: PUBLISHER_TRIAD_ENTRIES,
+          budget: {
+            always_loaded_est: 0,
+            on_demand_total_est: 1220,
+            avg_task_load_est: 244,
+            avg_task_load_observed: null,
+          },
+        },
+        null,
+        2,
+      ),
+      "utf-8",
+    );
+
+    const seatsPath = join(sb.dir, "seats.json");
+    writeFileSync(
+      seatsPath,
+      JSON.stringify(
+        {
+          seats: {
+            "E:/AI/Research and Development": { seat: "rnd", store: rndStoreDir },
+            "E:/AI/Publisher": { seat: "publisher", store: pubStoreDir },
+          },
+        },
+        null,
+        2,
+      ),
+      "utf-8",
+    );
+
+    const skillsDir = join(sb.dir, ".claude", "skills");
+    for (const skillName of ["remote-argon", "loadout-os", "full-treatment"]) {
+      const sDir = join(skillsDir, skillName);
+      mkdirSync(sDir, { recursive: true });
+      writeFileSync(
+        join(sDir, "SKILL.md"),
+        `---\nname: ${skillName}\ndescription: Synthetic skill fixture\n---\n# ${skillName}\n`,
+        "utf-8",
+      );
+    }
+
+    writeFileSync(
+      sb.settingsPath,
+      JSON.stringify({
+        hooks: {
+          UserPromptSubmit: [
+            {
+              hooks: [
+                {
+                  type: "command",
+                  command: "node ~/.claude/loadout-hook/loadout-hook.mjs",
+                },
+              ],
+            },
+          ],
+          PreToolUse: [
+            {
+              matcher: "Bash|Write|Edit|MultiEdit",
+              hooks: [
+                {
+                  type: "command",
+                  command: "loadout-os hook pre-tool --mode enforce",
+                },
+              ],
+            },
+          ],
+        },
+      }),
+      "utf-8",
+    );
+
+    // 1. Positive: both seats have their own 5 memory IDs in their own stores (and neither store has the other's IDs) -> PASS
+    const passRes = runDoctor({
+      ...pathsFor(sb),
+      skillsDir,
+      seatsPath,
+    });
+    const passTriad = find(passRes.checks, "triad-memories");
+    assert.equal(passTriad.status, "pass");
+    assert.match(passTriad.message, /rnd, publisher/);
+    assert.equal(passRes.ok, true);
+
+    // Exercise dispatchDoctor `--seats` CLI wiring
+    dispatch([
+      "doctor",
+      "--store",
+      sb.storeDir,
+      "--index",
+      sb.indexPath,
+      "--settings",
+      sb.settingsPath,
+      "--usage",
+      sb.usagePath,
+      "--skills",
+      skillsDir,
+      "--seats",
+      seatsPath,
+      "--json",
+    ]);
+    process.exitCode = 0;
+
+    // 2. Negative: remove one memory ID (`feedback-eastern-time` for `future-stamp`) from Publisher's store -> FAIL naming `publisher`
+    writeFileSync(
+      join(pubStoreDir, "index.json"),
+      JSON.stringify(
+        {
+          version: "1.0.0",
+          generated: "2026-11-09T00:00:00.000Z",
+          entries: PUBLISHER_TRIAD_ENTRIES.filter((e) => e.id !== "feedback-eastern-time"),
+          budget: {
+            always_loaded_est: 0,
+            on_demand_total_est: 1020,
+            avg_task_load_est: 204,
+            avg_task_load_observed: null,
+          },
+        },
+        null,
+        2,
+      ),
+      "utf-8",
+    );
+
+    const failRes = runDoctor({
+      ...pathsFor(sb),
+      skillsDir,
+      seatsPath,
+    });
+    const failTriad = find(failRes.checks, "triad-memories");
+    assert.equal(failTriad.status, "fail");
+    assert.match(
+      failTriad.message,
+      /publisher: future-stamp -> feedback-eastern-time/,
+      "Failure message must name the seat (`publisher`), rule (`future-stamp`), and missing memory ID (`feedback-eastern-time`)",
+    );
+    assert.equal(failRes.ok, false);
+
+    // 3. Direct `seatStores` option in DoctorPaths also validates per seat
+    const directRes = runDoctor({
+      ...pathsFor(sb),
+      skillsDir,
+      seatStores: { rnd: rndStoreDir, publisher: pubStoreDir },
+    });
+    assert.equal(find(directRes.checks, "triad-memories").status, "fail");
+  } finally {
+    sb.cleanup();
+  }
+});
+
 // ════════════════════════════════════════════════════════════════
 // PR 2 (Items 6, 7, 8): memory-index scaling, nested sub-indexes,
 // and `loadout-os memories split --by <rules.json>`
@@ -483,7 +672,6 @@ import {
   DEFAULT_SUBINDEX_WARN_ENTRIES,
   resolveScaleThresholds,
 } from "../doctor.js";
-import { dispatch } from "../cli.js";
 import { CliError } from "../console.js";
 
 test("PR2 Item 6: doctor warns when MEMORY.md passes 60% of 24.4 KB read limit (14,640 B) and when a sub-index passes 60 entries; both thresholds configurable", () => {
@@ -788,5 +976,3 @@ test("PR2 Item 8: `loadout-os memories split --by <rules.json>` splits 85-entry 
     sb.cleanup();
   }
 });
-
-
