@@ -472,3 +472,321 @@ test("Part 4.2 & 4.3: doctor triad check in temp HOME verifies all 5 rules' memo
   }
 });
 
+// ════════════════════════════════════════════════════════════════
+// PR 2 (Items 6, 7, 8): memory-index scaling, nested sub-indexes,
+// and `loadout-os memories split --by <rules.json>`
+// ════════════════════════════════════════════════════════════════
+
+import {
+  CLAUDE_CODE_MEMORY_READ_LIMIT_BYTES,
+  DEFAULT_MEMORY_WARN_BYTES,
+  DEFAULT_SUBINDEX_WARN_ENTRIES,
+  resolveScaleThresholds,
+} from "../doctor.js";
+import { dispatch } from "../cli.js";
+import { CliError } from "../console.js";
+
+test("PR2 Item 6: doctor warns when MEMORY.md passes 60% of 24.4 KB read limit (14,640 B) and when a sub-index passes 60 entries; both thresholds configurable", () => {
+  const sb = makeSandbox({
+    withUsage: true,
+    withSettingsHook: true,
+    withCore: true,
+    observedAvg: 130,
+  });
+  try {
+    assert.equal(CLAUDE_CODE_MEMORY_READ_LIMIT_BYTES, 24_400);
+    assert.equal(DEFAULT_MEMORY_WARN_BYTES, 14_640);
+    assert.equal(DEFAULT_SUBINDEX_WARN_ENTRIES, 60);
+
+    // 1. Small sandbox passes both memory-read-limit and subindex-entries
+    const initialRes = runDoctor(pathsFor(sb));
+    assert.equal(find(initialRes.checks, "memory-read-limit").status, "pass");
+    assert.equal(find(initialRes.checks, "subindex-entries").status, "pass");
+
+    // 2. Grow MEMORY.md past 14,640 bytes (60% of 24.4 KB) -> memory-read-limit warns
+    const baseMem = readFileSync(sb.memoryMd, "utf-8");
+    const paddedMem = `${baseMem}\n## Notes\n${"A".repeat(15_000)}\n`;
+    writeFileSync(sb.memoryMd, paddedMem, "utf-8");
+
+    const overBytesRes = runDoctor(pathsFor(sb));
+    const memLimitCheck = find(overBytesRes.checks, "memory-read-limit");
+    assert.equal(memLimitCheck.status, "warn");
+    assert.match(memLimitCheck.message, /24\.4 KB read limit/);
+    assert.match(memLimitCheck.message, /14640 B/);
+
+    // Raising memoryWarnBytes via DoctorPaths silences the warning
+    const customBytesRes = runDoctor({
+      ...pathsFor(sb),
+      memoryWarnBytes: 20_000,
+    });
+    assert.equal(find(customBytesRes.checks, "memory-read-limit").status, "pass");
+
+    // 3. Create a sub-index (metadata.loadout_role: subindex) with 61 entries -> subindex-entries warns
+    const subLines = [
+      "---",
+      "name: Large Subindex",
+      "description: Subindex with 61 entries",
+      "metadata:",
+      "  loadout_role: subindex",
+      "---",
+      "# Large Subindex",
+    ];
+    for (let i = 1; i <= 61; i++) {
+      const fname = `sub_entry_${String(i).padStart(2, "0")}.md`;
+      writeFileSync(
+        join(sb.storeDir, fname),
+        `---\nid: sub-${i}\nname: Sub ${i}\ndescription: Sub entry ${i}\n---\n# Sub ${i}\n`,
+        "utf-8",
+      );
+      subLines.push(`- [Sub ${i}](${fname}) — Sub entry ${i}`);
+    }
+    writeFileSync(join(sb.storeDir, "custom-sub.md"), subLines.join("\n") + "\n", "utf-8");
+    writeFileSync(
+      sb.memoryMd,
+      `${baseMem.trimEnd()}\n- [Large Subindex](custom-sub.md) — Subindex with 61 entries\n`,
+      "utf-8",
+    );
+
+    const overSubRes = runDoctor(pathsFor(sb));
+    const subCheck = find(overSubRes.checks, "subindex-entries");
+    assert.equal(subCheck.status, "warn");
+    assert.match(subCheck.message, /custom-sub\.md \(61 entries\)/);
+
+    // Raising subindexWarnEntries via .loadout.json or DoctorPaths silences the warning
+    writeFileSync(
+      join(sb.storeDir, ".loadout.json"),
+      JSON.stringify({ memoryWarnBytes: 18_000, subindexWarnEntries: 70 }),
+      "utf-8",
+    );
+    const resolvedThresholds = resolveScaleThresholds(pathsFor(sb));
+    assert.equal(resolvedThresholds.memoryWarnBytes, 18_000);
+    assert.equal(resolvedThresholds.subindexWarnEntries, 70);
+
+    const configOverrideRes = runDoctor(pathsFor(sb));
+    assert.equal(find(configOverrideRes.checks, "subindex-entries").status, "pass");
+
+    // Also test frontmatter metadata thresholds when .loadout.json is absent
+    writeFileSync(join(sb.storeDir, ".loadout.json"), "{ invalid", "utf-8");
+    const fmThresholdMem = [
+      "---",
+      "metadata:",
+      "  memory_warn_bytes: 16000",
+      "  subindex_warn_entries: 65",
+      "---",
+      baseMem,
+    ].join("\n");
+    const fmResolved = resolveScaleThresholds(pathsFor(sb), fmThresholdMem);
+    assert.equal(fmResolved.memoryWarnBytes, 16_000);
+    assert.equal(fmResolved.subindexWarnEntries, 65);
+
+    // CLI dispatch with --memory-warn-bytes and --subindex-warn-entries
+    dispatch([
+      "doctor",
+      "--store",
+      sb.storeDir,
+      "--index",
+      sb.indexPath,
+      "--settings",
+      sb.settingsPath,
+      "--usage",
+      sb.usagePath,
+      "--memory-warn-bytes",
+      "50",
+      "--subindex-warn-entries",
+      "10",
+      "--json",
+    ]);
+    process.exitCode = 0;
+
+    assert.throws(
+      () => dispatch(["doctor", "--memory-warn-bytes", "0"]),
+      (err: unknown) => err instanceof CliError && err.code === "INVALID_FLAG_VALUE",
+    );
+    assert.throws(
+      () => dispatch(["doctor", "--subindex-warn-entries", "-5"]),
+      (err: unknown) => err instanceof CliError && err.code === "INVALID_FLAG_VALUE",
+    );
+  } finally {
+    sb.cleanup();
+  }
+});
+
+test("PR2 Item 8: `loadout-os memories split --by <rules.json>` splits 85-entry temp store, proves count & priorities unchanged, writes nothing on --dry-run, and refuses on count mismatch", () => {
+  const sb = makeSandbox({
+    withUsage: true,
+    withSettingsHook: true,
+    withCore: true,
+    observedAvg: 130,
+  });
+  try {
+    // Populate sb.storeDir with 115 entries (core, domain, manual) so MEMORY.md exceeds 14,640 bytes
+    const memLines = ["# Workspace Memory", "", "## Core", ""];
+    for (let i = 1; i <= 5; i++) {
+      const f = `core_${i}.md`;
+      const desc = `Core entry ${i} with mandatory architecture invariants and session routing policy rules`;
+      writeFileSync(
+        join(sb.storeDir, f),
+        `---\nid: core-${i}\nname: Core ${i}\ndescription: ${desc}\npriority: core\n---\n# Core ${i}\n`,
+        "utf-8",
+      );
+      memLines.push(`- [Core ${i}](${f}) — ${desc}`);
+    }
+
+    memLines.push("", "## Feedback", "");
+    for (let i = 1; i <= 55; i++) {
+      const f = `feedback_${String(i).padStart(2, "0")}.md`;
+      const prio = i % 4 === 0 ? "manual" : "domain";
+      const desc = `Feedback entry ${i} documenting operational lesson, verification guard, and workflow rule`;
+      writeFileSync(
+        join(sb.storeDir, f),
+        `---\nid: fb-${i}\nname: Feedback ${i}\ndescription: ${desc}\npriority: ${prio}\n---\n# Feedback ${i}\n`,
+        "utf-8",
+      );
+      memLines.push(`- [Feedback ${i}](${f}) — ${desc}`);
+    }
+
+    memLines.push("", "## Projects", "");
+    for (let i = 1; i <= 55; i++) {
+      const f = `project_${String(i).padStart(2, "0")}.md`;
+      const desc = `Project entry ${i} covering repository roadmap, package boundaries, and release targets`;
+      writeFileSync(
+        join(sb.storeDir, f),
+        `---\nid: proj-${i}\nname: Project ${i}\ndescription: ${desc}\n---\n# Project ${i}\n`,
+        "utf-8",
+      );
+      memLines.push(`- [Project ${i}](${f}) — ${desc}`);
+    }
+
+    memLines.push("", "## Archive", "");
+    for (let i = 1; i <= 30; i++) {
+      const f = `archive_${String(i).padStart(2, "0")}.md`;
+      const desc = `Archive entry ${i} retaining historical audit trail, benchmark record, and context`;
+      writeFileSync(
+        join(sb.storeDir, f),
+        `---\nid: arch-${i}\nname: Archive ${i}\ndescription: ${desc}\npriority: manual\n---\n# Archive ${i}\n`,
+        "utf-8",
+      );
+      memLines.push(`- [Archive ${i}](${f}) — ${desc}`);
+    }
+
+    writeFileSync(sb.memoryMd, memLines.join("\n") + "\n", "utf-8");
+
+    // Reference any existing sandbox default topic files in MEMORY.md with matching frontmatter description
+    for (const f of readdirSync(sb.storeDir)) {
+      if (
+        f.endsWith(".md") &&
+        f !== "MEMORY.md" &&
+        !f.startsWith("core_") &&
+        !f.startsWith("feedback_") &&
+        !f.startsWith("project_") &&
+        !f.startsWith("archive_")
+      ) {
+        const p = join(sb.storeDir, f);
+        writeFileSync(
+          p,
+          `---\nid: ${f.replace(/\.md$/, "")}\nname: ${f}\ndescription: Sandbox fixture entry\n---\n# ${f}\n`,
+          "utf-8",
+        );
+        writeFileSync(
+          sb.memoryMd,
+          readFileSync(sb.memoryMd, "utf-8").trimEnd() +
+            `\n- [${f}](${f}) — Sandbox fixture entry\n`,
+          "utf-8",
+        );
+      }
+    }
+
+    // Before split: MEMORY.md is > 14,640 bytes, so doctor warns on `memory-read-limit`
+    const preSplitDoctor = runDoctor(pathsFor(sb));
+    assert.equal(find(preSplitDoctor.checks, "memory-read-limit").status, "warn");
+
+    const rulesPath = join(sb.dir, "rules.json");
+    writeFileSync(
+      rulesPath,
+      JSON.stringify({
+        keepInRoot: { prefixes: ["core_"] },
+        rules: [
+          {
+            subindex: "index-feedback.md",
+            title: "Feedback",
+            description: "Feedback memories sub-index",
+            prefix: "feedback_",
+          },
+          {
+            subindex: "index-projects.md",
+            title: "Projects",
+            description: "Project memories sub-index",
+            prefix: "project_",
+          },
+          {
+            subindex: "index-archive.md",
+            title: "Archive",
+            description: "Archive memories sub-index",
+            prefix: "archive_",
+          },
+        ],
+      }),
+      "utf-8",
+    );
+
+    const beforeBytes = readFileSync(sb.memoryMd, "utf-8");
+
+    // 0. Missing --by throws MISSING_ARG
+    assert.throws(
+      () => dispatch(["memories", "split", sb.memoryMd]),
+      (err: unknown) => err instanceof CliError && err.code === "MISSING_ARG",
+    );
+
+    // 1. CLI --dry-run (both --json and human output, plus directory positional arg) writes nothing
+    dispatch([
+      "memories",
+      "split",
+      sb.memoryMd,
+      "--by",
+      rulesPath,
+      "--dry-run",
+      "--json",
+    ]);
+    dispatch([
+      "memories",
+      "split",
+      sb.storeDir,
+      "--by",
+      rulesPath,
+      "--dry-run",
+    ]);
+    assert.equal(readFileSync(sb.memoryMd, "utf-8"), beforeBytes);
+    assert.equal(existsSync(join(sb.storeDir, "index-feedback.md")), false);
+
+    // 2. CLI refusal when a rule drops entries (entry count differs)
+    const badRulesPath = join(sb.dir, "bad-rules.json");
+    writeFileSync(
+      badRulesPath,
+      JSON.stringify({
+        rules: [{ subindex: "index-feedback.md", prefix: "feedback_", drop: true }],
+      }),
+      "utf-8",
+    );
+    assert.throws(
+      () => dispatch(["memories", "split", sb.memoryMd, "--by", badRulesPath]),
+      (err: unknown) => err instanceof CliError && err.code === "ENTRY_COUNT_MISMATCH",
+    );
+    assert.equal(readFileSync(sb.memoryMd, "utf-8"), beforeBytes);
+
+    // 3. Real CLI split
+    dispatch(["memories", "split", "--store", sb.storeDir, "--by", rulesPath]);
+    assert.ok(existsSync(join(sb.storeDir, "index-feedback.md")));
+    assert.ok(existsSync(join(sb.storeDir, "index-projects.md")));
+
+    // After split: MEMORY.md is now small (< 2 KB) and both sub-indexes have 40 entries (<= 60),
+    // so both `memory-read-limit` and `subindex-entries` pass in doctor!
+    const postSplitDoctor = runDoctor(pathsFor(sb));
+    assert.equal(find(postSplitDoctor.checks, "store-validates").status, "pass");
+    assert.equal(find(postSplitDoctor.checks, "memory-read-limit").status, "pass");
+    assert.equal(find(postSplitDoctor.checks, "subindex-entries").status, "pass");
+  } finally {
+    sb.cleanup();
+  }
+});
+
+

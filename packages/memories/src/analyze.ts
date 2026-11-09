@@ -73,8 +73,10 @@ export function analyzeMemoryMd(filePath: string): MemoryAnalysis {
   const diagnostics: Diagnostic[] = [];
   const missingFiles: string[] = [];
   const subindexFiles: string[] = [];
+  const subindexEntryCounts: Record<string, number> = {};
   const expandedRefs: MemoryRef[] = [];
   const referencedBasenames = new Set<string>();
+  const visitedIndexFiles = new Set<string>([resolve(filePath)]);
   let topicTokens = 0;
 
   const recordMissing = (ref: MemoryRef, sourceLabel: string) => {
@@ -89,71 +91,99 @@ export function analyzeMemoryMd(filePath: string): MemoryAnalysis {
     });
   };
 
-  for (const ref of topRefs) {
-    referencedBasenames.add(ref.path);
-    referencedBasenames.add(basename(ref.path));
+  const expandIndexRefs = (
+    refs: MemoryRef[],
+    currentDir: string,
+    currentParentDir: string,
+    sourceLabel: string,
+    inSubindex: boolean,
+    subindexPathLabel?: string,
+    inheritedDefaultPriority?: Priority,
+  ) => {
+    for (const ref of refs) {
+      const effectiveRef: MemoryRef = inSubindex
+        ? {
+            ...ref,
+            subindex: true,
+            subindexPath: subindexPathLabel,
+            ...(inheritedDefaultPriority ? { defaultPriority: inheritedDefaultPriority } : {}),
+          }
+        : ref;
 
-    const resolved = resolveRefPath(ref.path, fileDir, parentDir);
-    if (!resolved) {
-      expandedRefs.push(ref);
-      recordMissing(ref, "MEMORY.md");
-      continue;
-    }
+      referencedBasenames.add(ref.path);
+      referencedBasenames.add(basename(ref.path));
 
-    let refContent: string;
-    try {
-      refContent = readFileSync(resolved, "utf-8");
-    } catch {
-      expandedRefs.push(ref);
-      recordMissing(ref, "MEMORY.md");
-      continue;
-    }
+      const resolved =
+        resolveRefPath(ref.path, currentDir, currentParentDir) ??
+        (inSubindex ? resolveRefPath(ref.path, fileDir, parentDir) : null);
 
-    const subCheck = detectSubindex(ref.path, refContent);
-    if (subCheck.isSubindex) {
-      // Sub-index file: its bullets become entries; the sub-index itself is not an entry.
-      subindexFiles.push(ref.path);
-      referencedBasenames.add(basename(resolved));
+      if (!resolved) {
+        expandedRefs.push(effectiveRef);
+        recordMissing(effectiveRef, sourceLabel);
+        continue;
+      }
+
       const relResolved = relative(fileDir, resolved).replace(/\\/g, "/");
       referencedBasenames.add(relResolved);
+      referencedBasenames.add(basename(resolved));
 
-      const subDir = dirname(resolved);
-      const subParent = dirname(subDir);
-      const { refs: subRefs } = parseMemoryMd(refContent);
-
-      for (const sref of subRefs) {
-        const subEntryRef: MemoryRef = {
-          ...sref,
-          subindex: true,
-          subindexPath: ref.path,
-          ...(subCheck.defaultPriority ? { defaultPriority: subCheck.defaultPriority } : {}),
-        };
-        expandedRefs.push(subEntryRef);
-        referencedBasenames.add(sref.path);
-        referencedBasenames.add(basename(sref.path));
-
-        const subResolved =
-          resolveRefPath(sref.path, subDir, subParent) ??
-          resolveRefPath(sref.path, fileDir, parentDir);
-        if (subResolved) {
-          const relSub = relative(fileDir, subResolved).replace(/\\/g, "/");
-          referencedBasenames.add(relSub);
-          referencedBasenames.add(basename(subResolved));
-          try {
-            const subTopicContent = readFileSync(subResolved, "utf-8");
-            topicTokens += estimateTokens(subTopicContent);
-          } catch {
-            recordMissing(subEntryRef, ref.path);
-          }
-        } else {
-          recordMissing(subEntryRef, ref.path);
-        }
+      let refContent: string;
+      try {
+        refContent = readFileSync(resolved, "utf-8");
+      } catch {
+        expandedRefs.push(effectiveRef);
+        recordMissing(effectiveRef, sourceLabel);
+        continue;
       }
-    } else {
-      expandedRefs.push(ref);
-      topicTokens += estimateTokens(refContent);
+
+      const subCheck = detectSubindex(ref.path, refContent);
+      if (subCheck.isSubindex) {
+        const canonicalSub = resolve(resolved);
+        if (visitedIndexFiles.has(canonicalSub)) {
+          diagnostics.push({
+            severity: "warning",
+            code: "SUBINDEX_CYCLE",
+            message: `Circular sub-index reference skipped: ${ref.path} (from ${sourceLabel})`,
+            refPath: ref.path,
+            line: ref.line,
+            hint: `Remove the circular sub-index link in ${sourceLabel}`,
+          });
+          continue;
+        }
+        visitedIndexFiles.add(canonicalSub);
+
+        const subLabel = inSubindex
+          ? relResolved && !relResolved.startsWith("..")
+            ? relResolved
+            : ref.path
+          : ref.path;
+        if (!subindexFiles.includes(subLabel)) {
+          subindexFiles.push(subLabel);
+        }
+
+        const subDir = dirname(resolved);
+        const subParent = dirname(subDir);
+        const { refs: subRefs } = parseMemoryMd(refContent);
+        subindexEntryCounts[subLabel] = subRefs.length;
+
+        const nextDefaultPriority = subCheck.defaultPriority ?? inheritedDefaultPriority;
+        expandIndexRefs(
+          subRefs,
+          subDir,
+          subParent,
+          subLabel,
+          true,
+          subLabel,
+          nextDefaultPriority,
+        );
+      } else {
+        expandedRefs.push(effectiveRef);
+        topicTokens += estimateTokens(refContent);
+      }
     }
-  }
+  };
+
+  expandIndexRefs(topRefs, fileDir, parentDir, "MEMORY.md", false);
 
   const orphanFiles: string[] = [];
 
@@ -188,6 +218,7 @@ export function analyzeMemoryMd(filePath: string): MemoryAnalysis {
     sections,
     refs: expandedRefs,
     subindexFiles,
+    subindexEntryCounts,
     orphanFiles,
     missingFiles,
     diagnostics,

@@ -17,6 +17,7 @@ import { analyzeMemoryMd } from "./analyze.js";
 import { generateIndex } from "./index-gen.js";
 import { validateMemory, validateMemoryIndex } from "./validate.js";
 import { generateStats, formatStats } from "./stats.js";
+import { loadSplitRulesFile, splitMemoryStore, SplitError } from "./split.js";
 import type { IdSource, ValidationIssue } from "./types.js";
 
 /**
@@ -99,7 +100,7 @@ function parseIdSourceFlag(args: string[]): IdSource | undefined {
   );
 }
 
-const VALUE_FLAGS = new Set(["out", "id-source"]);
+const VALUE_FLAGS = new Set(["out", "id-source", "by"]);
 
 function positionalArgs(args: string[]): string[] {
   const out: string[] = [];
@@ -363,6 +364,34 @@ async function cmdStats(args: string[]) {
   log("");
 }
 
+async function cmdSplit(args: string[]) {
+  const rulesPath = flagValue(args, "by");
+  if (!rulesPath) {
+    fail(
+      "MISSING_FLAG_VALUE",
+      "memories split requires --by <rules.json>",
+      "Usage: claude-memories split [MEMORY.md] --by <rules.json> [--dry-run]",
+    );
+  }
+  const filePath = resolveMemoryMd(args);
+  const dryRun = hasFlag(args, "dry-run");
+  const idSource = parseIdSourceFlag(args);
+  const rulesConfig = loadSplitRulesFile(rulesPath);
+  const result = splitMemoryStore(filePath, rulesConfig, { dryRun, idSource });
+
+  log(`\n${BOLD}${dryRun ? "Dry-run split" : "Split"}${RESET} ${filePath}\n`);
+  ok(`Entries preserved: ${result.beforeEntryCount} → ${result.afterEntryCount} (priorities unchanged)`);
+  info(`Moved to sub-indexes: ${result.movedEntryCount} · Kept in root: ${result.keptInRootCount}`);
+  info(`MEMORY.md size: ${result.beforeMemoryMdBytes} B → ${result.afterMemoryMdBytes} B`);
+  for (const sub of result.subindexes) {
+    ok(`${sub.subindex}: ${sub.movedCount} moved (${sub.totalEntries} total)`);
+  }
+  if (dryRun) {
+    info("Dry run: no files were written.");
+  }
+  log("");
+}
+
 async function cmdHealth() {
   const version = getVersion();
   const nodeMajor = parseInt(process.version.slice(1), 10);
@@ -431,6 +460,9 @@ const cmdArgs = args.slice(1);
  * + actionable hint and exit cleanly via the existing structured `fail`.
  */
 function classifyError(err: unknown): { code: string; message: string; hint?: string } {
+  if (err instanceof SplitError) {
+    return { code: err.code, message: err.message, hint: err.hint };
+  }
   const message = err instanceof Error ? err.message : String(err);
   // Read failures surface from analyzeMemoryMd ("Cannot read MEMORY.md at …")
   // and from any readFileSync on a topic file. EISDIR means a directory slipped
@@ -480,6 +512,9 @@ switch (cmd) {
     break;
   case "stats":
     await runCommand(() => cmdStats(cmdArgs));
+    break;
+  case "split":
+    await runCommand(() => cmdSplit(cmdArgs));
     break;
   case "health":
     await runCommand(() => cmdHealth());

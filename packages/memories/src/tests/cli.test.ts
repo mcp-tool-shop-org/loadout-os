@@ -203,4 +203,43 @@ describe("index health summary (FT-MR4)", () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  it("split command runs --dry-run and real split via --by <rules.json>, and errors cleanly when --by is missing or count mismatches", () => {
+    const dir = mkdtempSync(join(tmpdir(), "mem-cli-split-"));
+    try {
+      writeFileSync(
+        join(dir, "topic.md"),
+        "---\nid: topic-one\nname: Topic One\ndescription: Topic one desc\n---\n# Topic\n",
+      );
+      writeFileSync(join(dir, "MEMORY.md"), "# Mem\n- [Topic One](topic.md) — Topic one desc\n");
+      const rulesFile = join(dir, "rules.json");
+      writeFileSync(
+        rulesFile,
+        JSON.stringify({ rules: [{ subindex: "index-topics.md", prefix: "topic" }] }),
+      );
+
+      const missingBy = runCli(["split", join(dir, "MEMORY.md")]);
+      assert.equal(missingBy.status, 1);
+      assert.match(missingBy.stderr, /MISSING_FLAG_VALUE/);
+
+      const dry = runCli(["split", join(dir, "MEMORY.md"), "--by", rulesFile, "--dry-run"]);
+      assert.equal(dry.status, 0);
+      assert.match(dry.stdout, /Entries preserved: 1 → 1/);
+
+      const badRules = join(dir, "bad-rules.json");
+      writeFileSync(
+        badRules,
+        JSON.stringify({ rules: [{ subindex: "index-topics.md", prefix: "topic", drop: true }] }),
+      );
+      const refused = runCli(["split", join(dir, "MEMORY.md"), "--by", badRules]);
+      assert.equal(refused.status, 1);
+      assert.match(refused.stderr, /ENTRY_COUNT_MISMATCH/);
+
+      const real = runCli(["split", join(dir, "MEMORY.md"), "--by", rulesFile]);
+      assert.equal(real.status, 0);
+      assert.match(real.stdout, /index-topics\.md: 1 moved/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });

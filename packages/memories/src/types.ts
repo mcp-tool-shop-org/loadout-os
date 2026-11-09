@@ -71,6 +71,7 @@ export interface MemoryAnalysis {
   sections: MemorySection[];
   refs: MemoryRef[];
   subindexFiles?: string[];  // sub-index files linked from MEMORY.md (not emitted as entries)
+  subindexEntryCounts?: Record<string, number>; // direct entry count per discovered sub-index file
   orphanFiles: string[];     // topic files not referenced in MEMORY.md or sub-indexes (derived view of diagnostics)
   missingFiles: string[];    // referenced paths that don't exist on disk (derived view of diagnostics)
   diagnostics: Diagnostic[]; // FT-MR3: structured signals (back-compat superset of the flat arrays)
