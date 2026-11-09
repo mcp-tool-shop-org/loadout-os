@@ -46,6 +46,7 @@ import {
   memoriesSyncSummaries,
   memoriesPlace,
   memoriesMove,
+  memoriesSplit,
   rulesAnalyze,
   rulesValidate,
   rulesStats,
@@ -91,7 +92,7 @@ export function topLevelHelp(): string {
 ${BOLD}loadout-os${RESET} v${getVersion()} — unified Knowledge OS CLI
 
 ${BOLD}Namespaces (wrapped library surfaces):${RESET}
-  loadout-os memories <index|validate|stats|health|sync-summaries|place|move> <MEMORY.md>
+  loadout-os memories <index|validate|stats|health|sync-summaries|place|move|split> <MEMORY.md>
   loadout-os rules    <analyze|validate|stats|split> [CLAUDE.md]
 
 ${BOLD}Flat verbs (knowledge router / kernel):${RESET}
@@ -139,6 +140,7 @@ ${BOLD}loadout-os memories${RESET} — wraps @mcptoolshop/claude-memories
   loadout-os memories sync-summaries <MEMORY.md> [--fix] [--json]
   loadout-os memories place <topic.md> <index> [--store <dir>] [--into <index>] [--json]
   loadout-os memories move <topic.md> <index> [--store <dir>] [--into <index>] [--json]
+  loadout-os memories split [<MEMORY.md>] --by <rules.json> [--store <dir>] [--dry-run] [--json]
 `;
 }
 
@@ -178,11 +180,13 @@ function dispatchMemories(args: string[]): void {
       return memoriesPlace(rest);
     case "move":
       return memoriesMove(rest);
+    case "split":
+      return memoriesSplit(rest);
     default:
       throw new CliError(
         "UNKNOWN_COMMAND",
         `Unknown memories subcommand: ${sub}`,
-        "Expected one of: index, validate, stats, health, sync-summaries, place, move. Run 'loadout-os memories --help'.",
+        "Expected one of: index, validate, stats, health, sync-summaries, place, move, split. Run 'loadout-os memories --help'.",
       );
   }
 }
@@ -225,6 +229,8 @@ function dispatchDoctor(args: string[]): void {
   const skills = flagValue(args, "skills");
   const projectIndex = flagValue(args, "project-index");
   const seats = flagValue(args, "seats");
+  const memoryWarnBytesRaw = flagValue(args, "memory-warn-bytes");
+  const subindexWarnEntriesRaw = flagValue(args, "subindex-warn-entries");
   if (store) paths.store = resolve(store);
   if (index) paths.index = resolve(index);
   if (settings) paths.settings = resolve(settings);
@@ -233,6 +239,28 @@ function dispatchDoctor(args: string[]): void {
   if (projectIndex) paths.extraIndexes = [resolve(projectIndex)];
   if (seats !== undefined) {
     paths.seatsPath = seats.trim() ? resolve(seats) : undefined;
+  }
+  if (memoryWarnBytesRaw !== undefined) {
+    const n = Number(memoryWarnBytesRaw);
+    if (!Number.isFinite(n) || n <= 0) {
+      throw new CliError(
+        "INVALID_FLAG_VALUE",
+        `Invalid --memory-warn-bytes "${memoryWarnBytesRaw}": expected a positive number`,
+        "Pass a positive byte threshold, e.g. --memory-warn-bytes 14640",
+      );
+    }
+    paths.memoryWarnBytes = n;
+  }
+  if (subindexWarnEntriesRaw !== undefined) {
+    const n = Number(subindexWarnEntriesRaw);
+    if (!Number.isFinite(n) || n <= 0) {
+      throw new CliError(
+        "INVALID_FLAG_VALUE",
+        `Invalid --subindex-warn-entries "${subindexWarnEntriesRaw}": expected a positive number`,
+        "Pass a positive entry threshold, e.g. --subindex-warn-entries 60",
+      );
+    }
+    paths.subindexWarnEntries = n;
   }
 
   const result = runDoctor(paths);

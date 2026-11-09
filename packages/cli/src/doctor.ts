@@ -19,13 +19,20 @@
  *     not a multi-model pipeline; this is a single deterministic screen.
  */
 
-import { readFileSync, existsSync, statSync } from "node:fs";
+import { readFileSync, existsSync, statSync, readdirSync } from "node:fs";
 import { createHash } from "node:crypto";
-import { dirname, join, resolve } from "node:path";
+import { dirname, extname, join, resolve } from "node:path";
 import { homedir } from "node:os";
 
-import { analyzeMemoryMd, generateIndex as generateMemoryIndex, validateMemory } from "@mcptoolshop/claude-memories";
 import {
+  analyzeMemoryMd,
+  detectSubindex,
+  generateIndex as generateMemoryIndex,
+  parseMemoryMd,
+  validateMemory,
+} from "@mcptoolshop/claude-memories";
+import {
+  parseFrontmatter,
   validateIndex,
   discoverLayers,
   type LoadoutIndex,
@@ -72,10 +79,125 @@ export interface DoctorPaths {
   seatStores?: Record<string, string>;
   /** Override pre-tool rule table for the triad check (defaults to `PRETOOL_RULES`). */
   rules?: readonly PreToolRule[];
+  /** Warn threshold in bytes for MEMORY.md size (defaults to 60% of 24.4 KB = 14,640 B). */
+  memoryWarnBytes?: number;
+  /** Warn threshold for entries in a sub-index (`metadata.loadout_role: subindex`, defaults to 60). */
+  subindexWarnEntries?: number;
 }
+
+/** Claude Code's 24.4 KB read limit for MEMORY.md. */
+export const CLAUDE_CODE_MEMORY_READ_LIMIT_BYTES = 24_400;
+/** Default warn threshold: 60% of Claude Code's 24.4 KB read limit (14,640 bytes). */
+export const DEFAULT_MEMORY_WARN_BYTES = Math.round(
+  CLAUDE_CODE_MEMORY_READ_LIMIT_BYTES * 0.6,
+);
+/** Default warn threshold for sub-index (`metadata.loadout_role: subindex`) entry count. */
+export const DEFAULT_SUBINDEX_WARN_ENTRIES = 60;
 
 /** ~7 days — a usage.jsonl untouched longer than this is "stale" (warn). */
 const RECENT_MS = 7 * 24 * 60 * 60 * 1000;
+
+function toPositiveNumber(val: unknown): number | undefined {
+  if (typeof val === "number" && Number.isFinite(val) && val > 0) {
+    return val;
+  }
+  if (typeof val === "string" && val.trim().length > 0) {
+    const parsed = Number(val);
+    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  }
+  return undefined;
+}
+
+/**
+ * Resolve configurable scaling thresholds for MEMORY.md bytes and sub-index entry counts.
+ * Precedence: explicit DoctorPaths / CLI flag > <store>/.loadout.json > MEMORY.md frontmatter > defaults.
+ */
+export function resolveScaleThresholds(
+  paths: DoctorPaths,
+  memoryMdContent?: string,
+): { memoryWarnBytes: number; subindexWarnEntries: number } {
+  let cfgBytes: number | undefined;
+  let cfgEntries: number | undefined;
+
+  const storeConfigPath = join(paths.store, ".loadout.json");
+  if (existsSync(storeConfigPath)) {
+    try {
+      const cfg = JSON.parse(readFileSync(storeConfigPath, "utf-8")) as Record<
+        string,
+        unknown
+      >;
+      cfgBytes =
+        toPositiveNumber(cfg.memoryWarnBytes) ??
+        toPositiveNumber(cfg.memory_warn_bytes);
+      cfgEntries =
+        toPositiveNumber(cfg.subindexWarnEntries) ??
+        toPositiveNumber(cfg.subindex_warn_entries);
+    } catch {
+      // ignore malformed .loadout.json
+    }
+  }
+
+  let fmBytes: number | undefined;
+  let fmEntries: number | undefined;
+  if (memoryMdContent) {
+    const { frontmatter } = parseFrontmatter(memoryMdContent);
+    const meta = frontmatter?.metadata as Record<string, unknown> | undefined;
+    fmBytes =
+      toPositiveNumber(meta?.memory_warn_bytes) ??
+      toPositiveNumber(meta?.memoryWarnBytes);
+    fmEntries =
+      toPositiveNumber(meta?.subindex_warn_entries) ??
+      toPositiveNumber(meta?.subindexWarnEntries);
+
+    // Fallback when MEMORY.md frontmatter has no `name:` or `id:` field
+    if (
+      (fmBytes === undefined || fmEntries === undefined) &&
+      memoryMdContent.startsWith("---")
+    ) {
+      const firstNewline = memoryMdContent.indexOf("\n");
+      const closeIdx =
+        firstNewline !== -1
+          ? memoryMdContent.indexOf("\n---", firstNewline)
+          : -1;
+      if (closeIdx !== -1) {
+        const block = memoryMdContent.slice(firstNewline + 1, closeIdx);
+        for (const rawLine of block.split(/\r?\n/)) {
+          const colonIdx = rawLine.indexOf(":");
+          if (colonIdx <= 0) continue;
+          const k = rawLine.slice(0, colonIdx).trim();
+          const val = rawLine
+            .slice(colonIdx + 1)
+            .trim()
+            .replace(/^["']|["']$/g, "");
+          if (
+            (k === "memory_warn_bytes" || k === "memoryWarnBytes") &&
+            fmBytes === undefined
+          ) {
+            fmBytes = toPositiveNumber(val);
+          } else if (
+            (k === "subindex_warn_entries" || k === "subindexWarnEntries") &&
+            fmEntries === undefined
+          ) {
+            fmEntries = toPositiveNumber(val);
+          }
+        }
+      }
+    }
+  }
+
+  return {
+    memoryWarnBytes:
+      toPositiveNumber(paths.memoryWarnBytes) ??
+      cfgBytes ??
+      fmBytes ??
+      DEFAULT_MEMORY_WARN_BYTES,
+    subindexWarnEntries:
+      toPositiveNumber(paths.subindexWarnEntries) ??
+      cfgEntries ??
+      fmEntries ??
+      DEFAULT_SUBINDEX_WARN_ENTRIES,
+  };
+}
 
 export function defaultDoctorPaths(
   repoRoot: string = process.cwd(),
@@ -185,6 +307,92 @@ export function runDoctor(paths: DoctorPaths): DoctorResult {
           id: "store-validates",
           status: "pass",
           message: `Store MEMORY.md validates (0 errors, ${analysis.refs.length} refs)`,
+        });
+      }
+
+      // (a2) MEMORY.md size vs 60% of Claude Code's 24.4 KB read limit & sub-index entry counts
+      const memoryMdRaw = readFileSync(memoryMd, "utf-8");
+      const memoryMdBytes = Buffer.byteLength(memoryMdRaw, "utf-8");
+      const { memoryWarnBytes, subindexWarnEntries } = resolveScaleThresholds(
+        paths,
+        memoryMdRaw,
+      );
+      const pctOfReadLimit = Math.round(
+        (memoryMdBytes / CLAUDE_CODE_MEMORY_READ_LIMIT_BYTES) * 100,
+      );
+
+      if (memoryMdBytes > memoryWarnBytes) {
+        checks.push({
+          id: "memory-read-limit",
+          status: "warn",
+          message: `MEMORY.md is ${memoryMdBytes} B (${pctOfReadLimit}% of Claude Code's 24.4 KB read limit; warn threshold ${memoryWarnBytes} B)`,
+          hint: "Split root entries into sub-indexes with `loadout-os memories split --by <rules.json>`.",
+        });
+      } else {
+        checks.push({
+          id: "memory-read-limit",
+          status: "pass",
+          message: `MEMORY.md size ${memoryMdBytes} B (${pctOfReadLimit}% of 24.4 KB read limit <= ${memoryWarnBytes} B warn threshold)`,
+        });
+      }
+
+      // Gather sub-index entry counts from analysis and any sub-index files in the store directory
+      const subindexCounts = new Map<string, number>();
+      if (analysis.subindexEntryCounts) {
+        for (const [subFile, count] of Object.entries(
+          analysis.subindexEntryCounts,
+        )) {
+          subindexCounts.set(subFile, count);
+        }
+      }
+      if (existsSync(paths.store)) {
+        try {
+          for (const entry of readdirSync(paths.store)) {
+            if (extname(entry) !== ".md" || entry === "MEMORY.md") continue;
+            if (subindexCounts.has(entry)) continue;
+            const fullPath = join(paths.store, entry);
+            try {
+              if (!statSync(fullPath).isFile()) continue;
+              const subRaw = readFileSync(fullPath, "utf-8");
+              if (detectSubindex(entry, subRaw).isSubindex) {
+                subindexCounts.set(entry, parseMemoryMd(subRaw).refs.length);
+              }
+            } catch {
+              // ignore unreadable file
+            }
+          }
+        } catch {
+          // ignore unreadable dir
+        }
+      }
+
+      const overSubindexes: { file: string; count: number }[] = [];
+      let maxSubindexEntries = 0;
+      for (const [file, count] of subindexCounts) {
+        if (count > maxSubindexEntries) maxSubindexEntries = count;
+        if (count > subindexWarnEntries) {
+          overSubindexes.push({ file, count });
+        }
+      }
+
+      if (overSubindexes.length > 0) {
+        const detail = overSubindexes
+          .map((s) => `${s.file} (${s.count} entries)`)
+          .join(", ");
+        checks.push({
+          id: "subindex-entries",
+          status: "warn",
+          message: `${overSubindexes.length} sub-index(es) exceed ${subindexWarnEntries} entries: ${detail}`,
+          hint: "Split large sub-indexes into smaller topic sub-indexes.",
+        });
+      } else {
+        checks.push({
+          id: "subindex-entries",
+          status: "pass",
+          message:
+            subindexCounts.size > 0
+              ? `${subindexCounts.size} sub-index(es) checked; all <= ${subindexWarnEntries} entries (max ${maxSubindexEntries})`
+              : `0 sub-indexes in store (warn threshold ${subindexWarnEntries} entries)`,
         });
       }
     } catch (e) {

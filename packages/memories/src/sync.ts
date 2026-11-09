@@ -87,6 +87,53 @@ function rewriteRefLine(line: string, newDesc: string): string {
 }
 
 /**
+ * Recursively discover all sub-index files reachable from `absMemoryMd` (with cycle guard).
+ */
+function discoverLinkedSubindexes(
+  absMemoryMd: string,
+  storeDir: string,
+  parentDir: string,
+): { absPath: string; label: string }[] {
+  const visited = new Set<string>([resolve(absMemoryMd)]);
+  const queue: { absPath: string; currentDir: string; currentParent: string }[] = [
+    { absPath: absMemoryMd, currentDir: storeDir, currentParent: parentDir },
+  ];
+  const discovered: { absPath: string; label: string }[] = [];
+
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    let content: string;
+    try {
+      content = readFileSync(current.absPath, "utf-8");
+    } catch {
+      continue;
+    }
+    const { refs } = parseMemoryMd(content);
+    for (const ref of refs) {
+      const resolved =
+        resolveRefPath(ref.path, current.currentDir, current.currentParent) ??
+        resolveRefPath(ref.path, storeDir, parentDir);
+      if (!resolved || !existsSync(resolved)) continue;
+      const canonical = resolve(resolved);
+      if (visited.has(canonical)) continue;
+      try {
+        const refContent = readFileSync(resolved, "utf-8");
+        if (detectSubindex(ref.path, refContent).isSubindex) {
+          visited.add(canonical);
+          discovered.push({ absPath: resolved, label: ref.path });
+          const subDir = dirname(resolved);
+          queue.push({ absPath: resolved, currentDir: subDir, currentParent: dirname(subDir) });
+        }
+      } catch {
+        // ignore unreadable
+      }
+    }
+  }
+
+  return discovered;
+}
+
+/**
  * Scan MEMORY.md and all linked sub-index files for bullet summaries that differ
  * from their topic files' frontmatter `description`. When `opts.fix` is true,
  * rewrites the drifted index lines atomically on disk.
@@ -103,27 +150,12 @@ export function syncSummaries(
 
   const indexFilesToScan: { absPath: string; label: string; clipLen: number }[] = [
     { absPath: absMemoryMd, label: "MEMORY.md", clipLen: MAIN_CLIP },
+    ...discoverLinkedSubindexes(absMemoryMd, storeDir, parentDir).map((s) => ({
+      absPath: s.absPath,
+      label: s.label,
+      clipLen: SUBINDEX_CLIP,
+    })),
   ];
-
-  // Discover linked sub-index files from MEMORY.md
-  const mainContent = readFileSync(absMemoryMd, "utf-8");
-  const { refs: topRefs } = parseMemoryMd(mainContent);
-  for (const ref of topRefs) {
-    const resolved = resolveRefPath(ref.path, storeDir, parentDir);
-    if (!resolved || !existsSync(resolved)) continue;
-    try {
-      const refContent = readFileSync(resolved, "utf-8");
-      if (detectSubindex(ref.path, refContent).isSubindex) {
-        indexFilesToScan.push({
-          absPath: resolved,
-          label: ref.path,
-          clipLen: SUBINDEX_CLIP,
-        });
-      }
-    } catch {
-      // ignore unreadable
-    }
-  }
 
   for (const idxFile of indexFilesToScan) {
     const raw = readFileSync(idxFile.absPath, "utf-8");
@@ -253,20 +285,8 @@ export function placeOrMoveEntry(opts: {
 
   // Gather all index files in the store (MEMORY.md + linked sub-indexes + targetAbs)
   const indexPaths = new Set<string>([memoryMd, targetAbs]);
-  const mainRaw = readFileSync(memoryMd, "utf-8");
-  const { refs: topRefs } = parseMemoryMd(mainRaw);
-  for (const ref of topRefs) {
-    const resolved = resolveRefPath(ref.path, storeDir, dirname(storeDir));
-    if (resolved && existsSync(resolved)) {
-      try {
-        const c = readFileSync(resolved, "utf-8");
-        if (detectSubindex(ref.path, c).isSubindex) {
-          indexPaths.add(resolved);
-        }
-      } catch {
-        // ignore
-      }
-    }
+  for (const sub of discoverLinkedSubindexes(memoryMd, storeDir, dirname(storeDir))) {
+    indexPaths.add(sub.absPath);
   }
 
   const removedFrom: string[] = [];

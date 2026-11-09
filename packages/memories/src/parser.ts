@@ -16,8 +16,34 @@
 import type { MemorySection, MemoryRef } from "./types.js";
 import { nameToId } from "./index-gen.js";
 
-// Match: "Name — description → `path`" with optional bullet prefix
-const ARROW_REF_RE = /^(?:[-*]\s+)?(.+?)\s+→\s+`?([^\s`]+)`?\s*$/;
+// Match: "Name — description → `path`" with optional bullet prefix (linear O(n) scanner, no polynomial regex)
+function matchArrowRef(line: string): [string, string, string] | null {
+  let start = 0;
+  if (
+    (line.startsWith("-") || line.startsWith("*")) &&
+    line.length > 1 &&
+    /\s/.test(line[1])
+  ) {
+    start = 2;
+    while (start < line.length && /\s/.test(line[start])) start++;
+  }
+  const rest = line.slice(start).trimEnd();
+  const arrowIdx = rest.lastIndexOf("→");
+  if (arrowIdx <= 0) return null;
+  if (!/\s/.test(rest[arrowIdx - 1])) return null;
+  const afterArrow = rest.slice(arrowIdx + 1);
+  if (!afterArrow || !/^\s/.test(afterArrow[0])) return null;
+  const rhs = afterArrow.trim();
+  if (!rhs) return null;
+  const unquoted =
+    rhs.startsWith("`") && rhs.endsWith("`") && rhs.length >= 2
+      ? rhs.slice(1, -1)
+      : rhs.replace(/^`|`$/g, "");
+  if (!unquoted || /[\s`]/.test(unquoted)) return null;
+  const nameDesc = rest.slice(0, arrowIdx).trimEnd();
+  if (!nameDesc) return null;
+  return [line, nameDesc, unquoted];
+}
 
 // Match inline code path at end: `memory/foo.md`
 const INLINE_PATH_RE = /`(memory\/[^\s`]+|[^\s`]+\.md)`/;
@@ -122,7 +148,7 @@ function parseRefLine(line: string, lineNum: number): MemoryRef | null {
   const stripped = line.replace(/^[-*]\s+/, "").trim();
   if (!stripped) return null;
 
-  const arrowMatch = line.match(ARROW_REF_RE);
+  const arrowMatch = matchArrowRef(line);
   const hasBacktickedArrowTarget =
     arrowMatch !== null && line.trimEnd().endsWith("`" + arrowMatch[2] + "`");
 
@@ -175,7 +201,9 @@ function parseRefLine(line: string, lineNum: number): MemoryRef | null {
         if (pathIdx !== -1) {
           const beforePath = stripped.slice(0, pathIdx).trim();
           // Remove trailing arrow if present
-          const cleaned = beforePath.replace(/\s*→\s*$/, "").trim();
+          const cleaned = (
+            beforePath.endsWith("→") ? beforePath.slice(0, -1) : beforePath
+          ).trim();
           if (cleaned) {
             const { name, description } = splitNameDesc(cleaned);
             const id = nameToId(name);

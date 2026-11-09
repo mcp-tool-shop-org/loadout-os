@@ -59,6 +59,24 @@ export {
 } from "./sync.js";
 export type { SyncChange, SyncSummariesResult, PlaceMoveResult } from "./sync.js";
 
+// ── Split ─────────────────────────────────────────────────────
+export {
+  splitMemoryStore,
+  parseSplitRules,
+  loadSplitRulesFile,
+  normalizeSubindexFilename,
+  SplitError,
+} from "./split.js";
+export type {
+  SplitMatcher,
+  SplitRule,
+  SplitRulesConfig,
+  SplitSubindexSummary,
+  SplitResult,
+  SplitMemoryOptions,
+  ProposedSplitFiles,
+} from "./split.js";
+
 // ── Path resolution ───────────────────────────────────────────
 export { resolveRefPath } from "./paths.js";
 

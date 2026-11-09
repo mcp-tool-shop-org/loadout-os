@@ -124,6 +124,23 @@ export const COMMAND_HELP: Record<string, HelpEntry> = {
     example: "loadout-os memories move ./project_alpha.md --into index-archive.md --store .",
     exits: [["0", "entry moved atomically"], ["1", "missing file / invalid args"]],
   },
+  "memories split": {
+    synopsis: "loadout-os memories split [<MEMORY.md>] --by <rules.json> [--store <dir>] [--id-source title|name] [--dry-run] [--json]",
+    args: [["[<MEMORY.md>]", "optional path to MEMORY.md or store directory (default: --store or ./MEMORY.md)"]],
+    flags: [
+      ["--by <rules.json>", "JSON rules file mapping root entries to sub-indexes (required)"],
+      ["--store <dir>", "memory store directory containing MEMORY.md"],
+      ["--id-source <mode>", "entry id source when frontmatter has no explicit id: 'title' or 'name'"],
+      ["--dry-run", "compute split and prove entry count/priorities unchanged without writing files"],
+      ["--json", "machine-readable output"],
+    ],
+    note: "Mechanically splits root MEMORY.md entries into sub-indexes (`metadata.loadout_role: subindex`), preserves every entry and its priority, writes nothing on --dry-run, and refuses if the post-split entry count or any priority differs.",
+    example: "loadout-os memories split ./MEMORY.md --by ./split-rules.json --dry-run",
+    exits: [
+      ["0", "split completed (or dry-run verified) with entry count unchanged"],
+      ["1", "missing/invalid rules, entry count or priority mismatch, or I/O error"],
+    ],
+  },
 
   // ── rules namespace ──────────────────────────────────────────
   "rules analyze": {
@@ -235,7 +252,7 @@ export const COMMAND_HELP: Record<string, HelpEntry> = {
 
   // ── rituals ──────────────────────────────────────────────────
   doctor: {
-    synopsis: "loadout-os doctor [--store <dir>] [--index <p>] [--project-index <p>] [--settings <p>] [--skills <dir>] [--usage <p>] [--seats <p>] [--repo-root <dir>] [--json]",
+    synopsis: "loadout-os doctor [--store <dir>] [--index <p>] [--project-index <p>] [--settings <p>] [--skills <dir>] [--usage <p>] [--seats <p>] [--repo-root <dir>] [--memory-warn-bytes <n>] [--subindex-warn-entries <n>] [--json]",
     flags: [
       ["--store <dir>", "memory store dir (default canonical store)"],
       ["--index <p>", "global resolver index (default ~/.ai-loadout/index.json)"],
@@ -245,6 +262,8 @@ export const COMMAND_HELP: Record<string, HelpEntry> = {
       ["--usage <p>", "usage.jsonl path (default ~/.ai-loadout/usage.jsonl)"],
       ["--seats <p>", "override path to seats.json for per-seat triad memory checks (default ~/.ai-loadout/seats.json)"],
       ["--repo-root <dir>", "repo root for the hook-drift check (default cwd)"],
+      ["--memory-warn-bytes <n>", "warn threshold in bytes for MEMORY.md size (default 14640 = 60% of 24.4 KB read limit)"],
+      ["--subindex-warn-entries <n>", "warn threshold for entries in a sub-index (default 60)"],
       ["--json", "machine-readable output"],
     ],
     note: "Read-only: doctor NEVER writes. Every check delegates to a library validator.",

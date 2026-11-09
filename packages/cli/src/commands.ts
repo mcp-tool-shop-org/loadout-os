@@ -37,6 +37,9 @@ import {
   formatStats,
   syncSummaries,
   placeOrMoveEntry,
+  splitMemoryStore,
+  loadSplitRulesFile,
+  SplitError,
 } from "@mcptoolshop/claude-memories";
 
 // rules
@@ -127,10 +130,17 @@ function loadKernelIndex(path: string): LoadoutIndex {
 }
 
 // ══════════════════════════════════════════════════════════════
-// memories <index|validate|stats|health|sync-summaries|place|move>
+// memories <index|validate|stats|health|sync-summaries|place|move|split>
 // ══════════════════════════════════════════════════════════════
 
-const MEMORIES_VALUE_FLAGS = new Set(["max-lines", "max-bytes", "id-source", "store", "into"]);
+const MEMORIES_VALUE_FLAGS = new Set([
+  "max-lines",
+  "max-bytes",
+  "id-source",
+  "store",
+  "into",
+  "by",
+]);
 
 function memoriesPositionalArgs(args: string[]): string[] {
   const out: string[] = [];
@@ -398,6 +408,90 @@ export function memoriesPlace(args: string[]): void {
 
 export function memoriesMove(args: string[]): void {
   memoriesPlaceOrMove(args, "move");
+}
+
+export function memoriesSplit(args: string[]): void {
+  const idSource = parseIdSourceFlag(args);
+  const json = hasFlag(args, "json");
+  const dryRun = hasFlag(args, "dry-run");
+  const storeOpt = flag(args, "store");
+  const byOpt = flag(args, "by");
+
+  if (!byOpt) {
+    fail(
+      "MISSING_ARG",
+      "Usage: loadout-os memories split [<MEMORY.md>] --by <rules.json> [--store <dir>] [--dry-run]",
+      "Provide a split rules JSON file via --by <rules.json>.",
+    );
+  }
+
+  const pos = memoriesPositionalArgs(args);
+  let targetMemoryMd: string;
+  if (pos.length > 0) {
+    const candidate = resolve(pos[0]);
+    if (existsSync(candidate) && statSync(candidate).isDirectory()) {
+      targetMemoryMd = requireFile(join(candidate, "MEMORY.md"), "MEMORY.md");
+    } else {
+      targetMemoryMd = requireFile(pos[0], "MEMORY.md");
+    }
+  } else if (storeOpt) {
+    targetMemoryMd = requireFile(join(resolve(storeOpt), "MEMORY.md"), "MEMORY.md");
+  } else if (existsSync(resolve("MEMORY.md"))) {
+    targetMemoryMd = requireFile("MEMORY.md", "MEMORY.md");
+  } else if (existsSync(resolve(".claude/MEMORY.md"))) {
+    targetMemoryMd = requireFile(".claude/MEMORY.md", "MEMORY.md");
+  } else {
+    fail(
+      "MISSING_ARG",
+      "A path to MEMORY.md or --store <dir> is required",
+      "Usage: loadout-os memories split [<MEMORY.md>] --by <rules.json> [--store <dir>] [--dry-run]",
+    );
+  }
+
+  try {
+    const rulesConfig = loadSplitRulesFile(byOpt);
+    const result = splitMemoryStore(targetMemoryMd, rulesConfig, {
+      dryRun,
+      idSource,
+    });
+
+    if (json) {
+      log(JSON.stringify(result, null, 2));
+      return;
+    }
+
+    log(
+      `\n${BOLD}loadout-os memories split${RESET}${dryRun ? ` ${YELLOW}(dry-run)${RESET}` : ""} ${DIM}(${targetMemoryMd})${RESET}\n`,
+    );
+    ok(
+      `Entry count proven unchanged: ${result.beforeEntryCount} → ${result.afterEntryCount} (all priorities preserved)`,
+    );
+    info(
+      `Moved to sub-indexes: ${result.movedEntryCount} · Kept in root: ${result.keptInRootCount}`,
+    );
+    info(
+      `MEMORY.md size: ${result.beforeMemoryMdBytes} B → ${result.afterMemoryMdBytes} B`,
+    );
+    for (const sub of result.subindexes) {
+      ok(
+        `${sub.subindex}: ${sub.movedCount} moved (${sub.totalEntries} total${sub.created ? ", new" : ""})`,
+      );
+    }
+    if (dryRun) {
+      info("Dry run: no files were written.");
+    }
+    log("");
+  } catch (err) {
+    if (err instanceof SplitError) {
+      fail(err.code, err.message, err.hint, 1);
+    }
+    fail(
+      "MEMORIES_SPLIT_FAILED",
+      err instanceof Error ? err.message : String(err),
+      undefined,
+      1,
+    );
+  }
 }
 
 // ══════════════════════════════════════════════════════════════
