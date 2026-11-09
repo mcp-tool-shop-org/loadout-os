@@ -529,26 +529,7 @@ export function resolveStoreForProject(
         bestStore = storeDir;
       }
     }
-    if (bestStore) return resolve(bestStore);
-
-    // Also check if a seat matches projectRoot and has a configured store in seatStores
-    let matchedSeat: string | null = null;
-    let matchedSeatLen = -1;
-    for (const [rawPrefix, seatName] of Object.entries(sc.seats)) {
-      const normPrefix = normalizePreToolPath(rawPrefix).toLowerCase();
-      if (!normPrefix) continue;
-      if (
-        (normProj === normPrefix || normProj.startsWith(normPrefix + "/")) &&
-        normPrefix.length > matchedSeatLen
-      ) {
-        matchedSeatLen = normPrefix.length;
-        matchedSeat = seatName;
-      }
-    }
-    if (matchedSeat && sc.seatStores?.[matchedSeat]) {
-      return resolve(sc.seatStores[matchedSeat]);
-    }
-    return null;
+    return bestStore ? resolve(bestStore) : null;
   } catch {
     return null;
   }

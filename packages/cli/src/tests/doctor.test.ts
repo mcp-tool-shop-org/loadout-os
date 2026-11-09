@@ -11,6 +11,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { runDoctor, defaultDoctorPaths, type DoctorPaths } from "../doctor.js";
+import { dispatch } from "../cli.js";
 import { makeSandbox } from "./fixtures.js";
 
 function pathsFor(sb: ReturnType<typeof makeSandbox>): DoctorPaths {
@@ -593,6 +594,25 @@ test("Issue #25 / Ruling 1: doctor triad-memories check runs per seat across two
     assert.equal(passTriad.status, "pass");
     assert.match(passTriad.message, /rnd, publisher/);
     assert.equal(passRes.ok, true);
+
+    // Exercise dispatchDoctor `--seats` CLI wiring
+    dispatch([
+      "doctor",
+      "--store",
+      sb.storeDir,
+      "--index",
+      sb.indexPath,
+      "--settings",
+      sb.settingsPath,
+      "--usage",
+      sb.usagePath,
+      "--skills",
+      skillsDir,
+      "--seats",
+      seatsPath,
+      "--json",
+    ]);
+    process.exitCode = 0;
 
     // 2. Negative: remove one memory ID (`feedback-eastern-time` for `future-stamp`) from Publisher's store -> FAIL naming `publisher`
     writeFileSync(

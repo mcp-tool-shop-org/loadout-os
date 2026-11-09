@@ -433,7 +433,7 @@ export function runDoctor(paths: DoctorPaths): DoctorResult {
   const rules = paths.rules ?? PRETOOL_RULES;
 
   // (i) triad-memories: every rule in the table names a memory id that exists in the seat's store/index
-  const loadStoreMemoryIds = (storeDir: string, projectPrefix?: string): Set<string> => {
+  const loadStoreMemoryIds = (storeDir: string): Set<string> => {
     const ids = new Set<string>();
     const storeIndexFile = join(storeDir, "index.json");
     if (existsSync(storeIndexFile)) {
@@ -444,24 +444,12 @@ export function runDoctor(paths: DoctorPaths): DoctorResult {
         }
       }
     }
-    if (projectPrefix) {
-      const projIdxFile = join(resolve(projectPrefix), ".claude", "loadout", "index.json");
-      if (existsSync(projIdxFile)) {
-        const loadedProjIdx = loadIndex(projIdxFile);
-        if ("index" in loadedProjIdx) {
-          for (const e of loadedProjIdx.index.entries) {
-            if (e && typeof e.id === "string") ids.add(e.id);
-          }
-        }
-      }
-    }
     const memFile = join(storeDir, "MEMORY.md");
-    if (existsSync(memFile)) {
+    if (ids.size === 0 && existsSync(memFile)) {
       try {
         const analysis = analyzeMemoryMd(memFile);
         for (const pm of [false, true]) {
-          const gen = generateMemoryIndex(analysis, { projectMode: pm });
-          for (const e of gen.entries) {
+          for (const e of generateMemoryIndex(analysis, { projectMode: pm }).entries) {
             if (e && typeof e.id === "string") ids.add(e.id);
           }
         }
@@ -473,7 +461,6 @@ export function runDoctor(paths: DoctorPaths): DoctorResult {
   };
 
   let configuredSeatStores: Record<string, string> = {};
-  const seatProjectPrefix: Record<string, string> = {};
   if (paths.seatStores && Object.keys(paths.seatStores).length > 0) {
     configuredSeatStores = { ...paths.seatStores };
   } else if (paths.seatsPath && existsSync(paths.seatsPath)) {
@@ -481,17 +468,6 @@ export function runDoctor(paths: DoctorPaths): DoctorResult {
       const sc = loadSeatConfig(paths.seatsPath);
       if (sc.seatStores && Object.keys(sc.seatStores).length > 0) {
         configuredSeatStores = { ...sc.seatStores };
-      }
-      if (sc.projectStores) {
-        for (const [pfx, st] of Object.entries(sc.projectStores)) {
-          const seatName = sc.seats[pfx];
-          if (seatName && !seatProjectPrefix[seatName]) {
-            seatProjectPrefix[seatName] = pfx;
-          }
-          if (seatName && !configuredSeatStores[seatName]) {
-            configuredSeatStores[seatName] = st;
-          }
-        }
       }
     } catch {
       /* ignore unreadable seats.json; falls back to single-store triad check */
@@ -503,7 +479,7 @@ export function runDoctor(paths: DoctorPaths): DoctorResult {
     const missingSeatMemoryRules: string[] = [];
     for (const seat of seatNames) {
       const storeDir = configuredSeatStores[seat];
-      const seatKnownIds = loadStoreMemoryIds(storeDir, seatProjectPrefix[seat]);
+      const seatKnownIds = loadStoreMemoryIds(storeDir);
       for (const r of rules) {
         const memId = resolveRuleMemory(r, seat);
         if (!memId || !seatKnownIds.has(memId)) {
