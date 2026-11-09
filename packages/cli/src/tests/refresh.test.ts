@@ -940,6 +940,18 @@ test("Issue #25 Item 5: refresh --project without --store uses seats.json store 
     const secondBak = JSON.parse(readFileSync(run2WrongStore.backupPath!, "utf-8"));
     assert.equal(secondBak.source_store, resolve(sbB.storeDir));
     assert.equal(secondBak.entries.length, 2);
+
+    // 5. Also verify CLI dispatch(["refresh", ...]) with --seats and --allow-store-change
+    dispatch([
+      "refresh",
+      "--project",
+      projRoot,
+      "--seats",
+      seatsFile,
+      "--allow-store-change",
+    ]);
+    const restoredIdx = JSON.parse(readFileSync(dest, "utf-8"));
+    assert.equal(restoredIdx.source_store, resolve(sbA.storeDir));
   } finally {
     sbA.cleanup();
     sbB.cleanup();

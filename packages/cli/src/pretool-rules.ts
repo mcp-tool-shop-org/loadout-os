@@ -23,6 +23,7 @@ import { isAbsolute, join, posix, resolve } from "node:path";
 
 import {
   defaultRepliesDir,
+  extractSedWriteTargets,
   normalizePreToolPath,
   parseBashCommand,
   prenormalizeStorePaths,
@@ -210,19 +211,6 @@ export function matchUnreviewedMerge(ctx: RuleMatchInput): RuleMatchResult {
       }
       return { matched: true, detail: hit.detail };
     }
-  }
-
-  if (
-    /\bgh\s+(?:-[^\s]+\s+)*pr\s+merge\b/i.test(rawCmd) ||
-    /(?:^|[\s/\\'"`])gatemerge(?:\.[a-z0-9]+)?\b/i.test(rawCmd)
-  ) {
-    const shaMatch =
-      rawCmd.match(/--(?:match-head-commit|head)(?:=|\s+)([0-9a-f]{7,40})\b/i) ??
-      rawCmd.match(/\bgatemerge(?:\.[a-z0-9]+)?\s+\S+\s+\d+\s+([0-9a-f]{7,40})\b/i);
-    if (shaMatch?.[1] && hasReviewPassAtHead(repliesDir, shaMatch[1])) {
-      return { matched: false };
-    }
-    return { matched: true, detail: rawCmd.trim().slice(0, 120) };
   }
 
   return { matched: false };
@@ -828,9 +816,10 @@ function extractSedTargetFilesAndWriteTargets(args: string[]): {
 
   // Also extract any `w <file>` target inside sed scripts
   for (const sc of scripts) {
-    const wMatch = sc.match(/(?:^|[;}\n]|\d+|\$|[\/][^\/]*[\/]|[gipmI0-9])[wW]\s+(\S+)/);
-    if (wMatch?.[1]) {
-      targetFiles.push(wMatch[1]);
+    for (const wt of extractSedWriteTargets(sc)) {
+      if (wt && wt !== "<sed-w>") {
+        targetFiles.push(wt);
+      }
     }
   }
 

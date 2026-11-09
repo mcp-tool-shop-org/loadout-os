@@ -2596,5 +2596,84 @@ describe("Part 6: Issue #25 (P1.1–P4.15) and log-only rulings", () => {
       assert.equal(resolveRuleMemory(rule, "publisher"), expectedMap[rule.id]!.publisher);
     }
   });
+
+  it("covers additional sed write patterns, wrapper flags (`nice`, `nohup`, `time`, `env -u`, `xargs -I`), `cp -t`/`--target-directory=`, `dd of=`, `MultiEdit` disk reconstruction, and `=sha` merge flags", () => {
+    const target = `${storeDir.replace(/\\/g, "/")}/BOARD.md`;
+    const storeSlash = storeDir.replace(/\\/g, "/");
+    const repliesDir = join(tempDir, "replies");
+    mkdirSync(repliesDir, { recursive: true });
+    writeFileSync(join(repliesDir, "review.md"), "PASS at d4ddd0e4\n", "utf-8");
+
+    // 1. Additional sed -n write patterns (`s/a\/b/c/gw out.txt`, `/pat/w out.txt`)
+    for (const sedCmd of [
+      "sed -n 's/a\\/b/c/gw out.txt' README.md",
+      "sed -n '/pattern/w out.txt' README.md",
+      "sed -n --expression='w out.txt' README.md",
+      "sed -n -ew\\ out.txt README.md",
+    ]) {
+      const p = parseBashCommand(sedCmd);
+      assert.equal(isSegmentReadOnly(p.segments[0]!), false);
+    }
+
+    // 2. Wrapper flags (`nice -n 5`, `nohup`, `time`, `env -u FOO BAR=1`, `xargs -I {}`) + `cp -t` / `--target-directory=` / `dd` / `sed w <store>`
+    for (const cmd of [
+      `nice -n 5 rm -f "${target}"`,
+      `nohup rm -f "${target}"`,
+      `time -p rm -f "${target}"`,
+      `env -u FOO BAR=1 rm -f "${target}"`,
+      `echo "${target}" | xargs -I {} rm -f "${target}"`,
+      `cp -t "${storeSlash}" README.md`,
+      `cp --target-directory="${storeSlash}" README.md`,
+      `dd if=/dev/zero of="${target}" count=1`,
+      `sed -n 'w ${target}' README.md`,
+    ]) {
+      const res = runPreTool({
+        stdinJson: JSON.stringify({
+          tool_name: "Bash",
+          tool_input: { command: cmd },
+          cwd: "E:/AI/Research and Development",
+        }),
+        seatsPath,
+        logPath,
+      });
+      assert.equal(res.exitCode, 2, `Expected block for: ${cmd}`);
+    }
+
+    // 3. `MultiEdit` disk reconstruction
+    writeFileSync(target, "# Board\n\n**Last updated:** 2026-11-08 15:03 ET\n", "utf-8");
+    const multiRes = runPreTool({
+      stdinJson: JSON.stringify({
+        tool_name: "MultiEdit",
+        tool_input: {
+          file_path: target,
+          edits: [{ old_string: "15:03 ET", new_string: "23:59 ET" }],
+        },
+        cwd: "E:/AI/Research and Development",
+      }),
+      seatsPath,
+      logPath,
+      nowMs: fixedClockMs,
+    });
+    assert.equal(multiRes.exitCode, 2);
+
+    // 4. `=sha` merge flags (`--match-head-commit=d4ddd0e4`, `gatemerge.sh --head=d4ddd0e4`, `gatemerge.sh --head d4ddd0e4`)
+    for (const mergeCmd of [
+      "gh pr merge 24 --squash --match-head-commit=d4ddd0e4",
+      "bash scripts/gatemerge.sh mcp-tool-shop-org/loadout-os 24 --head=d4ddd0e4",
+      "bash scripts/gatemerge.sh mcp-tool-shop-org/loadout-os 24 --head d4ddd0e4",
+    ]) {
+      const mRes = runPreTool({
+        stdinJson: JSON.stringify({
+          tool_name: "Bash",
+          tool_input: { command: mergeCmd },
+          cwd: "E:/AI/Publisher",
+        }),
+        seatsPath,
+        logPath,
+        repliesDir,
+      });
+      assert.equal(mRes.outcome, "allow", `Expected PASS at d4ddd0e4 suppression for: ${mergeCmd}`);
+    }
+  });
 });
 

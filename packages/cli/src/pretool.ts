@@ -1242,17 +1242,74 @@ export function parseBashCommand(
   };
 }
 
+/**
+ * Linear (non-backtracking) parser that extracts write-command target filenames (`w <file>` / `W <file>`)
+ * from a `sed` script expression (`s/a/b/w out.txt`, `1,10w out.txt`, `/pat/w out.txt`, `w out.txt`).
+ */
+export function extractSedWriteTargets(script: string): string[] {
+  const targets: string[] = [];
+  for (const rawClause of script.split(/[;\n}]+/)) {
+    let c = rawClause.trim();
+    if (!c) continue;
+    if (c.startsWith("s") && c.length >= 4) {
+      const delim = c[1];
+      let delimCount = 1;
+      let idx = 2;
+      while (idx < c.length && delimCount < 3) {
+        if (c[idx] === "\\") {
+          idx += 2;
+          continue;
+        }
+        if (c[idx] === delim) {
+          delimCount++;
+        }
+        idx++;
+      }
+      if (delimCount === 3) {
+        while (idx < c.length && /[gipmI0-9\s]/.test(c[idx])) {
+          idx++;
+        }
+        if (
+          idx < c.length &&
+          (c[idx] === "w" || c[idx] === "W") &&
+          (idx + 1 === c.length || /\s/.test(c[idx + 1]))
+        ) {
+          targets.push(c.slice(idx + 1).trim() || "<sed-w>");
+        }
+      }
+      continue;
+    }
+
+    // Strip leading address ranges (`1,10`, `$`, `/regex/`, `!`, whitespace)
+    let pos = 0;
+    while (pos < c.length) {
+      const ch = c[pos];
+      if (/[0-9$,~+!\s]/.test(ch)) {
+        pos++;
+      } else if (ch === "/") {
+        pos++;
+        while (pos < c.length && c[pos] !== "/") {
+          if (c[pos] === "\\") pos++;
+          pos++;
+        }
+        if (pos < c.length) pos++;
+      } else {
+        break;
+      }
+    }
+    const rest = c.slice(pos);
+    if (
+      (rest.startsWith("w") || rest.startsWith("W")) &&
+      (rest.length === 1 || /\s/.test(rest[1]))
+    ) {
+      targets.push(rest.slice(1).trim() || "<sed-w>");
+    }
+  }
+  return targets;
+}
+
 function sedScriptHasWriteCommand(script: string): boolean {
-  // Match `s<delim>...<delim>...<delim>[flags]*w` or address/command `w <file>` / `W <file>`
-  const s = script.trim();
-  if (!s) return false;
-  if (/^s(.)(?:\\.|(?!\1).)*\1(?:\\.|(?!\1).)*\1[gipmI0-9]*[wW](?:\s|$)/.test(s)) {
-    return true;
-  }
-  if (/(?:^|[;}\n]|\d+|\$|[\/][^\/]*[\/])\s*[wW](?:\s+\S|$)/.test(s)) {
-    return true;
-  }
-  return false;
+  return extractSedWriteTargets(script).length > 0;
 }
 
 /**

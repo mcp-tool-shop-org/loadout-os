@@ -628,6 +628,14 @@ test("Issue #25 / Ruling 1: doctor triad-memories check runs per seat across two
       "Failure message must name the seat (`publisher`), rule (`future-stamp`), and missing memory ID (`feedback-eastern-time`)",
     );
     assert.equal(failRes.ok, false);
+
+    // 3. Direct `seatStores` option in DoctorPaths also validates per seat
+    const directRes = runDoctor({
+      ...pathsFor(sb),
+      skillsDir,
+      seatStores: { rnd: rndStoreDir, publisher: pubStoreDir },
+    });
+    assert.equal(find(directRes.checks, "triad-memories").status, "fail");
   } finally {
     sb.cleanup();
   }
