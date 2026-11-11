@@ -49,7 +49,7 @@
       "confidence": "low",
       "highWater": null,
       "name": "cli",
-      "qualifyingSourceCommits": 16,
+      "qualifyingSourceCommits": 10,
       "rebaseline": null
     },
     {
@@ -73,25 +73,28 @@
         "coChangesOnly": [],
         "collapsed": false,
         "confidence": "low",
-        "importsAndCoChanges": [],
+        "importsAndCoChanges": [
+          "memories"
+        ],
         "importsOnly": [
           "cli",
           "hook",
-          "memories",
           "rules"
         ]
       },
-      "cohesion": null,
+      "cohesion": 0,
       "cohesionDropped": false,
       "confidence": "low",
       "highWater": null,
       "name": "kernel",
-      "qualifyingSourceCommits": 8,
+      "qualifyingSourceCommits": 7,
       "rebaseline": null
     },
     {
       "breakage": {
-        "coChangesOnly": [],
+        "coChangesOnly": [
+          "kernel"
+        ],
         "collapsed": false,
         "confidence": "low",
         "importsAndCoChanges": [],
@@ -99,12 +102,12 @@
           "cli"
         ]
       },
-      "cohesion": 1,
+      "cohesion": 0.588235,
       "cohesionDropped": false,
       "confidence": "low",
       "highWater": null,
       "name": "memories",
-      "qualifyingSourceCommits": 12,
+      "qualifyingSourceCommits": 11,
       "rebaseline": null
     },
     {
@@ -187,8 +190,8 @@
         "path": ".gitignore"
       },
       {
-        "commits": 9,
-        "lines": 251,
+        "commits": 10,
+        "lines": 510,
         "path": "CHANGELOG.md"
       },
       {
@@ -197,43 +200,43 @@
         "path": "LICENSE"
       },
       {
-        "commits": 3,
-        "lines": 152,
+        "commits": 4,
+        "lines": 292,
         "path": "README.es.md"
       },
       {
-        "commits": 3,
-        "lines": 162,
+        "commits": 4,
+        "lines": 292,
         "path": "README.fr.md"
       },
       {
-        "commits": 3,
-        "lines": 160,
+        "commits": 4,
+        "lines": 286,
         "path": "README.hi.md"
       },
       {
-        "commits": 3,
-        "lines": 150,
+        "commits": 4,
+        "lines": 286,
         "path": "README.it.md"
       },
       {
-        "commits": 3,
-        "lines": 142,
+        "commits": 4,
+        "lines": 278,
         "path": "README.ja.md"
       },
       {
-        "commits": 14,
-        "lines": 294,
+        "commits": 12,
+        "lines": 278,
         "path": "README.md"
       },
       {
-        "commits": 3,
-        "lines": 134,
+        "commits": 4,
+        "lines": 264,
         "path": "README.pt-BR.md"
       },
       {
-        "commits": 3,
-        "lines": 168,
+        "commits": 4,
+        "lines": 300,
         "path": "README.zh.md"
       },
       {
@@ -277,8 +280,8 @@
         "path": "apps/hook/smoke-test.ps1"
       },
       {
-        "commits": 10,
-        "lines": 433,
+        "commits": 5,
+        "lines": 376,
         "path": "atlas/README.md"
       },
       {
@@ -287,18 +290,18 @@
         "path": "atlas/boundaries.yaml"
       },
       {
-        "commits": 10,
-        "lines": 1825,
+        "commits": 5,
+        "lines": 1656,
         "path": "atlas/page.json"
       },
       {
-        "commits": 10,
-        "lines": 5186,
+        "commits": 5,
+        "lines": 4864,
         "path": "atlas/statistics.json"
       },
       {
-        "commits": 10,
-        "lines": 21861,
+        "commits": 5,
+        "lines": 21461,
         "path": "atlas/structure.json"
       },
       {
@@ -312,12 +315,12 @@
         "path": "logo.png"
       },
       {
-        "commits": 11,
-        "lines": 1525,
+        "commits": 13,
+        "lines": 1529,
         "path": "package-lock.json"
       },
       {
-        "commits": 6,
+        "commits": 5,
         "lines": 38,
         "path": "package.json"
       },
@@ -332,8 +335,8 @@
         "path": "packages/cli/LICENSE"
       },
       {
-        "commits": 6,
-        "lines": 159,
+        "commits": 4,
+        "lines": 145,
         "path": "packages/cli/README.md"
       },
       {
@@ -342,18 +345,18 @@
         "path": "packages/cli/esbuild.config.mjs"
       },
       {
-        "commits": 9,
-        "lines": 84,
+        "commits": 11,
+        "lines": 88,
         "path": "packages/cli/package.json"
       },
       {
-        "commits": 8,
-        "lines": 619,
+        "commits": 7,
+        "lines": 692,
         "path": "packages/cli/src/cli.ts"
       },
       {
         "commits": 5,
-        "lines": 1109,
+        "lines": 1197,
         "path": "packages/cli/src/commands.ts"
       },
       {
@@ -362,28 +365,38 @@
         "path": "packages/cli/src/console.ts"
       },
       {
-        "commits": 2,
-        "lines": 464,
+        "commits": 5,
+        "lines": 994,
         "path": "packages/cli/src/doctor.ts"
       },
       {
-        "commits": 6,
-        "lines": 454,
+        "commits": 5,
+        "lines": 456,
         "path": "packages/cli/src/help.ts"
       },
       {
-        "commits": 8,
-        "lines": 878,
+        "commits": 3,
+        "lines": 830,
         "path": "packages/cli/src/hook.ts"
       },
       {
-        "commits": 2,
-        "lines": 63,
+        "commits": 3,
+        "lines": 107,
         "path": "packages/cli/src/index.ts"
       },
       {
-        "commits": 6,
-        "lines": 1230,
+        "commits": 2,
+        "lines": 2551,
+        "path": "packages/cli/src/pretool-rules.ts"
+      },
+      {
+        "commits": 2,
+        "lines": 1962,
+        "path": "packages/cli/src/pretool.ts"
+      },
+      {
+        "commits": 5,
+        "lines": 1326,
         "path": "packages/cli/src/refresh.ts"
       },
       {
@@ -402,28 +415,33 @@
         "path": "packages/cli/src/tests/dispatch.test.ts"
       },
       {
-        "commits": 2,
-        "lines": 188,
+        "commits": 5,
+        "lines": 988,
         "path": "packages/cli/src/tests/doctor.test.ts"
       },
       {
-        "commits": 2,
-        "lines": 279,
+        "commits": 4,
+        "lines": 592,
         "path": "packages/cli/src/tests/fixtures.ts"
       },
       {
-        "commits": 5,
-        "lines": 188,
+        "commits": 3,
+        "lines": 189,
         "path": "packages/cli/src/tests/help.test.ts"
       },
       {
-        "commits": 6,
-        "lines": 1272,
+        "commits": 2,
+        "lines": 1268,
         "path": "packages/cli/src/tests/hook.test.ts"
       },
       {
-        "commits": 8,
-        "lines": 899,
+        "commits": 2,
+        "lines": 3239,
+        "path": "packages/cli/src/tests/pretool.test.ts"
+      },
+      {
+        "commits": 4,
+        "lines": 970,
         "path": "packages/cli/src/tests/refresh.test.ts"
       },
       {
@@ -918,12 +936,12 @@
       },
       {
         "commits": 5,
-        "lines": 309,
+        "lines": 440,
         "path": "packages/kernel/src/frontmatter.ts"
       },
       {
-        "commits": 5,
-        "lines": 68,
+        "commits": 6,
+        "lines": 69,
         "path": "packages/kernel/src/index.ts"
       },
       {
@@ -957,8 +975,8 @@
         "path": "packages/kernel/src/tests/cli-helpers.test.ts"
       },
       {
-        "commits": 5,
-        "lines": 212,
+        "commits": 4,
+        "lines": 250,
         "path": "packages/kernel/src/tests/frontmatter.test.ts"
       },
       {
@@ -1002,8 +1020,8 @@
         "path": "packages/kernel/src/tokens.ts"
       },
       {
-        "commits": 3,
-        "lines": 128,
+        "commits": 4,
+        "lines": 149,
         "path": "packages/kernel/src/types.ts"
       },
       {
@@ -1427,28 +1445,28 @@
         "path": "packages/memories/site/tsconfig.json"
       },
       {
-        "commits": 3,
-        "lines": 442,
+        "commits": 4,
+        "lines": 595,
         "path": "packages/memories/src/analyze.ts"
       },
       {
-        "commits": 4,
-        "lines": 525,
+        "commits": 5,
+        "lines": 562,
         "path": "packages/memories/src/cli.ts"
       },
       {
-        "commits": 9,
-        "lines": 562,
+        "commits": 8,
+        "lines": 708,
         "path": "packages/memories/src/index-gen.ts"
       },
       {
-        "commits": 4,
-        "lines": 80,
+        "commits": 5,
+        "lines": 97,
         "path": "packages/memories/src/index.ts"
       },
       {
-        "commits": 3,
-        "lines": 246,
+        "commits": 5,
+        "lines": 312,
         "path": "packages/memories/src/parser.ts"
       },
       {
@@ -1458,12 +1476,17 @@
       },
       {
         "commits": 1,
+        "lines": 906,
+        "path": "packages/memories/src/split.ts"
+      },
+      {
+        "commits": 1,
         "lines": 104,
         "path": "packages/memories/src/stats.ts"
       },
       {
         "commits": 2,
-        "lines": 335,
+        "lines": 405,
         "path": "packages/memories/src/sync.ts"
       },
       {
@@ -1472,8 +1495,8 @@
         "path": "packages/memories/src/tests/analyze.test.ts"
       },
       {
-        "commits": 2,
-        "lines": 206,
+        "commits": 3,
+        "lines": 245,
         "path": "packages/memories/src/tests/cli.test.ts"
       },
       {
@@ -1537,14 +1560,19 @@
         "path": "packages/memories/src/tests/health.test.ts"
       },
       {
-        "commits": 8,
-        "lines": 881,
+        "commits": 6,
+        "lines": 1185,
         "path": "packages/memories/src/tests/index-gen.test.ts"
       },
       {
-        "commits": 5,
-        "lines": 243,
+        "commits": 6,
+        "lines": 354,
         "path": "packages/memories/src/tests/parser.test.ts"
+      },
+      {
+        "commits": 1,
+        "lines": 935,
+        "path": "packages/memories/src/tests/split.test.ts"
       },
       {
         "commits": 1,
@@ -1552,18 +1580,18 @@
         "path": "packages/memories/src/tests/stats.test.ts"
       },
       {
-        "commits": 6,
-        "lines": 235,
+        "commits": 4,
+        "lines": 207,
         "path": "packages/memories/src/tests/validate.test.ts"
       },
       {
         "commits": 4,
-        "lines": 100,
+        "lines": 101,
         "path": "packages/memories/src/types.ts"
       },
       {
-        "commits": 7,
-        "lines": 401,
+        "commits": 5,
+        "lines": 383,
         "path": "packages/memories/src/validate.ts"
       },
       {
@@ -2122,8 +2150,8 @@
         "path": "site/src/content/docs/handbook/reference.md"
       },
       {
-        "commits": 3,
-        "lines": 190,
+        "commits": 2,
+        "lines": 188,
         "path": "site/src/content/docs/handbook/rituals.md"
       },
       {
@@ -2162,136 +2190,73 @@
     "level": "low",
     "reason": "fewer than 25 source files reach 10 revisions in the window"
   },
-  "generatedAt": "2026-11-08T17:43:07.867Z",
+  "generatedAt": "2026-11-11T22:20:34.061Z",
   "generatedFrom": {
-    "commit": "c838284447d36e0435d2840d3bc7d11c2b186a21"
+    "commit": "3fe2ae44ed0239f982cc76908ed10a2110af7144"
   },
   "pairs": [
     {
-      "a": "atlas/README.md",
-      "b": "atlas/page.json",
-      "either": 8,
-      "shared": 8,
-      "strength": 1
-    },
-    {
-      "a": "atlas/README.md",
-      "b": "atlas/statistics.json",
-      "either": 8,
-      "shared": 8,
-      "strength": 1
-    },
-    {
-      "a": "atlas/README.md",
-      "b": "atlas/structure.json",
-      "either": 8,
-      "shared": 8,
-      "strength": 1
-    },
-    {
-      "a": "atlas/page.json",
-      "b": "atlas/statistics.json",
-      "either": 8,
-      "shared": 8,
-      "strength": 1
-    },
-    {
-      "a": "atlas/page.json",
-      "b": "atlas/structure.json",
-      "either": 8,
-      "shared": 8,
-      "strength": 1
-    },
-    {
-      "a": "atlas/statistics.json",
-      "b": "atlas/structure.json",
-      "either": 8,
-      "shared": 8,
-      "strength": 1
-    },
-    {
       "a": "packages/cli/src/cli.ts",
-      "b": "packages/cli/src/help.ts",
-      "either": 8,
-      "shared": 6,
-      "strength": 0.75
-    },
-    {
-      "a": "packages/cli/src/cli.ts",
-      "b": "packages/cli/src/tests/help.test.ts",
-      "either": 8,
-      "shared": 5,
-      "strength": 0.625
-    },
-    {
-      "a": "packages/cli/src/help.ts",
-      "b": "packages/cli/src/refresh.ts",
+      "b": "packages/cli/src/commands.ts",
       "either": 8,
       "shared": 4,
       "strength": 0.5
     },
     {
-      "a": "packages/cli/src/help.ts",
-      "b": "packages/cli/src/tests/help.test.ts",
-      "either": 6,
-      "shared": 5,
-      "strength": 0.833333
-    },
-    {
-      "a": "packages/cli/src/hook.ts",
-      "b": "packages/cli/src/tests/hook.test.ts",
-      "either": 9,
-      "shared": 5,
-      "strength": 0.555556
-    },
-    {
-      "a": "packages/cli/src/refresh.ts",
-      "b": "packages/cli/src/tests/refresh.test.ts",
-      "either": 9,
-      "shared": 5,
-      "strength": 0.555556
-    },
-    {
-      "a": "packages/memories/src/index-gen.ts",
-      "b": "packages/memories/src/tests/index-gen.test.ts",
-      "either": 9,
-      "shared": 6,
-      "strength": 0.666667
-    },
-    {
-      "a": "packages/memories/src/index-gen.ts",
-      "b": "packages/memories/src/tests/validate.test.ts",
-      "either": 8,
-      "shared": 5,
-      "strength": 0.625
-    },
-    {
-      "a": "packages/memories/src/index-gen.ts",
-      "b": "packages/memories/src/validate.ts",
-      "either": 8,
-      "shared": 6,
-      "strength": 0.75
-    },
-    {
-      "a": "packages/memories/src/tests/index-gen.test.ts",
-      "b": "packages/memories/src/tests/validate.test.ts",
+      "a": "packages/cli/src/cli.ts",
+      "b": "packages/cli/src/doctor.ts",
       "either": 7,
       "shared": 5,
       "strength": 0.714286
     },
     {
-      "a": "packages/memories/src/tests/index-gen.test.ts",
-      "b": "packages/memories/src/validate.ts",
-      "either": 8,
+      "a": "packages/cli/src/cli.ts",
+      "b": "packages/cli/src/help.ts",
+      "either": 7,
       "shared": 5,
-      "strength": 0.625
+      "strength": 0.714286
     },
     {
-      "a": "packages/memories/src/tests/validate.test.ts",
-      "b": "packages/memories/src/validate.ts",
-      "either": 6,
+      "a": "packages/cli/src/cli.ts",
+      "b": "packages/cli/src/tests/doctor.test.ts",
+      "either": 7,
       "shared": 5,
-      "strength": 0.833333
+      "strength": 0.714286
+    },
+    {
+      "a": "packages/cli/src/doctor.ts",
+      "b": "packages/cli/src/help.ts",
+      "either": 6,
+      "shared": 4,
+      "strength": 0.666667
+    },
+    {
+      "a": "packages/cli/src/doctor.ts",
+      "b": "packages/cli/src/tests/doctor.test.ts",
+      "either": 5,
+      "shared": 5,
+      "strength": 1
+    },
+    {
+      "a": "packages/cli/src/help.ts",
+      "b": "packages/cli/src/tests/doctor.test.ts",
+      "either": 6,
+      "shared": 4,
+      "strength": 0.666667
+    },
+    {
+      "a": "packages/kernel/src/index.ts",
+      "b": "packages/memories/src/index-gen.ts",
+      "either": 8,
+      "shared": 4,
+      "strength": 0.5
+    },
+    {
+      "a": "packages/memories/src/index-gen.ts",
+      "b": "packages/memories/src/tests/index-gen.test.ts",
+      "either": 7,
+      "shared": 5,
+      "strength": 0.714286
     }
   ],
   "parameters": {
@@ -2304,16 +2269,16 @@
     "floor": "fallen",
     "floorHeld": false,
     "floorTrigger": "revision-depth",
-    "headDate": "2026-11-08T12:40:24-05:00",
-    "inScopeFiles": 388,
+    "headDate": "2026-11-09T14:20:48-05:00",
+    "inScopeFiles": 393,
     "pinnedStart": null,
     "priorFloor": "fallen",
-    "qualifyingCommits": 51,
+    "qualifyingCommits": 47,
     "qualifyingMinimum": 30,
     "revisions": 5,
     "shared": 10,
     "sharedFloorUsed": 3,
-    "since": "2026-05-12T17:40:24.000Z",
+    "since": "2026-05-13T19:20:48.000Z",
     "sourceExtensions": [
       ".js",
       ".mjs",
