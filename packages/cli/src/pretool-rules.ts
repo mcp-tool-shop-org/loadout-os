@@ -2,11 +2,22 @@
  * Pre-tool rule table — Part 3 (Layer A hard blocks and Layer B soft reminders).
  *
  * Rules in this PR (Part 3, Part 4.3, and #25 enforce-readiness):
- *   1. unreviewed-merge   | warn-only | memory: { rnd: publisher-merges, publisher: publisher-merges-as-coordinator }
- *   2. director-quote     | Layer A   | memory: { rnd: never-quote-director-in-public, publisher: feedback-never-quote-director }
- *   3. memory-shell-write | Layer A   | memory: { rnd: build-in-studio-tools-not-side-scripts, publisher: project-memory-system }
- *   4. future-stamp       | Layer A   | memory: { rnd: rnd-memory-system, publisher: feedback-eastern-time }
- *   5. release-reminder   | Layer B   | memory: { rnd: publishing-tags-need-publisher-ok / publisher-approves-every-publish }
+ *   1. unreviewed-merge   | warn-only | memory: { rnd: publisher-merges, publisher: rule-coordinator-and-merges }
+ *   2. director-quote     | Layer A   | memory: { default: feedbackfeedbackneverquotethedirectormd, rnd: never-quote-director-in-public, publisher: rule-director-communication }
+ *   3. memory-shell-write | Layer A   | memory: { rnd: build-in-studio-tools-not-side-scripts, publisher: reference-memory-system }
+ *   4. future-stamp       | Layer A   | memory: { rnd: rnd-memory-system, publisher: reference-memory-system }
+ *   5. release-reminder   | Layer B   | memory: { rnd: publisher-approves-every-publish, publisher: rule-coordinator-and-merges }
+ *
+ * Memory ids resolve per seat, and each must exist in the store that seat's sessions can read:
+ * `rnd` -> the R&D store, `publisher` -> the Publisher store, `default` -> the studio (global)
+ * index. Ids are store-specific: a store rebuild or a file move renames them, so after one,
+ * re-run `loadout-os doctor` with a `seats.json` that declares each seat's `store`, which makes
+ * the `triad-memories` check validate every seat against its own store.
+ *
+ * Known gap (measured 2026-11-21): no entry in the studio store carries rules 1, 3, 4 and 5, so
+ * their `default` ids still name the R&D entries. Doctor's single-index fallback (no seat stores
+ * declared) reports those four until the studio store gains the entries; at that point only the
+ * `default` ids below need to change.
  */
 
 import {
@@ -312,7 +323,7 @@ export const UNREVIEWED_MERGE_RULE: PreToolRule = {
   memory: {
     default: "publisher-merges",
     rnd: "publisher-merges",
-    publisher: "publisher-merges-as-coordinator",
+    publisher: "rule-coordinator-and-merges",
   },
   skill: "remote-argon",
   message: (_res, ctx) => {
@@ -556,9 +567,9 @@ export const DIRECTOR_QUOTE_RULE: PreToolRule = {
     publisher: "block",
   },
   memory: {
-    default: "never-quote-director-in-public",
+    default: "feedbackfeedbackneverquotethedirectormd",
     rnd: "never-quote-director-in-public",
-    publisher: "feedback-never-quote-director",
+    publisher: "rule-director-communication",
   },
   skill: "none",
   skillNoneReason:
@@ -1558,7 +1569,7 @@ export const MEMORY_SHELL_WRITE_RULE: PreToolRule = {
   memory: {
     default: "build-in-studio-tools-not-side-scripts",
     rnd: "build-in-studio-tools-not-side-scripts",
-    publisher: "project-memory-system",
+    publisher: "reference-memory-system",
   },
   skill: "loadout-os",
   message: (res, ctx) => {
@@ -2042,7 +2053,7 @@ export const FUTURE_STAMP_RULE: PreToolRule = {
   memory: {
     default: "rnd-memory-system",
     rnd: "rnd-memory-system",
-    publisher: "feedback-eastern-time",
+    publisher: "reference-memory-system",
   },
   skill: "loadout-os",
   message: (res, ctx) => {
@@ -2145,7 +2156,7 @@ export const RELEASE_REMINDER_RULE: PreToolRule = {
   memory: {
     default: "publisher-approves-every-publish",
     rnd: "publisher-approves-every-publish",
-    publisher: "publishing-tags-need-publisher-ok",
+    publisher: "rule-coordinator-and-merges",
   },
   skill: "full-treatment",
   message: (res, ctx) => {
