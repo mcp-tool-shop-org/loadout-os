@@ -330,12 +330,12 @@ export const UNREVIEWED_MERGE_RULE: PreToolRule = {
     const memId = resolveRuleMemory(UNREVIEWED_MERGE_RULE, ctx.seat);
     if (ctx.seat === "rnd") {
       return [
-        `[unreviewed-merge] REMINDER: R&D hands reviewed PRs to the Publisher to merge; merge only with an Argon-verdict sha (memory: ${memId}, skill: remote-argon).`,
+        `[unreviewed-merge] REMINDER: R&D hands reviewed PRs to the Publisher to merge; merge only with an other-family verdict at the exact head sha: Opus for Carbon or Neon builds, Carbon in AI Studio for Claude-written work (memory: ${memId}, skill: remote-argon).`,
         "Pass `--match-head-commit <head8>` (or `gatemerge <repo> <pr> <head8>`) with a matching `PASS at <head8>` reply to suppress.",
       ].join("\n");
     }
     return [
-      `[unreviewed-merge] REMINDER: Merge only with an Argon-verdict sha (memory: ${memId}, skill: remote-argon, ledger step 2).`,
+      `[unreviewed-merge] REMINDER: Merge only with an other-family verdict at the exact head sha: Opus for Carbon or Neon builds, Carbon in AI Studio for Claude-written work (memory: ${memId}, skill: remote-argon, ledger step 2).`,
       "Pass `--match-head-commit <head8>` (or `gatemerge <repo> <pr> <head8>`) with a matching `PASS at <head8>` reply to suppress.",
     ].join("\n");
   },
