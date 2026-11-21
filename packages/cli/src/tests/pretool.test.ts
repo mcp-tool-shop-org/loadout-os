@@ -1102,6 +1102,8 @@ describe("Part 3: the first five rules (unreviewed-merge, director-quote, memory
         assert.equal(rndRes.outcome, "warn");
         assert.match(rndRes.stdout, /R&D hands reviewed PRs to the Publisher to merge/i);
         assert.match(rndRes.stdout, /publisher-merges/);
+        assert.match(rndRes.stdout, /other-family verdict at the exact head sha/);
+        assert.doesNotMatch(rndRes.stdout, /Argon/);
 
         // Publisher seat -> warn (exit 0 + other-family verdict reminder mentioning ledger step 2 and rule-coordinator-and-merges)
         const pubRes = runPreTool({

@@ -600,16 +600,19 @@ describe("Part A: loadout-hook.mjs project-layer support", () => {
       assert.equal(gLines.length, 5);
       assert.ok(gLines[0].startsWith("- topic-licence "), `topic entry first, got: ${gLines[0]}`);
 
-      // Both layers: the project layer has three matched entries, so the global layer gets its
-      // fair share, and its first place goes to the matched topic entry, not a core entry.
+      // Both layers: three matched project entries scoring 0.67 (two of three keywords), below the
+      // project core entry's 1.0, which is listed first in the index. Score order alone would put
+      // p-core first; the fix must still give the project's three places to the matched entries,
+      // and the global layer's first place to its matched topic entry.
+      const projectIndexPath = join(projectRoot, ".claude", "loadout", "index.json");
       writeFileSync(
-        join(projectRoot, ".claude", "loadout", "index.json"),
+        projectIndexPath,
         JSON.stringify(
           makeTestIndex([
-            { id: "p1", keywords: ["yarn", "spinner"], summary: "P1" },
-            { id: "p2", keywords: ["yarn", "spinner"], summary: "P2" },
-            { id: "p3", keywords: ["yarn", "spinner"], summary: "P3" },
             { id: "p-core", keywords: ["unrelated"], priority: "core", summary: "PC" },
+            { id: "p1", keywords: ["yarn", "spinner", "zzz"], summary: "P1" },
+            { id: "p2", keywords: ["yarn", "spinner", "zzz"], summary: "P2" },
+            { id: "p3", keywords: ["yarn", "spinner", "zzz"], summary: "P3" },
           ])
         )
       );
@@ -619,7 +622,30 @@ describe("Part A: loadout-hook.mjs project-layer support", () => {
       const bLines = bCtx.split("\n").filter((l) => l.startsWith("- "));
       assert.equal(bLines.length, 5);
       assert.ok(bCtx.includes("- topic-licence "), "matched global topic entry surfaces");
+      for (const id of ["p1", "p2", "p3"]) assert.ok(bCtx.includes(`- ${id} `), `${id} surfaces`);
       assert.ok(!bCtx.includes("- p-core "), "project core entry yields to the project's matched entries");
+
+      // One project match plus the project core entry: the match comes first, and the core entry
+      // fills a place left over rather than being dropped.
+      writeFileSync(
+        projectIndexPath,
+        JSON.stringify(
+          makeTestIndex([
+            { id: "p-core", keywords: ["unrelated"], priority: "core", summary: "PC" },
+            { id: "p1", keywords: ["yarn", "spinner", "zzz"], summary: "P1" },
+          ])
+        )
+      );
+      const c = invokeHookRaw({ sandboxHome: homeDir, cwd: projectRoot, payloadCwd: projectRoot, prompt });
+      assert.equal(c.status, 0);
+      const cCtx: string = JSON.parse(c.stdout).hookSpecificOutput.additionalContext;
+      const projSection = cCtx.split("[loadout-hook] Project memory entries")[1] ?? "";
+      const pLines = projSection.split("\n").filter((l) => l.startsWith("- "));
+      assert.deepEqual(
+        pLines.map((l) => l.slice(2).split(" ")[0]),
+        ["p1", "p-core"],
+        "project match first, project core fills the leftover place"
+      );
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
