@@ -82,6 +82,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
     never overwrites an existing `<dest>.bak` whose `source_store` differs (preserving both
     backups).
 
+- **Pre-tool rule memory ids follow the stores they point into** (`packages/cli`) — the `publisher`
+  ids in `PRETOOL_RULES` named entries the Publisher store renamed in its 2026-11-21 rebuild, so every
+  `publisher` pair failed `doctor`'s per-seat `triad-memories` check once seat stores were declared.
+  They now name the entries that absorbed them: `rule-coordinator-and-merges` (`unreviewed-merge`,
+  `release-reminder`), `rule-director-communication` (`director-quote`) and `reference-memory-system`
+  (`memory-shell-write`, `future-stamp`). The `default` id of `director-quote` now names the studio-store
+  entry that carries that rule (`feedbackfeedbackneverquotethedirectormd`). The `default` ids of
+  `unreviewed-merge`, `memory-shell-write`, `future-stamp` and `release-reminder` still name R&D entries:
+  no studio-store entry carries those rules, so doctor's single-index fallback reports them until one
+  does. Declaring a `store` for each seat in `seats.json` makes `doctor` validate every seat against its
+  own store instead. Tests lock the full three-column table and cover a store whose entries were renamed.
+
 ## [1.1.1] - 2026-11-08
 
 ### Fixed

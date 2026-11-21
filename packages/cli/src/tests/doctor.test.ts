@@ -189,7 +189,11 @@ test("doctor: defaultDoctorPaths points hookSource at bundled apps/hook/dist/loa
 
 import { parseFrontmatter, serializeFrontmatter } from "@mcptoolshop/ai-loadout";
 import { analyzeMemoryMd, generateIndex } from "@mcptoolshop/claude-memories";
-import { RND_TRIAD_ENTRIES, PUBLISHER_TRIAD_ENTRIES } from "./fixtures.js";
+import {
+  RND_TRIAD_ENTRIES,
+  PUBLISHER_TRIAD_ENTRIES,
+  STUDIO_TRIAD_ENTRIES,
+} from "./fixtures.js";
 import { PRETOOL_RULES } from "../pretool-rules.js";
 
 test("Part 4.1: provenance & triad frontmatter fields read at top-level or under metadata, and carried into index entries", () => {
@@ -319,7 +323,9 @@ test("Part 4.2 & 4.3: doctor triad check in temp HOME verifies all 5 rules' memo
     observedAvg: 130,
   });
   try {
-    // Populate temp HOME's project index with the 5 R&D triad entries from the Part 4.3 fixture
+    // Populate temp HOME's project index with the 5 R&D triad entries from the Part 4.3 fixture, plus the
+    // studio entry the `default` seat cites for director-quote (the single-index fallback validates the
+    // `default` column against the global and project indexes together)
     const projectIndexPath = join(sb.dir, "project-index.json");
     writeFileSync(
       projectIndexPath,
@@ -327,7 +333,7 @@ test("Part 4.2 & 4.3: doctor triad check in temp HOME verifies all 5 rules' memo
         {
           version: "1.0.0",
           generated: "2026-11-08T20:00:00.000Z",
-          entries: RND_TRIAD_ENTRIES,
+          entries: [...RND_TRIAD_ENTRIES, ...STUDIO_TRIAD_ENTRIES],
           budget: {
             always_loaded_est: 0,
             on_demand_total_est: 2293,
@@ -614,14 +620,14 @@ test("Issue #25 / Ruling 1: doctor triad-memories check runs per seat across two
     ]);
     process.exitCode = 0;
 
-    // 2. Negative: remove one memory ID (`feedback-eastern-time` for `future-stamp`) from Publisher's store -> FAIL naming `publisher`
+    // 2. Negative: remove the one memory ID only `director-quote` cites (`rule-director-communication`) from Publisher's store -> FAIL naming `publisher`
     writeFileSync(
       join(pubStoreDir, "index.json"),
       JSON.stringify(
         {
           version: "1.0.0",
           generated: "2026-11-09T00:00:00.000Z",
-          entries: PUBLISHER_TRIAD_ENTRIES.filter((e) => e.id !== "feedback-eastern-time"),
+          entries: PUBLISHER_TRIAD_ENTRIES.filter((e) => e.id !== "rule-director-communication"),
           budget: {
             always_loaded_est: 0,
             on_demand_total_est: 1020,
@@ -644,10 +650,75 @@ test("Issue #25 / Ruling 1: doctor triad-memories check runs per seat across two
     assert.equal(failTriad.status, "fail");
     assert.match(
       failTriad.message,
-      /publisher: future-stamp -> feedback-eastern-time/,
-      "Failure message must name the seat (`publisher`), rule (`future-stamp`), and missing memory ID (`feedback-eastern-time`)",
+      /publisher: director-quote -> rule-director-communication/,
+      "Failure message must name the seat (`publisher`), rule (`director-quote`), and missing memory ID (`rule-director-communication`)",
+    );
+    assert.doesNotMatch(
+      failTriad.message,
+      /rnd: /,
+      "A Publisher-store gap must not be reported against the R&D seat",
     );
     assert.equal(failRes.ok, false);
+
+    // 2b. Stale ids after a store rebuild: a Publisher store that still carries only the entry ids it
+    // used before its 2026-11-21 rebuild fails for every rule, each pair naming the id the table now cites
+    const preRebuildIds = [
+      "publisher-merges-as-coordinator",
+      "feedback-never-quote-director",
+      "project-memory-system",
+      "feedback-eastern-time",
+      "publishing-tags-need-publisher-ok",
+    ];
+    writeFileSync(
+      join(pubStoreDir, "index.json"),
+      JSON.stringify(
+        {
+          version: "1.0.0",
+          generated: "2026-11-09T00:00:00.000Z",
+          entries: preRebuildIds.map((id) => ({
+            id,
+            path: `memory/${id}.md`,
+            keywords: [id],
+            patterns: [id.replace(/-/g, "_")],
+            priority: "domain",
+            summary: "Entry id from before the store rebuild",
+            triggers: { task: true, plan: true, edit: false },
+            tokens_est: 100,
+            lines: 10,
+          })),
+          budget: {
+            always_loaded_est: 0,
+            on_demand_total_est: 500,
+            avg_task_load_est: 100,
+            avg_task_load_observed: null,
+          },
+        },
+        null,
+        2,
+      ),
+      "utf-8",
+    );
+    const staleRes = runDoctor({
+      ...pathsFor(sb),
+      skillsDir,
+      seatsPath,
+    });
+    const staleTriad = find(staleRes.checks, "triad-memories");
+    assert.equal(staleTriad.status, "fail");
+    for (const pair of [
+      "unreviewed-merge -> rule-coordinator-and-merges",
+      "director-quote -> rule-director-communication",
+      "memory-shell-write -> reference-memory-system",
+      "future-stamp -> reference-memory-system",
+      "release-reminder -> rule-coordinator-and-merges",
+    ]) {
+      assert.ok(
+        staleTriad.message.includes(`publisher: ${pair}`),
+        `Stale Publisher store must report \`publisher: ${pair}\`; got: ${staleTriad.message}`,
+      );
+    }
+    assert.doesNotMatch(staleTriad.message, /rnd: /);
+    assert.equal(staleRes.ok, false);
 
     // 3. Direct `seatStores` option in DoctorPaths also validates per seat
     const directRes = runDoctor({

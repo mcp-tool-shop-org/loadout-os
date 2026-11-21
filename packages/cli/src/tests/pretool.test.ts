@@ -1103,7 +1103,7 @@ describe("Part 3: the first five rules (unreviewed-merge, director-quote, memory
         assert.match(rndRes.stdout, /R&D hands reviewed PRs to the Publisher to merge/i);
         assert.match(rndRes.stdout, /publisher-merges/);
 
-        // Publisher seat -> warn (exit 0 + Argon-verdict sha reminder mentioning ledger step 2 and publisher-merges-as-coordinator)
+        // Publisher seat -> warn (exit 0 + Argon-verdict sha reminder mentioning ledger step 2 and rule-coordinator-and-merges)
         const pubRes = runPreTool({
           stdinJson: JSON.stringify({
             tool_name: "Bash",
@@ -1117,7 +1117,7 @@ describe("Part 3: the first five rules (unreviewed-merge, director-quote, memory
         assert.equal(pubRes.outcome, "warn");
         assert.match(pubRes.stdout, /Argon-verdict sha/);
         assert.match(pubRes.stdout, /step 2/);
-        assert.match(pubRes.stdout, /publisher-merges-as-coordinator/);
+        assert.match(pubRes.stdout, /rule-coordinator-and-merges/);
 
         // Default seat -> warn
         const defRes = runPreTool({
@@ -1832,7 +1832,7 @@ describe("Part 3: the first five rules (unreviewed-merge, director-quote, memory
       for (const command of releaseCommands) {
         for (const [cwd, expectedMemId] of [
           ["E:/AI/Research and Development", /publisher-approves-every-publish/],
-          ["E:/AI/Publisher", /publishing-tags-need-publisher-ok/],
+          ["E:/AI/Publisher", /rule-coordinator-and-merges/],
           ["E:/AI/OtherRepo", /publisher-approves-every-publish/],
         ] as const) {
           const res = runPreTool({
@@ -2596,31 +2596,45 @@ describe("Part 6: Issue #25 (P1.1–P4.15) and log-only rulings", () => {
     assert.equal(midnightWrapRes.exitCode, 0, "Midnight wrap ~23:58 ET at 00:02 ET must pass");
   });
 
-  it("Ruling 1: resolves per-seat memory IDs for all 5 rules (`rnd` vs `publisher`) and formats seat-specific memory IDs in messages", () => {
-    const expectedMap: Record<string, { rnd: string; publisher: string }> = {
+  it("Ruling 1: resolves per-seat memory IDs for all 5 rules (`default` vs `rnd` vs `publisher`) and formats seat-specific memory IDs in messages", () => {
+    // `default` -> the studio (global) index; `rnd` -> the R&D store; `publisher` -> the Publisher store.
+    // Only director-quote has a studio entry; the other four `default` ids still name the R&D entries
+    // until the studio store carries those rules (see the header of pretool-rules.ts).
+    const expectedMap: Record<string, { default: string; rnd: string; publisher: string }> = {
       "unreviewed-merge": {
+        default: "publisher-merges",
         rnd: "publisher-merges",
-        publisher: "publisher-merges-as-coordinator",
+        publisher: "rule-coordinator-and-merges",
       },
       "director-quote": {
+        default: "feedbackfeedbackneverquotethedirectormd",
         rnd: "never-quote-director-in-public",
-        publisher: "feedback-never-quote-director",
+        publisher: "rule-director-communication",
       },
       "memory-shell-write": {
+        default: "build-in-studio-tools-not-side-scripts",
         rnd: "build-in-studio-tools-not-side-scripts",
-        publisher: "project-memory-system",
+        publisher: "reference-memory-system",
       },
       "future-stamp": {
+        default: "rnd-memory-system",
         rnd: "rnd-memory-system",
-        publisher: "feedback-eastern-time",
+        publisher: "reference-memory-system",
       },
       "release-reminder": {
+        default: "publisher-approves-every-publish",
         rnd: "publisher-approves-every-publish",
-        publisher: "publishing-tags-need-publisher-ok",
+        publisher: "rule-coordinator-and-merges",
       },
     };
 
+    assert.deepEqual(
+      PRETOOL_RULES.map((r) => r.id).sort(),
+      Object.keys(expectedMap).sort(),
+      "every rule in the table must have an expected memory map",
+    );
     for (const rule of PRETOOL_RULES) {
+      assert.equal(resolveRuleMemory(rule, "default"), expectedMap[rule.id]!.default);
       assert.equal(resolveRuleMemory(rule, "rnd"), expectedMap[rule.id]!.rnd);
       assert.equal(resolveRuleMemory(rule, "publisher"), expectedMap[rule.id]!.publisher);
     }

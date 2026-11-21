@@ -377,61 +377,66 @@ export const RND_TRIAD_ENTRIES: LoadoutIndex["entries"] = [
   },
 ];
 
+/**
+ * The Publisher-store entries the `publisher` column of the rule table cites, under the ids the
+ * Publisher store uses since its 2026-11-21 rebuild (`idSource: name`). Three entries carry all five
+ * rules: the coordinator entry carries unreviewed-merge and release-reminder, the Director
+ * communication entry carries director-quote, and the memory-system entry carries memory-shell-write
+ * and future-stamp.
+ */
 export const PUBLISHER_TRIAD_ENTRIES: LoadoutIndex["entries"] = [
   {
-    id: "feedback-eastern-time",
-    path: "memory/feedback-eastern-time.md",
-    keywords: ["eastern", "time", "clock"],
-    patterns: ["feedback_eastern_time"],
+    id: "rule-coordinator-and-merges",
+    path: "memory/rule-coordinator-and-merges.md",
+    keywords: ["coordinator", "merges", "publish", "gate"],
+    patterns: ["rule_coordinator_and_merges"],
     priority: "domain",
-    summary: "All timestamps use Eastern Time checked against the OS clock",
+    summary: "Coordinator authority, merge and publish gating, cross-family code verdicts at the head",
     triggers: { task: true, plan: true, edit: false },
-    tokens_est: 200,
-    lines: 14,
+    tokens_est: 1800,
+    lines: 50,
   },
   {
-    id: "publishing-tags-need-publisher-ok",
-    path: "memory/publishing-tags-need-publisher-ok.md",
-    keywords: ["publish", "tags", "publisher"],
-    patterns: ["publishing_tags_need_publisher_ok"],
+    id: "rule-director-communication",
+    path: "memory/rule-director-communication.md",
+    keywords: ["director", "communication", "quote", "eastern"],
+    patterns: ["rule_director_communication"],
     priority: "domain",
-    summary: "Publishing tags and releases requires Publisher OK and full-treatment",
+    summary: "Standing Director communication rules: never reproduce his words, Eastern time only",
     triggers: { task: true, plan: true, edit: false },
-    tokens_est: 220,
-    lines: 15,
+    tokens_est: 1100,
+    lines: 50,
   },
   {
-    id: "publisher-merges-as-coordinator",
-    path: "memory/publisher-merges-as-coordinator.md",
-    keywords: ["merges", "coordinator", "publisher"],
-    patterns: ["publisher_merges_as_coordinator"],
+    id: "reference-memory-system",
+    path: "memory/reference-memory-system.md",
+    keywords: ["memory", "system", "loadout", "refresh"],
+    patterns: ["reference_memory_system"],
     priority: "domain",
-    summary: "Publisher merges PRs as coordinator after Argon PASS at head",
+    summary: "How Publisher memory operates on loadout-os: board injection, refresh guard, Edit-tool-only writes",
     triggers: { task: true, plan: true, edit: false },
-    tokens_est: 240,
-    lines: 16,
+    tokens_est: 1200,
+    lines: 35,
   },
+];
+
+/**
+ * The studio (global index) entry the `default` column cites for director-quote. The studio store
+ * has no `.loadout.json`, so its ids derive from the file path (`Feedback/feedback_...md`) with the
+ * separators and punctuation removed. No studio entry carries the other four rules.
+ */
+export const STUDIO_TRIAD_ENTRIES: LoadoutIndex["entries"] = [
   {
-    id: "feedback-never-quote-director",
-    path: "memory/feedback-never-quote-director.md",
-    keywords: ["director", "never", "quote"],
-    patterns: ["feedback_never_quote_director"],
+    id: "feedbackfeedbackneverquotethedirectormd",
+    path: "memory/Feedback/feedback_never_quote_the_director.md",
+    keywords: ["quote", "director", "verbatim", "speech"],
+    patterns: ["feedback_never_quote_the_director", "feedbackfeedbackneverquotethedirectormd"],
     priority: "domain",
-    summary: "Never reproduce the Director's words verbatim in any artifact",
+    summary: "Hard law: never reproduce the Director's words verbatim in any artifact",
     triggers: { task: true, plan: true, edit: false },
-    tokens_est: 260,
-    lines: 18,
-  },
-  {
-    id: "project-memory-system",
-    path: "memory/project-memory-system.md",
-    keywords: ["memory", "system", "loadout"],
-    patterns: ["project_memory_system"],
-    priority: "domain",
-    summary: "Publisher project memory system managed via loadout-os",
-    triggers: { task: true, plan: true, edit: false },
-    tokens_est: 300,
-    lines: 20,
+    tokens_est: 2462,
+    lines: 154,
+    metadata: { type: "feedback" },
   },
 ];
 
