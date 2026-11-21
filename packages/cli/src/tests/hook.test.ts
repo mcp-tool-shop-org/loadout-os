@@ -558,6 +558,73 @@ describe("Part A: loadout-hook.mjs project-layer support", () => {
     }
   });
 
+  test("7b. a matched topic entry comes before core entries in its layer, which only fill the places left", () => {
+    if (!existsSync(HOOK)) return;
+    const root = mkdtempSync(join(tmpdir(), "loadout-part-a-corelast-"));
+    try {
+      const homeDir = join(root, "home");
+      const projectRoot = join(root, "project");
+      const emptyWorkdir = join(root, "workspace");
+      mkdirSync(join(homeDir, ".ai-loadout"), { recursive: true });
+      mkdirSync(join(projectRoot, ".claude", "loadout"), { recursive: true });
+      mkdirSync(emptyWorkdir, { recursive: true });
+
+      // 5 global core entries (score 1.0 on every prompt) and one global domain entry that the
+      // prompt matches on one of its three keywords plus its pattern (1/3 + 0.2 = 0.53).
+      writeFileSync(
+        join(homeDir, ".ai-loadout", "index.json"),
+        JSON.stringify(
+          makeTestIndex([
+            { id: "g1", keywords: ["unrelated"], priority: "core", summary: "G1" },
+            { id: "g2", keywords: ["unrelated"], priority: "core", summary: "G2" },
+            { id: "g3", keywords: ["unrelated"], priority: "core", summary: "G3" },
+            { id: "g4", keywords: ["unrelated"], priority: "core", summary: "G4" },
+            { id: "g5", keywords: ["unrelated"], priority: "core", summary: "G5" },
+            {
+              id: "topic-licence",
+              keywords: ["yarn", "yarnspinner", "yspl"],
+              patterns: ["yarn_spinner_yarnspinner_yspl"],
+              summary: "Topic rule",
+            },
+          ])
+        )
+      );
+      const prompt = "can we use the yarn spinner plugin";
+
+      // Global layer only: the topic entry leads, and core entries fill the other four places.
+      const g = invokeHookRaw({ sandboxHome: homeDir, cwd: emptyWorkdir, prompt });
+      assert.equal(g.status, 0);
+      const gLines = (JSON.parse(g.stdout).hookSpecificOutput.additionalContext as string)
+        .split("\n")
+        .filter((l) => l.startsWith("- "));
+      assert.equal(gLines.length, 5);
+      assert.ok(gLines[0].startsWith("- topic-licence "), `topic entry first, got: ${gLines[0]}`);
+
+      // Both layers: the project layer has three matched entries, so the global layer gets its
+      // fair share, and its first place goes to the matched topic entry, not a core entry.
+      writeFileSync(
+        join(projectRoot, ".claude", "loadout", "index.json"),
+        JSON.stringify(
+          makeTestIndex([
+            { id: "p1", keywords: ["yarn", "spinner"], summary: "P1" },
+            { id: "p2", keywords: ["yarn", "spinner"], summary: "P2" },
+            { id: "p3", keywords: ["yarn", "spinner"], summary: "P3" },
+            { id: "p-core", keywords: ["unrelated"], priority: "core", summary: "PC" },
+          ])
+        )
+      );
+      const b = invokeHookRaw({ sandboxHome: homeDir, cwd: projectRoot, payloadCwd: projectRoot, prompt });
+      assert.equal(b.status, 0);
+      const bCtx: string = JSON.parse(b.stdout).hookSpecificOutput.additionalContext;
+      const bLines = bCtx.split("\n").filter((l) => l.startsWith("- "));
+      assert.equal(bLines.length, 5);
+      assert.ok(bCtx.includes("- topic-licence "), "matched global topic entry surfaces");
+      assert.ok(!bCtx.includes("- p-core "), "project core entry yields to the project's matched entries");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   test("8. the AI_LOADOUT_PROJECT_INDEX env override works", () => {
     if (!existsSync(HOOK)) return;
     const root = mkdtempSync(join(tmpdir(), "loadout-part-a-env-"));

@@ -29,6 +29,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Matched topic entries reach the prompt hook again** (`apps/hook`) — within each layer, entries the prompt
+  matched now come before `core` entries, which fill only the places left. Core entries score 1.0 on every
+  prompt, so a store with several of them filled its whole share every time and a matched entry (scoring, say,
+  0.53) never surfaced. Measured on a real two-layer setup: 9 of 11 sample prompts now surface their topic
+  entry, against 2 of 11 before. With no match, the output is unchanged. New test `7b` in `hook.test.ts`.
+- **Merge reminder wording** (`packages/cli`, `pretool-rules.ts`) — the `unreviewed-merge` reminder asks for
+  an other-family verdict at the exact head sha (Opus for Carbon or Neon builds, Carbon in AI Studio for
+  Claude-written work) instead of the retired "Argon-verdict sha".
 - **Pre-tool hook enforce-readiness & issue #25** (`packages/cli`, closes #25) —
   - **Read-only pass-through & seat map hardening (P1.1–P1.3):** rejected `git -c <key>=<val>`
     and leading `VAR=val` environment variable prefixes on read-only pass-through segments;

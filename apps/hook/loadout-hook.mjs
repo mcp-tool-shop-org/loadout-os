@@ -93,14 +93,27 @@ function formatPointerLine(r) {
  *   so auto-loaded MEMORY.md entries do not crowd out sub-index entries.
  * - Take up to FAIR_SHARE_PER_LAYER (3) from each layer first, then fill any remaining
  *   slots up to MAX_ENTRIES (5) from whichever layer still has candidates.
+ * - Within each layer, entries the prompt actually matched come before core entries.
+ *   Core entries score 1.0 on every prompt, so ranking them by score let a store with
+ *   several core entries fill its whole share on every prompt, and a matched topic entry
+ *   (say a licence rule at 0.53) never reached the output. Core entries now fill only
+ *   the places left after the matched ones; with no match, the output is unchanged.
  */
+function coreLast(list) {
+  return [
+    ...list.filter(r => r.entry.priority !== 'core'),
+    ...list.filter(r => r.entry.priority === 'core'),
+  ];
+}
+
 function selectTopEntries(aboveFloor, provenance) {
   const getLayer = (r) => {
     const p = provenance && provenance[r.entry.id];
     return p === 'project' ? 'project' : 'global';
   };
 
-  const globalCandidates = aboveFloor.filter(r => getLayer(r) === 'global');
+  // matchLoadout returns entries sorted by score; coreLast keeps that order within each group.
+  const globalCandidates = coreLast(aboveFloor.filter(r => getLayer(r) === 'global'));
   const projectCandidates = aboveFloor.filter(r => getLayer(r) === 'project');
 
   // When only global candidates exist, preserve main's exact order and slicing.
@@ -108,12 +121,13 @@ function selectTopEntries(aboveFloor, provenance) {
     return globalCandidates.slice(0, MAX_ENTRIES);
   }
 
-  // Within project candidates, prefer sub-index entries over top-level MEMORY.md entries
-  // among domain matches so sub-index entries aren't starved by already-loaded MEMORY.md bullets (F-22).
+  // Within project candidates, matched entries come before core entries (see coreLast), and
+  // sub-index entries come before top-level MEMORY.md entries among domain matches, so
+  // sub-index entries aren't starved by already-loaded MEMORY.md bullets (F-22).
   const sortedProject = [...projectCandidates].sort((a, b) => {
     const aCore = a.entry.priority === 'core' ? 1 : 0;
     const bCore = b.entry.priority === 'core' ? 1 : 0;
-    if (bCore !== aCore) return bCore - aCore;
+    if (aCore !== bCore) return aCore - bCore;
     const aSub = isSubindexEntry(a.entry) ? 1 : 0;
     const bSub = isSubindexEntry(b.entry) ? 1 : 0;
     if (bSub !== aSub) return bSub - aSub;

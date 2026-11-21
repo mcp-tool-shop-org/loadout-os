@@ -1103,7 +1103,7 @@ describe("Part 3: the first five rules (unreviewed-merge, director-quote, memory
         assert.match(rndRes.stdout, /R&D hands reviewed PRs to the Publisher to merge/i);
         assert.match(rndRes.stdout, /publisher-merges/);
 
-        // Publisher seat -> warn (exit 0 + Argon-verdict sha reminder mentioning ledger step 2 and rule-coordinator-and-merges)
+        // Publisher seat -> warn (exit 0 + other-family verdict reminder mentioning ledger step 2 and rule-coordinator-and-merges)
         const pubRes = runPreTool({
           stdinJson: JSON.stringify({
             tool_name: "Bash",
@@ -1115,7 +1115,8 @@ describe("Part 3: the first five rules (unreviewed-merge, director-quote, memory
         });
         assert.equal(pubRes.exitCode, 0, `Publisher should warn: ${command}`);
         assert.equal(pubRes.outcome, "warn");
-        assert.match(pubRes.stdout, /Argon-verdict sha/);
+        assert.match(pubRes.stdout, /other-family verdict at the exact head sha/);
+        assert.doesNotMatch(pubRes.stdout, /Argon/);
         assert.match(pubRes.stdout, /step 2/);
         assert.match(pubRes.stdout, /rule-coordinator-and-merges/);
 
