@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-11-26
+
+**A PreToolUse hook that checks tool calls against your memory store's rules, configured per profile.** `loadout-os hook pre-tool` runs a rule table (including `quote-gate`) whose speakers, memory ids and notes come from `~/.ai-loadout/profiles.json`; `doctor` gains triad, memory-index scaling and config-load checks; `loadout-os memories split` moves root index entries into sub-indexes, which may themselves nest. Global `refresh` and `doctor` now take the default store only from `--store`, `AI_LOADOUT_STORE` or `profiles.json` `defaultStore`, and refuse with `DEFAULT_STORE_REQUIRED` when none is set.
+
 ### Added
 
 - **PreToolUse hook framework (`loadout-os hook pre-tool`) and triad `doctor` checks** (`packages/cli`, `packages/kernel`, `packages/memories`, #24) —
