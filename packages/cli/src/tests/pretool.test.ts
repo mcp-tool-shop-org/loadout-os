@@ -8,7 +8,7 @@
 import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync, existsSync } from "node:fs";
-import { join } from "node:path";
+import { join, parse } from "node:path";
 import { tmpdir } from "node:os";
 
 import {
@@ -31,6 +31,7 @@ import {
   hashToolInput,
   defaultProfilesPath,
   defaultDecisionLogPath,
+  collectStorePaths,
   DEFAULT_PRETOOL_TIMEOUT_MS,
   ProfileConfigError,
   type PreToolRule,
@@ -3987,6 +3988,137 @@ describe("Part 7: PR #26 Fix 1 — shipped defaults, false-positive fixes, and r
     } finally {
       if (prevEnvStore === undefined) delete process.env.AI_LOADOUT_STORE;
       else process.env.AI_LOADOUT_STORE = prevEnvStore;
+    }
+  });
+
+  it("FIX-1 Item 2: AI_LOADOUT_STORE resolves relative paths and skips overly broad paths (root, home dir, .git repo root) with config_warning while protecting normal stores", () => {
+    const emptyProfiles = join(tempDir, "empty-fix1-profiles.json");
+    writeFileSync(emptyProfiles, JSON.stringify({}), "utf-8");
+
+    const prevCwd = process.cwd();
+    const prevEnvStore = process.env.AI_LOADOUT_STORE;
+    const prevHome = process.env.HOME;
+    const prevUserProfile = process.env.USERPROFILE;
+
+    try {
+      // 1. Relative AI_LOADOUT_STORE resolves to absolute path and protects across another cwd
+      process.chdir(tempDir);
+      process.env.AI_LOADOUT_STORE = join("rel-store", "memory");
+      const emptyCfg = loadProfileConfig(emptyProfiles);
+      const collectedRel = collectStorePaths(emptyCfg);
+      const expectedRelStore = resolve(tempDir, "rel-store", "memory");
+      assert.ok(collectedRel.includes(expectedRelStore));
+
+      const otherCwd = join(tempDir, "other-workdir");
+      mkdirSync(otherCwd, { recursive: true });
+      const relBlocked = runPreTool({
+        stdinJson: JSON.stringify({
+          tool_name: "Bash",
+          tool_input: {
+            command: `rm "${join(expectedRelStore, "topic.md").replace(/\\/g, "/")}"`,
+          },
+          cwd: otherCwd,
+        }),
+        profilesPath: emptyProfiles,
+        logPath,
+      });
+      assert.equal(relBlocked.exitCode, 2, "Resolved relative AI_LOADOUT_STORE must block shell writes");
+      assert.ok(relBlocked.logEntry?.matched.some((m) => m.id === "memory-shell-write"));
+
+      // 2. Home-dir AI_LOADOUT_STORE is skipped with config_warning and does not block writes under home
+      const fakeHome = join(tempDir, "fake-home");
+      mkdirSync(fakeHome, { recursive: true });
+      process.env.HOME = fakeHome;
+      process.env.USERPROFILE = fakeHome;
+      process.env.AI_LOADOUT_STORE = fakeHome;
+
+      const homeRes = runPreTool({
+        stdinJson: JSON.stringify({
+          tool_name: "Bash",
+          tool_input: {
+            command: `rm "${join(fakeHome, "scratch.txt").replace(/\\/g, "/")}"`,
+          },
+          cwd: tempDir,
+        }),
+        profilesPath: emptyProfiles,
+        logPath,
+      });
+      assert.equal(homeRes.exitCode, 0, "Home-dir AI_LOADOUT_STORE must be skipped with warning");
+      assert.equal(homeRes.outcome, "allow");
+      assert.ok(
+        homeRes.logEntry?.notes?.some((n) => n.includes("config_warning:AI_LOADOUT_STORE skipped (home_dir)")),
+      );
+
+      // 3a. Filesystem root is skipped with config_warning
+      process.env.AI_LOADOUT_STORE = parse(tempDir).root;
+      const rootRes = runPreTool({
+        stdinJson: JSON.stringify({
+          tool_name: "Bash",
+          tool_input: {
+            command: `rm "${join(tempDir, "root-test.txt").replace(/\\/g, "/")}"`,
+          },
+          cwd: tempDir,
+        }),
+        profilesPath: emptyProfiles,
+        logPath,
+      });
+      assert.equal(rootRes.exitCode, 0);
+      assert.equal(rootRes.outcome, "allow");
+      assert.ok(
+        rootRes.logEntry?.notes?.some((n) =>
+          n.includes("config_warning:AI_LOADOUT_STORE skipped (filesystem_root)"),
+        ),
+      );
+
+      // 3b. Repo root containing `.git` is skipped with config_warning
+      const fakeRepo = join(tempDir, "fake-repo");
+      mkdirSync(join(fakeRepo, ".git"), { recursive: true });
+      process.env.AI_LOADOUT_STORE = fakeRepo;
+      const repoRes = runPreTool({
+        stdinJson: JSON.stringify({
+          tool_name: "Bash",
+          tool_input: {
+            command: `rm "${join(fakeRepo, "README.md").replace(/\\/g, "/")}"`,
+          },
+          cwd: tempDir,
+        }),
+        profilesPath: emptyProfiles,
+        logPath,
+      });
+      assert.equal(repoRes.exitCode, 0);
+      assert.equal(repoRes.outcome, "allow");
+      assert.ok(
+        repoRes.logEntry?.notes?.some((n) =>
+          n.includes("config_warning:AI_LOADOUT_STORE skipped (repo_root)"),
+        ),
+      );
+
+      // 4. Normal store directory still blocks without warnings
+      const validStore = join(tempDir, "valid-store", "memory");
+      mkdirSync(validStore, { recursive: true });
+      process.env.AI_LOADOUT_STORE = validStore;
+      const validRes = runPreTool({
+        stdinJson: JSON.stringify({
+          tool_name: "Bash",
+          tool_input: {
+            command: `rm "${join(validStore, "topic.md").replace(/\\/g, "/")}"`,
+          },
+          cwd: tempDir,
+        }),
+        profilesPath: emptyProfiles,
+        logPath,
+      });
+      assert.equal(validRes.exitCode, 2);
+      assert.ok(validRes.logEntry?.matched.some((m) => m.id === "memory-shell-write"));
+      assert.ok(!validRes.logEntry?.notes?.some((n) => n.includes("AI_LOADOUT_STORE skipped")));
+    } finally {
+      process.chdir(prevCwd);
+      if (prevEnvStore === undefined) delete process.env.AI_LOADOUT_STORE;
+      else process.env.AI_LOADOUT_STORE = prevEnvStore;
+      if (prevHome === undefined) delete process.env.HOME;
+      else process.env.HOME = prevHome;
+      if (prevUserProfile === undefined) delete process.env.USERPROFILE;
+      else process.env.USERPROFILE = prevUserProfile;
     }
   });
 });

@@ -30,7 +30,7 @@
 
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join, parse, resolve } from "node:path";
 import { homedir } from "node:os";
 import { performance } from "node:perf_hooks";
 
@@ -2044,9 +2044,36 @@ export function readDecisionLog(
 
 // ── Pre-Tool Hook Execution (Parts 1 & 2) ─────────────────────
 
+export interface CollectStorePathsOptions {
+  /** Called when `AI_LOADOUT_STORE` is skipped due to overly broad resolution. */
+  onWarning?: (msg: string) => void;
+}
+
+function checkEnvStoreBreadth(resolvedPath: string): string | null {
+  const parsed = parse(resolvedPath);
+  if (
+    resolvedPath === parsed.root ||
+    parsed.base === "" ||
+    /^[a-zA-Z]:[\\/]?$/.test(resolvedPath) ||
+    resolvedPath === "/"
+  ) {
+    return "AI_LOADOUT_STORE skipped (filesystem_root): refusing filesystem root as memory store";
+  }
+  const normTarget = normalizePreToolPath(resolvedPath);
+  const normHome = normalizePreToolPath(resolve(homedir()));
+  if (normTarget && normHome && normTarget === normHome) {
+    return "AI_LOADOUT_STORE skipped (home_dir): refusing home directory as memory store";
+  }
+  if (existsSync(join(resolvedPath, ".git"))) {
+    return "AI_LOADOUT_STORE skipped (repo_root): refusing repository root (.git) as memory store";
+  }
+  return null;
+}
+
 export function collectStorePaths(
   profileConfig: ProfileConfig,
   extraStorePaths?: string[],
+  opts?: CollectStorePathsOptions,
 ): string[] {
   const out = new Set<string>();
   out.add(`${HOMEDIR_SLASH}/.claude/projects/*/memory`);
@@ -2056,7 +2083,13 @@ export function collectStorePaths(
   }
   const envStore = process.env.AI_LOADOUT_STORE?.trim();
   if (envStore) {
-    out.add(envStore);
+    const resolvedEnvStore = resolve(envStore);
+    const breadthWarning = checkEnvStoreBreadth(resolvedEnvStore);
+    if (breadthWarning) {
+      opts?.onWarning?.(breadthWarning);
+    } else {
+      out.add(resolvedEnvStore);
+    }
   }
   if (extraStorePaths) {
     for (const p of extraStorePaths) {
@@ -2236,7 +2269,11 @@ export function runPreTool(opts: PreToolOptions = {}): PreToolResult {
 
   // ── 4. Evaluate rule table ──────────────────────────────────
   const rules = opts.rules ?? PRETOOL_RULES;
-  const storePaths = collectStorePaths(profileConfig, opts.storePaths);
+  const storePaths = collectStorePaths(profileConfig, opts.storePaths, {
+    onWarning: (w) => {
+      notes.push(`config_warning:${w}`);
+    },
+  });
   const normalizedStorePaths = prenormalizeStorePaths(storePaths);
   const repliesDir =
     opts.repliesDir ?? profileConfig.repliesDir ?? defaultRepliesDir();
