@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-11-26
+
 ### Added
 
 - `loadout-os hook pre-tool` (`PreToolUse` Layer A/B guard and decision logger) driven by
