@@ -176,19 +176,33 @@ describe("Part 1: hook pre-tool entry, profile map, pass-through, rule table, de
     });
 
     it("validates profiles.json with structured ProfileConfigError and warns on unknown keys without crashing", () => {
+      delete process.env.AI_LOADOUT_PROFILES_PATH;
+      assert.ok(defaultProfilesPath().replace(/\\/g, "/").endsWith("/.ai-loadout/profiles.json"));
+      assert.deepEqual(loadProfileConfig().profiles, {});
+
       const badCases: Array<[unknown, string]> = [
         [[], "PROFILE_CONFIG_NOT_OBJECT"],
         [{ profiles: "bad" }, "INVALID_PROFILES_MAP"],
+        [{ profiles: { "/repo": 123 } }, "INVALID_PROFILE_ENTRY"],
         [{ profiles: { "/repo": {} } }, "MISSING_PROFILE_NAME"],
         [{ profiles: { "/repo": "" } }, "MISSING_PROFILE_NAME"],
+        [{ profiles: { "/repo": { profile: "docs", repliesDir: "" } } }, "INVALID_REPLIES_DIR"],
+        [{ profiles: { "/repo": { profile: "docs", store: "" } } }, "INVALID_STORE_PATH"],
+        [{ profiles: { "/repo": { profile: "docs", stores: ["ok", 42] } } }, "INVALID_STORE_PATH"],
+        [{ profiles: { "/repo": { profile: "docs", prefixes: "bad" } } }, "INVALID_PROFILE_PREFIXES"],
         [{ stores: ["ok", ""] }, "INVALID_STORE_PATH"],
         [{ repliesDir: 123 }, "INVALID_REPLIES_DIR"],
+        [{ replies_dir: 123 }, "INVALID_REPLIES_DIR"],
+        [{ ruleAliases: "bad" }, "INVALID_RULE_ALIASES"],
         [{ ruleAliases: { old: 42 } }, "INVALID_RULE_ALIASES"],
         [{ rules: [] }, "INVALID_RULES_MAP"],
         [{ rules: { "quote-gate": "bad" } }, "INVALID_RULE_OVERRIDE"],
+        [{ rules: { "quote-gate": { action: "bad" } } }, "INVALID_RULE_ACTION"],
         [{ rules: { "quote-gate": { action: { docs: "explode" } } } }, "INVALID_RULE_ACTION"],
+        [{ rules: { "quote-gate": { memory: "bad" } } }, "INVALID_RULE_MEMORY"],
         [{ rules: { "quote-gate": { memory: { docs: "" } } } }, "INVALID_RULE_MEMORY"],
         [{ rules: { "quote-gate": { skill: "" } } }, "INVALID_RULE_SKILL"],
+        [{ rules: { "quote-gate": { note: "bad" } } }, "INVALID_RULE_NOTE"],
         [{ rules: { "quote-gate": { note: { docs: 99 } } } }, "INVALID_RULE_NOTE"],
         [{ quoteGate: "bad" }, "INVALID_QUOTE_GATE"],
         [{ quoteGate: { speakers: [123] } }, "INVALID_QUOTE_GATE_SPEAKERS"],
@@ -205,6 +219,39 @@ describe("Part 1: hook pre-tool entry, profile map, pass-through, rule table, de
           `Expected ProfileConfigError(${expectedCode}) for case ${i}`,
         );
       }
+
+      // Missing explicit file & malformed JSON
+      assert.throws(
+        () => loadProfileConfig(join(tempDir, "does-not-exist.json")),
+        (err: unknown) => err instanceof ProfileConfigError && err.code === "PROFILE_CONFIG_NOT_FOUND",
+      );
+      const invalidJsonPath = join(tempDir, "invalid.json");
+      writeFileSync(invalidJsonPath, "{ not valid json", "utf-8");
+      assert.throws(
+        () => loadProfileConfig(invalidJsonPath),
+        (err: unknown) => err instanceof ProfileConfigError && err.code === "PROFILE_CONFIG_INVALID_JSON",
+      );
+
+      // Valid replies_dir, entry-level repliesDir + stores[]
+      const extraFormsPath = join(tempDir, "extra-forms.json");
+      writeFileSync(
+        extraFormsPath,
+        JSON.stringify({
+          replies_dir: "/tmp/replies-top",
+          profiles: {
+            "/repos/docs": {
+              profile: "docs",
+              repliesDir: "/tmp/replies-ignored",
+              stores: ["E:/StoreA/memory", "E:/StoreB/memory"],
+            },
+          },
+        }),
+        "utf-8",
+      );
+      const extraCfg = loadProfileConfig(extraFormsPath);
+      assert.equal(extraCfg.repliesDir, "/tmp/replies-top");
+      assert.deepEqual(extraCfg.storePaths, ["E:/StoreA/memory", "E:/StoreB/memory"]);
+      assert.equal(extraCfg.profileStores.docs, "E:/StoreA/memory");
 
       // Unknown keys warn and do not crash
       const unknownKeysPath = join(tempDir, "unknown-keys.json");
@@ -2857,7 +2904,7 @@ describe("Part 6: Issue #25 (P1.1–P4.15) and log-only rulings", () => {
       "Run release checklist before publishing.",
     );
 
-    // Alias in rules override maps old id -> new id
+    // Alias in rules override maps old id -> new id, and canonical key wins over alias in either order
     const aliasedProfiles = join(tempDir, "aliased-profiles.json");
     writeFileSync(
       aliasedProfiles,
@@ -2865,18 +2912,60 @@ describe("Part 6: Issue #25 (P1.1–P4.15) and log-only rulings", () => {
         ruleAliases: { "old-quote-id": "quote-gate" },
         rules: {
           "old-quote-id": {
-            action: { docs: "warn" },
-            memory: { docs: "aliased-quote-mem" },
-            note: { docs: "Note via alias." },
+            action: { docs: "warn", default: "warn" },
+            memory: { docs: "aliased-quote-mem", default: "fallback-quote-mem" },
+            note: { docs: "Note via alias.", default: "Default note." },
+          },
+          "quote-gate": {
+            action: { docs: "block" },
+          },
+          "future-stamp": {
+            action: { default: "warn" },
+            memory: { default: "default-stamp-mem" },
+          },
+          "unreviewed-merge": {
+            note: { docs: "Only docs note" },
+          },
+          "memory-shell-write": {
+            action: { release: "off" },
           },
         },
       }),
       "utf-8",
     );
     const aliasedCfg = loadProfileConfig(aliasedProfiles);
-    assert.equal(resolveRuleAction(PRETOOL_RULES[1]!, "docs", aliasedCfg), "warn");
+    assert.equal(resolveRuleAction(PRETOOL_RULES[1]!, "docs", aliasedCfg), "block");
+    assert.equal(resolveRuleAction(PRETOOL_RULES[1]!, "release", aliasedCfg), "warn");
     assert.equal(resolveRuleMemory(PRETOOL_RULES[1]!, "docs", aliasedCfg), "aliased-quote-mem");
+    assert.equal(resolveRuleMemory(PRETOOL_RULES[1]!, "release", aliasedCfg), "fallback-quote-mem");
+    assert.equal(resolveRuleMemory(PRETOOL_RULES[3]!, "release", aliasedCfg), "default-stamp-mem");
+    assert.equal(
+      resolveRuleMemory({ ...PRETOOL_RULES[0]!, memory: "string-mem-id" }, "docs"),
+      "string-mem-id",
+    );
+    assert.equal(
+      resolveRuleMemory({ ...PRETOOL_RULES[0]!, memory: { docs: "inline-docs-mem" } }, "docs"),
+      "inline-docs-mem",
+    );
     assert.equal(resolveRuleNote(PRETOOL_RULES[1]!, "docs", aliasedCfg), "Note via alias.");
+    assert.equal(resolveRuleNote(PRETOOL_RULES[1]!, "release", aliasedCfg), "Default note.");
+
+    // Canonical key listed BEFORE alias still wins
+    const reverseOrderProfiles = join(tempDir, "reverse-order-profiles.json");
+    writeFileSync(
+      reverseOrderProfiles,
+      JSON.stringify({
+        ruleAliases: { "old-quote-id": "quote-gate" },
+        rules: {
+          "quote-gate": { action: { docs: "block" }, skill: "canonical-skill" },
+          "old-quote-id": { action: { docs: "warn" }, skill: "alias-skill" },
+        },
+      }),
+      "utf-8",
+    );
+    const revCfg = loadProfileConfig(reverseOrderProfiles);
+    assert.equal(resolveRuleAction(PRETOOL_RULES[1]!, "docs", revCfg), "block");
+    assert.equal(resolveRuleSkill(PRETOOL_RULES[1]!, revCfg), "canonical-skill");
 
     // readDecisionLog remaps old rule ids in evaluated, matched, and rule_error notes
     const legacyLog = join(tempDir, "legacy-decisions.jsonl");
@@ -2894,7 +2983,7 @@ describe("Part 6: Issue #25 (P1.1–P4.15) and log-only rulings", () => {
           outcome: "block",
           latency_ms: 1.2,
           input_hash: "0".repeat(64),
-          notes: ["rule_error:old-quote-id"],
+          notes: ["rule_error:old-quote-id", "config_warning:extra"],
         }),
         "{ malformed line",
         "",
@@ -2905,7 +2994,7 @@ describe("Part 6: Issue #25 (P1.1–P4.15) and log-only rulings", () => {
     assert.equal(entries.length, 1);
     assert.deepEqual(entries[0]!.evaluated, ["quote-gate", "future-stamp"]);
     assert.deepEqual(entries[0]!.matched, [{ id: "quote-gate", layer: "A", action: "block" }]);
-    assert.deepEqual(entries[0]!.notes, ["rule_error:quote-gate"]);
+    assert.deepEqual(entries[0]!.notes, ["rule_error:quote-gate", "config_warning:extra"]);
   });
 
   it("covers additional sed write patterns, wrapper flags (`nice`, `nohup`, `time`, `env -u`, `xargs -I`), `cp -t`/`--target-directory=`, `dd of=`, `MultiEdit` disk reconstruction, and `=sha` merge flags", () => {
