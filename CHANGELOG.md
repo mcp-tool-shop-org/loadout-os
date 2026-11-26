@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - **PreToolUse hook framework (`loadout-os hook pre-tool`) and triad `doctor` checks** (`packages/cli`, `packages/kernel`, `packages/memories`, #24) —
   - Added the in-process `PreToolUse` guard (`runPreTool`, `--mode enforce|log-only`) with `stdin` schema validation, zero-I/O read-only tool and read-only Bash pipeline pass-through, longest-prefix `cwd` profile resolution, SHA-256 `input_hash` decision logging (`~/.ai-loadout/hook-decisions.jsonl`, `AI_LOADOUT_DECISIONS_LOG`), hard internal timeout (`300 ms`), and fail-open / fail-closed policy (`exit 2` + stderr only on block).
-  - Added the 5-rule Layer A/B rule table (`unreviewed-merge`, `quote-gate`, `memory-shell-write`, `future-stamp`, `release-reminder`), provenance frontmatter metadata (`loadout_skill`, `loadout_triggers`, `author_agent`, `created_at`, `verification_status`, `evidence_ref`, `supersedes`), and `doctor` triad checks (`triad-memories`, `triad-skills`, `triad-pretool-hook`).
+  - Added the 5-rule Layer A/B rule table (`unreviewed-merge`, `quote-gate`, `memory-shell-write`, `future-stamp`, `release-reminder`), provenance frontmatter metadata (`loadout_skill`, `loadout_triggers`, `author_agent`, `created_at`, `verification_status`, `evidence_ref`, `supersedes`), and `doctor` triad checks (`triad-memories`, `triad-skills`, `triad-pretool-hook`; note: `triad-pretool-hook` fails `doctor` with exit `1` until `loadout-os hook pre-tool` is wired under `hooks.PreToolUse` in `~/.claude/settings.json`).
 - **Memory-index scaling warnings in `doctor`** (`packages/cli`) — `loadout-os doctor` now runs two
   configurable capacity checks: `memory-read-limit` (warns when `MEMORY.md` passes 60% of Claude Code's
   24.4 KB read limit = 14,640 bytes by default) and `subindex-entries` (warns when a sub-index marked
@@ -38,11 +38,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - **Generic profile-driven PreToolUse framework (`profiles.json` and `quote-gate`)** (`packages/cli`) —
   - Replaced workspace-specific profile names and built-in store slugs with generic `profile` resolution (`ProfileName`, `ProfileConfig`, `loadProfileConfig`, `resolveProfile`, `defaultProfilesPath`), reading `~/.ai-loadout/profiles.json` (`AI_LOADOUT_PROFILES_PATH`, `--profiles <path>`). The only built-in profile is `default`. Global `refresh` and `doctor` resolve the default store only from configuration (`--store` > `AI_LOADOUT_STORE` env > `profiles.json` `defaultStore`) and refuse with `DEFAULT_STORE_REQUIRED` when unset, never deriving from `process.cwd()`.
-  - Removed all built-in per-profile actions, skill names, and memory IDs from `PRETOOL_RULES`; every rule message now states the rule in neutral terms, appends `(memory: <id>)` only when configured, and supports per-profile `action`, `memory`, `skill`, and extra `note` lines (appended after the 5-line base cap) from `profiles.json` (e.g., `docs` and `release` profiles).
+  - Removed all built-in per-profile actions, skill names, and memory IDs from `PRETOOL_RULES`; every rule message now states the rule in neutral terms, appends `(memory: <id>)` only when configured, and supports per-profile `action`, `memory`, and extra `note` lines (appended after the 5-line base cap), plus per-rule `skill`, from `profiles.json` (e.g., `docs` and `release` profiles).
   - Renamed the quote rule to `quote-gate` (`QUOTE_GATE_RULE`, `matchQuoteGate`) with `quoteGate.speakers` (speech-verb attribution subjects, defaulting to pronouns and generic role nouns: `He`, `She`, `They`, `the User`), separate `quoteGate.namedSpeakers` (defaulting to `[]` for P1 possessive-words, P1 first-name word-block, P2 possessive speech-noun, P2 line-start, and P2 dated attribution branches so generic `"the User"` never false-positives on `"the user's words"`, `"user: ..."`, or `"the user's reply: ..."`), configurable `quoteGate.allowlistSuffixes` (defaulting only to loadout-os's own rule and test files), and `ruleAliases` for rule lookups and `readDecisionLog` decision-log reading. P1 word-block matches only the first configured `namedSpeakers` entry (matching base behavior). Deliberately narrowed quote-gate matching with leading `\b` word boundaries on all six word-led branches — P1 named possessive-words, P1 first-name word-block, P2 speech-verb subject, P2 pronoun-possessive speech-noun, P2 named-possessive speech-noun, and P2 dated attribution — so words merely ending in a speaker or pronoun token (such as names ending in `she`, compounds ending in `user`, or words ending in `her`) no longer false-positive.
 
 ### Fixed
 
+- **`doctor` store resolution precedence and `--profiles` isolation** (`packages/cli`) —
+  `defaultDoctorPaths()` now leaves `store` empty instead of eagerly reading the ambient
+  `~/.ai-loadout/profiles.json`; `runDoctor` resolves `--store` > `AI_LOADOUT_STORE` >
+  `defaultStore` of the `profiles.json` actually in use (refusing with `DEFAULT_STORE_REQUIRED`
+  when none is set), and `printDoctor` prints the resolved store path and source (`flag`,
+  `env`, or `profiles`).
+- **Warn-only rule clamping (`unreviewed-merge`, `release-reminder`)** (`packages/cli`) —
+  `loadProfileConfig` and `resolveRuleAction` now clamp any configured `"block"` action on
+  warn-only rules (`WARN_ONLY_RULE_IDS`) down to `"warn"` and record a `config_warning`
+  (also surfaced by `doctor`'s `profiles-config` check); `"off"` remains allowed.
+- **`AI_LOADOUT_STORE` included in pre-tool store scope** (`packages/cli`) — `collectStorePaths`
+  now includes `AI_LOADOUT_STORE` so `memory-shell-write` and `future-stamp` protect stores set
+  solely via `AI_LOADOUT_STORE`; removed the undocumented `AI_LOADOUT_STORE_PATHS` env var.
+- **Platform-scoped MSYS path conversion in `normalizePreToolPath`** (`packages/cli`) —
+  restricted `/<drive>/...` MSYS conversion to `platform === "win32"` (removing the `/AI/`
+  path special case) and added an explicit `{ platform }` option to `normalizePreToolPath` and
+  `resolveProfile`.
+- **Published `@mcptoolshop/loadout-os` package docs and `--help` alignment** (`packages/cli`) —
+  updated `packages/cli/CHANGELOG.md` and `packages/cli/README.md` with the current command
+  surface (`memories split`, `hook pre-tool`, `--profiles`, `defaultStore` / `DEFAULT_STORE_REQUIRED`,
+  `doctor` checks, and absolute GitHub links), removed the `SDK use` section (`packages/cli` has
+  no `main` or `exports`), added `--allow-store-change` to `refresh --help`, and expanded
+  `public-hygiene.test.ts` to scan `packages/cli/*.md`.
 - **Matched topic entries reach the prompt hook again** (`apps/hook`) — within each layer, entries the prompt
   matched now come before `core` entries, which fill only the places left. Core entries score 1.0 on every
   prompt, so a store with several of them filled its whole share every time and a matched entry (scoring, say,
@@ -77,12 +100,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
     same-day time-only stamps (`~08:30 ET` edited at `21:30 ET`) while preserving midnight wrap
     within 6 hours after midnight (`~23:58 ET` at `00:02 ET`); stripped fenced code blocks and
     scoped frontmatter date keys (`created_at`, `modified`, `verified_at`) to the YAML frontmatter
-    block; scoped `future-stamp` strictly to configured memory store paths; and hashed unparseable
+    block; scoped `future-stamp` to memory store paths (`profiles.json` stores, `AI_LOADOUT_STORE`, and `~/.claude/projects/*/memory`); and hashed unparseable
     timestamp values in `notes` (`sha256:<hash12>(len=<n>)`) instead of logging raw prose.
   - **Per-profile memory IDs & per-profile `doctor` triad check (Ruling 1):** rule `memory` maps resolve
     per profile from `profiles.json`, rule messages cite the active profile's memory ID when configured,
-    and `doctor`'s `triad-memories` check (`--profiles <p>`) validates each configured profile against
-    its own store/index and names the failing profile on mismatch.
+    and `doctor`'s `triad-memories` check (`--profiles <p>`) validates each profile with a configured
+    store against its own store/index and names the failing profile on mismatch.
   - **`unreviewed-merge` warn-only with `PASS at <head8>` suppression (Ruling 2):**
     `unreviewed-merge` is permanently `warn` across all profiles (never `block`) and suppresses its
     warning when `repliesDir` is explicitly configured (`profiles.json` or `AI_LOADOUT_REPLIES_DIR`,

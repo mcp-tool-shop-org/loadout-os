@@ -47,9 +47,9 @@ import {
   type ProfileConfig,
 } from "./pretool.js";
 import { PRETOOL_RULES } from "./pretool-rules.js";
-import { resolveDefaultStore } from "./refresh.js";
 
 export type CheckStatus = "pass" | "warn" | "fail";
+export type DoctorStoreSource = "flag" | "env" | "profiles";
 
 export interface DoctorCheck {
   id: string;
@@ -62,6 +62,10 @@ export interface DoctorCheck {
 export interface DoctorResult {
   checks: DoctorCheck[];
   ok: boolean; // false iff any check failed (warns do not flip it)
+  /** Effective memory store resolved by runDoctor (when configured). */
+  store?: string;
+  /** Where `store` came from (`flag`, `env`, or `profiles`). */
+  storeSource?: DoctorStoreSource;
 }
 
 export interface DoctorPaths {
@@ -221,7 +225,7 @@ export function defaultDoctorPaths(
   const resolvedProfilesPath =
     envProfilesPath || existsSync(profilesPath) ? profilesPath : undefined;
   return {
-    store: resolveDefaultStore(resolvedProfilesPath) ?? "",
+    store: "",
     index: resolve(home, ".ai-loadout", "index.json"),
     settings: resolve(home, ".claude", "settings.json"),
     usage: resolve(home, ".ai-loadout", "usage.jsonl"),
@@ -311,13 +315,18 @@ export function runDoctor(paths: DoctorPaths): DoctorResult {
   }
 
   const envStore = process.env.AI_LOADOUT_STORE?.trim();
-  const effectiveStore = paths.store?.trim()
-    ? resolve(paths.store)
-    : envStore
-      ? resolve(envStore)
-      : loadedProfileConfig?.defaultStore?.trim()
-        ? resolve(loadedProfileConfig.defaultStore.trim())
-        : "";
+  let effectiveStore = "";
+  let storeSource: DoctorStoreSource | undefined;
+  if (paths.store?.trim()) {
+    effectiveStore = resolve(paths.store.trim());
+    storeSource = "flag";
+  } else if (envStore) {
+    effectiveStore = resolve(envStore);
+    storeSource = "env";
+  } else if (loadedProfileConfig?.defaultStore?.trim()) {
+    effectiveStore = resolve(loadedProfileConfig.defaultStore.trim());
+    storeSource = "profiles";
+  }
 
   // (a) store MEMORY.md validates (0 errors)
   if (!effectiveStore) {
@@ -918,7 +927,11 @@ export function runDoctor(paths: DoctorPaths): DoctorResult {
   }
 
   const ok = !checks.some((c) => c.status === "fail");
-  return { checks, ok };
+  return {
+    checks,
+    ok,
+    ...(effectiveStore ? { store: effectiveStore, storeSource } : {}),
+  };
 }
 
 function findPreToolHookCommand(settingsObj: Record<string, unknown>): string | null {
@@ -963,7 +976,12 @@ export function printDoctor(result: DoctorResult, paths: DoctorPaths): void {
   log();
   log(`${BOLD}loadout-os doctor${RESET} ${DIM}— read-only health screen${RESET}`);
   log();
-  log(`  ${DIM}store:    ${paths.store || "(unconfigured)"}${RESET}`);
+  const displayStore = result.store || paths.store || "";
+  const sourceSuffix =
+    displayStore && result.storeSource ? ` (${result.storeSource})` : "";
+  log(
+    `  ${DIM}store:    ${displayStore ? `${displayStore}${sourceSuffix}` : "(unconfigured)"}${RESET}`,
+  );
   log(`  ${DIM}index:    ${paths.index}${RESET}`);
   log(`  ${DIM}settings: ${paths.settings}${RESET}`);
   log(`  ${DIM}usage:    ${paths.usage}${RESET}`);
