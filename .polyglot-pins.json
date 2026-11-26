@@ -1,0 +1,131 @@
+{
+  "version": 1,
+  "pins": {
+    "835b769421892dbb:es": {
+      "lang": "es",
+      "source": "`loadout-os hook pre-tool` guards tool calls in-process before execution, passing read-only tools and read-only Bash pipelines silently (`exit 0`), evaluating the Layer A/B rule table per active profile, logging hashed decisions (`input_hash`, never raw command text) to `~/.ai-loadout/hook-decisions.jsonl`, failing open before a block match, and failing closed (`exit 2` + stderr only) once a block rule matches.",
+      "translation": "`loadout-os hook pre-tool` protege las llamadas a herramientas en proceso antes de la ejecución, pasando silenciosamente las herramientas de solo lectura y las canalizaciones de Bash de solo lectura (`exit 0`), evaluando la tabla de reglas de capa A/B por perfil activo, registrando las decisiones hash (`input_hash`, nunca el texto del comando sin procesar) en `~/.ai-loadout/hook-decisions.jsonl`, permitiendo el acceso si no hay una coincidencia de bloque y denegándolo (`exit 2` + solo stderr) una vez que una regla de bloque coincide.",
+      "pinnedAt": "2026-11-26T06:56:04.239Z"
+    },
+    "835b769421892dbb:fr": {
+      "lang": "fr",
+      "source": "`loadout-os hook pre-tool` guards tool calls in-process before execution, passing read-only tools and read-only Bash pipelines silently (`exit 0`), evaluating the Layer A/B rule table per active profile, logging hashed decisions (`input_hash`, never raw command text) to `~/.ai-loadout/hook-decisions.jsonl`, failing open before a block match, and failing closed (`exit 2` + stderr only) once a block rule matches.",
+      "translation": "`loadout-os hook pre-tool` protège les appels d’outils en cours avant l’exécution, en transmettant silencieusement les outils en lecture seule et les pipelines Bash en lecture seule (`exit 0`), en évaluant la table de règles de couche A/B par profil actif, en enregistrant les décisions hachées (`input_hash`, jamais le texte de commande brut) dans `~/.ai-loadout/hook-decisions.jsonl`, en échouant en mode ouvert (fail-open) avant toute correspondance de règle de blocage, et en mode fermé (fail-closed : `exit 2` + stderr uniquement) dès qu’une règle de blocage correspond.",
+      "pinnedAt": "2026-11-26T06:56:04.241Z"
+    },
+    "835b769421892dbb:hi": {
+      "lang": "hi",
+      "source": "`loadout-os hook pre-tool` guards tool calls in-process before execution, passing read-only tools and read-only Bash pipelines silently (`exit 0`), evaluating the Layer A/B rule table per active profile, logging hashed decisions (`input_hash`, never raw command text) to `~/.ai-loadout/hook-decisions.jsonl`, failing open before a block match, and failing closed (`exit 2` + stderr only) once a block rule matches.",
+      "translation": "`loadout-os hook pre-tool`, निष्पादन से पहले, प्रक्रिया के दौरान टूल कॉल की सुरक्षा करता है, केवल-पढ़ने योग्य टूल और केवल-पढ़ने योग्य बैश पाइपलाइन को चुपचाप पास करता है (`exit 0`), सक्रिय प्रोफ़ाइल के अनुसार लेयर ए/बी नियम तालिका का मूल्यांकन करता है, हैश किए गए निर्णयों को `~/.ai-loadout/hook-decisions.jsonl` में लॉग करता है (`input_hash`, कभी भी कच्चा कमांड टेक्स्ट नहीं), किसी ब्लॉक के मिलान से पहले विफल हो जाता है, और एक बार ब्लॉक नियम के मिलान पर विफल हो जाता है (`exit 2` + केवल stderr)।",
+      "pinnedAt": "2026-11-26T06:56:04.241Z"
+    },
+    "835b769421892dbb:it": {
+      "lang": "it",
+      "source": "`loadout-os hook pre-tool` guards tool calls in-process before execution, passing read-only tools and read-only Bash pipelines silently (`exit 0`), evaluating the Layer A/B rule table per active profile, logging hashed decisions (`input_hash`, never raw command text) to `~/.ai-loadout/hook-decisions.jsonl`, failing open before a block match, and failing closed (`exit 2` + stderr only) once a block rule matches.",
+      "translation": "`loadout-os hook pre-tool` protegge le chiamate agli strumenti durante l'esecuzione, passando silenziosamente gli strumenti in sola lettura e le pipeline Bash in sola lettura (`exit 0`), valutando la tabella delle regole del livello A/B per ogni profilo attivo, registrando le decisioni hash (`input_hash`, mai il testo del comando effettivo) in `~/.ai-loadout/hook-decisions.jsonl`, consentendo l'esecuzione in caso di mancata corrispondenza di un blocco e bloccando l'esecuzione (`exit 2` + solo stderr) una volta che una regola di blocco corrisponde.",
+      "pinnedAt": "2026-11-26T06:56:04.241Z"
+    },
+    "835b769421892dbb:ja": {
+      "lang": "ja",
+      "source": "`loadout-os hook pre-tool` guards tool calls in-process before execution, passing read-only tools and read-only Bash pipelines silently (`exit 0`), evaluating the Layer A/B rule table per active profile, logging hashed decisions (`input_hash`, never raw command text) to `~/.ai-loadout/hook-decisions.jsonl`, failing open before a block match, and failing closed (`exit 2` + stderr only) once a block rule matches.",
+      "translation": "`loadout-os hook pre-tool`は、実行前にプロセス内のツール呼び出しをガードし、読み取り専用のツールと読み取り専用のBashパイプラインをサイレントに渡します（`exit 0`）、アクティブなプロファイルごとにレイヤーA/Bルールテーブルを評価し、ハッシュ化された決定（`input_hash`、生のコマンドテキストは記録しません）を`~/.ai-loadout/hook-decisions.jsonl`にログ記録し、ブロックが一致する前にオープンに失敗し、ブロックルールが一致するとクローズして失敗します（`exit 2`+標準エラー出力のみ）。",
+      "pinnedAt": "2026-11-26T06:56:04.242Z"
+    },
+    "835b769421892dbb:pt": {
+      "lang": "pt",
+      "source": "`loadout-os hook pre-tool` guards tool calls in-process before execution, passing read-only tools and read-only Bash pipelines silently (`exit 0`), evaluating the Layer A/B rule table per active profile, logging hashed decisions (`input_hash`, never raw command text) to `~/.ai-loadout/hook-decisions.jsonl`, failing open before a block match, and failing closed (`exit 2` + stderr only) once a block rule matches.",
+      "translation": "`loadout-os hook pre-tool` protege as chamadas de ferramentas em processo antes da execução, passando ferramentas somente leitura e pipelines Bash somente leitura silenciosamente (`exit 0`), avaliando a tabela de regras da camada A/B por perfil ativo, registrando decisões com hash (`input_hash`, nunca o texto do comando bruto) em `~/.ai-loadout/hook-decisions.jsonl`, falhando de forma aberta antes de uma correspondência de bloco e falhando de forma fechada (`exit 2` + somente stderr) quando uma regra de bloco corresponde.",
+      "pinnedAt": "2026-11-26T06:56:04.242Z"
+    },
+    "835b769421892dbb:zh": {
+      "lang": "zh",
+      "source": "`loadout-os hook pre-tool` guards tool calls in-process before execution, passing read-only tools and read-only Bash pipelines silently (`exit 0`), evaluating the Layer A/B rule table per active profile, logging hashed decisions (`input_hash`, never raw command text) to `~/.ai-loadout/hook-decisions.jsonl`, failing open before a block match, and failing closed (`exit 2` + stderr only) once a block rule matches.",
+      "translation": "`loadout-os hook pre-tool` 在执行之前对工具调用进行保护，静默放行只读工具和只读 Bash 管道（`exit 0`），根据活动配置文件评估 A/B 规则表，将哈希决策（`input_hash`，绝不使用原始命令文本）记录到 `~/.ai-loadout/hook-decisions.jsonl`，在匹配到块之前失败（开放），并在匹配到块规则后失败（封闭）（`exit 2` + 仅 stderr）。",
+      "pinnedAt": "2026-11-26T06:56:04.243Z"
+    },
+    "b34e559f88578d6a:es": {
+      "lang": "es",
+      "source": "| `future-stamp` | A | `Write`, `Edit`, `MultiEdit` | `block` | Blocks tool-stamped timestamps more than 5 minutes ahead of the OS clock |",
+      "translation": "| `future-stamp` | A | `Write`, `Edit`, `MultiEdit` | `block` | Impide las marcas de tiempo selladas por herramientas que tengan más de 5 minutos de anticipación con respecto al reloj del sistema operativo |",
+      "pinnedAt": "2026-11-26T06:56:04.240Z"
+    },
+    "b34e559f88578d6a:fr": {
+      "lang": "fr",
+      "source": "| `future-stamp` | A | `Write`, `Edit`, `MultiEdit` | `block` | Blocks tool-stamped timestamps more than 5 minutes ahead of the OS clock |",
+      "translation": "| `future-stamp` | A | `Write`, `Edit`, `MultiEdit` | `block` | Bloque les horodatages apposés par un outil qui dépassent de plus de 5 minutes l’heure du système d’exploitation |",
+      "pinnedAt": "2026-11-26T06:56:04.241Z"
+    },
+    "b34e559f88578d6a:hi": {
+      "lang": "hi",
+      "source": "| `future-stamp` | A | `Write`, `Edit`, `MultiEdit` | `block` | Blocks tool-stamped timestamps more than 5 minutes ahead of the OS clock |",
+      "translation": "| `future-stamp` | A | `Write`, `Edit`, `MultiEdit` | `block` | टूल-स्टैम्प्ड टाइमस्टैम्प को ओएस घड़ी से 5 मिनट से अधिक आगे रोकता है |",
+      "pinnedAt": "2026-11-26T06:56:04.241Z"
+    },
+    "b34e559f88578d6a:it": {
+      "lang": "it",
+      "source": "| `future-stamp` | A | `Write`, `Edit`, `MultiEdit` | `block` | Blocks tool-stamped timestamps more than 5 minutes ahead of the OS clock |",
+      "translation": "| `future-stamp` | A | `Write`, `Edit`, `MultiEdit` | `block` | Impedisce l'uso di timestamp contrassegnati dagli strumenti che sono più di 5 minuti avanti rispetto all'orologio del sistema operativo |",
+      "pinnedAt": "2026-11-26T06:56:04.241Z"
+    },
+    "b34e559f88578d6a:ja": {
+      "lang": "ja",
+      "source": "| `future-stamp` | A | `Write`, `Edit`, `MultiEdit` | `block` | Blocks tool-stamped timestamps more than 5 minutes ahead of the OS clock |",
+      "translation": "| `future-stamp` | A | `Write`, `Edit`, `MultiEdit` | `block` | OSクロックより5分以上先のタイムスタンプをツールで付けることをブロックします。 |",
+      "pinnedAt": "2026-11-26T06:56:04.242Z"
+    },
+    "b34e559f88578d6a:pt": {
+      "lang": "pt",
+      "source": "| `future-stamp` | A | `Write`, `Edit`, `MultiEdit` | `block` | Blocks tool-stamped timestamps more than 5 minutes ahead of the OS clock |",
+      "translation": "| `future-stamp` | A | `Write`, `Edit`, `MultiEdit` | `block` | Impede que as ferramentas usem carimbos de data/hora mais de 5 minutos à frente do relógio do SO |",
+      "pinnedAt": "2026-11-26T06:56:04.242Z"
+    },
+    "b34e559f88578d6a:zh": {
+      "lang": "zh",
+      "source": "| `future-stamp` | A | `Write`, `Edit`, `MultiEdit` | `block` | Blocks tool-stamped timestamps more than 5 minutes ahead of the OS clock |",
+      "translation": "| `future-stamp` | A | `Write`, `Edit`, `MultiEdit` | `block` | 阻止工具时间戳超过 OS 时钟 5 分钟 |",
+      "pinnedAt": "2026-11-26T06:56:04.243Z"
+    },
+    "f4242b0799967572:es": {
+      "lang": "es",
+      "source": "The only built-in profile is `default`. Global `refresh` and `doctor` resolve the default memory store with precedence `--store <dir>` > `AI_LOADOUT_STORE` > `defaultStore` in `profiles.json` (and refuse with `DEFAULT_STORE_REQUIRED` if none is configured; they never derive from `cwd`). Longest matching `cwd` prefix selects the active profile and optional store/replies/rule overrides:",
+      "translation": "El único perfil predefinido es `default`. Los comandos globales `refresh` y `doctor` resuelven el almacenamiento de memoria predeterminado con la siguiente prioridad: `--store <dir>` > `AI_LOADOUT_STORE` > `defaultStore` en `profiles.json` (y se rechazan con `DEFAULT_STORE_REQUIRED` si no se configura ninguno; nunca se derivan de `cwd`). El prefijo `cwd` más largo determina el perfil activo y las anulaciones opcionales del almacenamiento/respuestas/reglas:",
+      "pinnedAt": "2026-11-26T06:56:04.240Z"
+    },
+    "f4242b0799967572:fr": {
+      "lang": "fr",
+      "source": "The only built-in profile is `default`. Global `refresh` and `doctor` resolve the default memory store with precedence `--store <dir>` > `AI_LOADOUT_STORE` > `defaultStore` in `profiles.json` (and refuse with `DEFAULT_STORE_REQUIRED` if none is configured; they never derive from `cwd`). Longest matching `cwd` prefix selects the active profile and optional store/replies/rule overrides:",
+      "translation": "Le seul profil intégré est `default`. Les commandes globales `refresh` et `doctor` déterminent l’emplacement de stockage par défaut en appliquant l’ordre de priorité suivant : `--store <dir>` > `AI_LOADOUT_STORE` > `defaultStore` dans `profiles.json` (et refusent l’opération avec `DEFAULT_STORE_REQUIRED` si aucun n’est configuré ; elles ne dérivent jamais de `cwd`). Le préfixe `cwd` le plus long correspondant sélectionne le profil actif et les remplacements optionnels pour le stockage, les réponses ou les règles :",
+      "pinnedAt": "2026-11-26T06:56:04.241Z"
+    },
+    "f4242b0799967572:hi": {
+      "lang": "hi",
+      "source": "The only built-in profile is `default`. Global `refresh` and `doctor` resolve the default memory store with precedence `--store <dir>` > `AI_LOADOUT_STORE` > `defaultStore` in `profiles.json` (and refuse with `DEFAULT_STORE_REQUIRED` if none is configured; they never derive from `cwd`). Longest matching `cwd` prefix selects the active profile and optional store/replies/rule overrides:",
+      "translation": "एकमात्र अंतर्निहित प्रोफ़ाइल `default` है। वैश्विक `refresh` और `doctor` डिफ़ॉल्ट मेमोरी स्टोर को प्राथमिकता `--store <dir>` > `AI_LOADOUT_STORE` > `defaultStore` के साथ `profiles.json` में हल करते हैं (और यदि कोई कॉन्फ़िगर नहीं है तो `DEFAULT_STORE_REQUIRED` के साथ अस्वीकार करते हैं; वे कभी भी `cwd` से प्राप्त नहीं होते हैं)। सबसे लंबे समय तक मिलान करने वाला `cwd` उपसर्ग सक्रिय प्रोफ़ाइल और वैकल्पिक स्टोर/उत्तर/नियम ओवरराइड का चयन करता है:",
+      "pinnedAt": "2026-11-26T06:56:04.241Z"
+    },
+    "f4242b0799967572:it": {
+      "lang": "it",
+      "source": "The only built-in profile is `default`. Global `refresh` and `doctor` resolve the default memory store with precedence `--store <dir>` > `AI_LOADOUT_STORE` > `defaultStore` in `profiles.json` (and refuse with `DEFAULT_STORE_REQUIRED` if none is configured; they never derive from `cwd`). Longest matching `cwd` prefix selects the active profile and optional store/replies/rule overrides:",
+      "translation": "L'unico profilo integrato è `default`. I comandi globali `refresh` e `doctor` risolvono l'archivio di memoria predefinito con la precedenza `--store <dir>` > `AI_LOADOUT_STORE` > `defaultStore` in `profiles.json` (e rifiutano con `DEFAULT_STORE_REQUIRED` se non è configurato nulla; non derivano mai da `cwd`). Il prefisso più lungo corrispondente `cwd` seleziona il profilo attivo e le opzioni di override dell'archivio/risposte/regole:",
+      "pinnedAt": "2026-11-26T06:56:04.241Z"
+    },
+    "f4242b0799967572:ja": {
+      "lang": "ja",
+      "source": "The only built-in profile is `default`. Global `refresh` and `doctor` resolve the default memory store with precedence `--store <dir>` > `AI_LOADOUT_STORE` > `defaultStore` in `profiles.json` (and refuse with `DEFAULT_STORE_REQUIRED` if none is configured; they never derive from `cwd`). Longest matching `cwd` prefix selects the active profile and optional store/replies/rule overrides:",
+      "translation": "組み込みのプロファイルは`default`のみです。グローバル`refresh`と`doctor`は、デフォルトのメモリストアを優先順位`--store <dir>`>`AI_LOADOUT_STORE`>`defaultStore`で解決します（`profiles.json`）。いずれも構成されていない場合は、拒否します（`DEFAULT_STORE_REQUIRED`）。`cwd`からは派生しません。最長一致の`cwd`プレフィックスが、アクティブなプロファイルとオプションのストア/レスポンス/ルールオーバーライドを選択します。",
+      "pinnedAt": "2026-11-26T06:56:04.242Z"
+    },
+    "f4242b0799967572:pt": {
+      "lang": "pt",
+      "source": "The only built-in profile is `default`. Global `refresh` and `doctor` resolve the default memory store with precedence `--store <dir>` > `AI_LOADOUT_STORE` > `defaultStore` in `profiles.json` (and refuse with `DEFAULT_STORE_REQUIRED` if none is configured; they never derive from `cwd`). Longest matching `cwd` prefix selects the active profile and optional store/replies/rule overrides:",
+      "translation": "O único perfil pré-definido é `default`. Os comandos globais `refresh` e `doctor` resolvem o armazenamento de memória padrão, com a seguinte ordem de precedência: `--store <dir>` > `AI_LOADOUT_STORE` > `defaultStore` em `profiles.json` (e rejeitam com `DEFAULT_STORE_REQUIRED` se nenhum estiver configurado; nunca derivam de `cwd`). O prefixo `cwd` mais longo correspondente seleciona o perfil ativo e as substituições opcionais de armazenamento/respostas/regras:",
+      "pinnedAt": "2026-11-26T06:56:04.242Z"
+    },
+    "f4242b0799967572:zh": {
+      "lang": "zh",
+      "source": "The only built-in profile is `default`. Global `refresh` and `doctor` resolve the default memory store with precedence `--store <dir>` > `AI_LOADOUT_STORE` > `defaultStore` in `profiles.json` (and refuse with `DEFAULT_STORE_REQUIRED` if none is configured; they never derive from `cwd`). Longest matching `cwd` prefix selects the active profile and optional store/replies/rule overrides:",
+      "translation": "唯一的内置配置是 `default`。全局 `refresh` 和 `doctor` 通过优先级 `--store <dir>` > `AI_LOADOUT_STORE` > `defaultStore` 在 `profiles.json` 中解析默认存储，如果未配置任何存储，则会拒绝（使用 `DEFAULT_STORE_REQUIRED`）；它们绝不会从 `cwd` 继承。最长匹配的 `cwd` 前缀会选择活动配置，并可选地覆盖存储/回复/规则：",
+      "pinnedAt": "2026-11-26T06:56:04.243Z"
+    }
+  }
+}

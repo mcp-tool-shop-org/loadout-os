@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="README.md">English</a> | <a href="README.ja.md">日本語</a> | <a href="README.zh.md">中文</a> | <a href="README.es.md">Español</a> | <a href="README.fr.md">Français</a> | <a href="README.hi.md">हिन्दी</a> | <a href="README.it.md">Italiano</a> | <a href="README.pt-BR.md">Português (BR)</a>
+  <a href="README.ja.md">日本語</a> | <a href="README.zh.md">中文</a> | <a href="README.es.md">Español</a> | <a href="README.fr.md">Français</a> | <a href="README.hi.md">हिन्दी</a> | <a href="README.md">English</a> | <a href="README.pt-BR.md">Português (BR)</a>
 </p>
 
 <p align="center"><img src="https://raw.githubusercontent.com/mcp-tool-shop-org/brand/main/logos/loadout-os/readme.png" alt="loadout-os" width="400"></p>
@@ -12,24 +12,24 @@
   <a href="https://mcp-tool-shop-org.github.io/loadout-os/"><img src="https://img.shields.io/badge/landing-page-blue" alt="Landing Page"></a>
 </p>
 
-**Un sistema operativo per la gestione delle conoscenze per agenti di codifica AI.** Un'unica interfaccia a riga di comando (CLI) che indirizza il contesto corretto al modello su richiesta, invece di caricare tutti i file di memoria e le regole nella finestra di contesto all'inizio di ogni sessione.
+**Un sistema operativo di conoscenza per agenti di codifica AI.** Un'unica interfaccia a riga di comando (CLI) che indirizza il contesto corretto al modello su richiesta, anziché caricare tutti i file di memoria e le regole nella finestra di contesto all'inizio di ogni sessione.
 
-I file di istruzioni e gli archivi di memoria crescono in modo illimitato. Ogni riga costa token in ogni richiesta, indipendentemente dal fatto che sia rilevante per l'attività in corso o meno. loadout-os mantiene un piccolo indice di riferimento sempre caricato e carica gli elementi più pesanti (argomenti di memoria, file di regole) solo quando le parole chiave dell'attività corrispondono. Pensalo come un set di equipaggiamento di un gioco: fornisci all'agente esattamente le conoscenze di cui ha bisogno per la missione.
+I file di istruzione e gli archivi di memoria crescono in modo illimitato. Ogni riga costa token per ogni richiesta, indipendentemente dal fatto che sia rilevante per l'attività in corso o meno. `loadout-os` mantiene un piccolo indice di dispatch sempre caricato e carica gli elementi più pesanti (argomenti di memoria, file di regole) solo quando le parole chiave dell'attività corrispondono. Pensalo come un set di equipaggiamento di un gioco: fornisci all'agente esattamente le conoscenze di cui ha bisogno per la missione.
 
-## Cosa contiene
+## Cosa c'è dentro
 
-loadout-os unifica quattro componenti in un unico eseguibile `loadout-os`:
+`loadout-os` unifica quattro componenti in un unico eseguibile `loadout-os`:
 
 | Componente | Cosa fa |
 |---|---|
-| **Kernel** (knowledge router) | Motore di corrispondenza deterministico di parole chiave/modelli, risolutore gerarchico a più livelli (globale → organizzazione → progetto → sessione) e contratto di runtime dell'agente. Le voci principali vengono sempre caricate; le voci di dominio vengono caricate quando c'è una corrispondenza; le voci manuali vengono caricate quando vengono esplicitamente cercate. |
-| **Memories adapter** | Trasforma un archivio `MEMORY.md` (più sotto-indici collegati `index-*.md` o `metadata.loadout_role: subindex`) in una tabella di riferimento leggibile dalla macchina e la verifica (il limite di troncamento del caricatore è di 180 righe / 24 KB; avviso predefinito, errore quando è abilitato tramite `--max-lines`/`--max-bytes`, frontmatter `metadata.enforce_limits: true` o `.loadout.json`; inoltre, verifica la presenza di file mancanti, elementi orfani tra i sotto-indici, riepiloghi obsoleti, duplicati, voci troppo lunghe). |
-| **Rules adapter** | Divide un archivio `CLAUDE.md` eccessivamente grande in un indice sempre caricato e più compatto, più file di regole caricati su richiesta, e convalida il frontmatter rispetto all'indice. |
-| **Runtime hooks** | Router di puntatori `UserPromptSubmit` (`loadout-hook.mjs`, che unisce i livelli globale e di progetto con un limite di equa distribuzione e una preferenza per i sotto-indici), `hook session-start` (iniezione del board UTF-8 + aggiornamento in caso di obsolescenza e modifica tramite shell), `hook pre-compact` (avviso di obsolescenza prima della compressione) e `hook post-write` (validatore `PostToolUse` + aggiornamento del progetto). |
+| **Kernel** (knowledge router) | Motore di corrispondenza deterministico di parole chiave/pattern, resolver gerarchico a più livelli (globale → organizzazione → progetto → sessione) e contratto di runtime dell'agente. Le voci principali vengono sempre caricate; le voci di dominio vengono caricate quando c'è una corrispondenza; le voci manuali vengono caricate quando vengono esplicitamente cercate. |
+| **Memories adapter** | Trasforma un archivio `MEMORY.md` (più sotto-indici collegati `index-*.md` o `metadata.loadout_role: subindex`) in una tabella di dispatch leggibile dalla macchina e la valida (i limiti di troncamento del caricatore sono di 180 righe / 24 KB; avviso predefinito, errore quando è abilitato tramite `--max-lines`/`--max-bytes`, intestazione `metadata.enforce_limits: true` o `.loadout.json`; inoltre, file mancanti, elementi orfani tra i sotto-indici, riepiloghi obsoleti, duplicati, voci troppo lunghe). |
+| **Rules adapter** | Divide un archivio `CLAUDE.md` eccessivamente grande in un indice sempre caricato e più compatto, più file di regole caricati su richiesta, e convalida l'intestazione rispetto all'indice. |
+| **Runtime hooks** | Router di puntatori `UserPromptSubmit` (`loadout-hook.mjs`, che unisce i livelli globale e di progetto con un limite di equa distribuzione e una preferenza per il sotto-indice), `hook session-start` (iniezione del pannello UTF-8 + aggiornamento della freschezza e modifica della shell), `hook pre-compact` (avviso di obsolescenza prima della compattazione), `hook post-write` (validatore `PostToolUse` + aggiornamento del progetto) e `hook pre-tool` (protezione del livello A/B `PreToolUse` + registro delle decisioni). |
 
-Inoltre, tre procedure che mantengono l'integrità del sistema: **`refresh`** (rigenera → convalida → pubblica l'indice di riferimento in ambito globale o `--project <root>`, con un compensatore `.bak`, blocco dei file del sistema operativo e opzionale `--snapshot-repo` / `--mirror-repo`), **`doctor`** (una schermata di controllo in sola lettura con 8 verifiche) e **`report`** (osservabilità dell'utilizzo / delle voci obsolete / del budget di token).
+Inoltre, tre procedure che mantengono l'integrità del sistema: **`refresh`** (rigenera → valida → pubblica l'indice di dispatch nel livello globale o `--project <root>`, con un compensatore `.bak`, un blocco dei file del sistema operativo e un'opzione `--snapshot-repo` / `--mirror-repo`), **`doctor`** (una schermata di controllo in sola lettura che include controlli triadi) e **`report`** (osservabilità dell'utilizzo / delle voci obsolete / del budget di token).
 
-## Interfaccia a riga di comando
+## Interfaccia di comando
 
 ```
 # Memory store adapter
@@ -40,6 +40,7 @@ loadout-os memories health         [path] [--json]
 loadout-os memories sync-summaries <MEMORY.md> [--fix] [--json]
 loadout-os memories place          <topic.md> <index> [--store <dir>] [--into <index>] [--json]
 loadout-os memories move           <topic.md> <index> [--store <dir>] [--into <index>] [--json]
+loadout-os memories split          [<MEMORY.md>] --by <rules.json> [--store <dir>] [--id-source title|name] [--dry-run] [--json]
 
 # Instruction-file adapter
 loadout-os rules analyze  <CLAUDE.md> [--rules-dir <dir>] [--json]
@@ -57,22 +58,23 @@ loadout-os budget <index> [jsonl]   # token budget breakdown
 loadout-os validate <index>         # validate index STRUCTURE (kernel)
 
 # Rituals + hooks
-loadout-os doctor [--json]                    # read-only health screen
-loadout-os report [--index <p>] [--jsonl <p>] # observability over usage.jsonl
-loadout-os hook test [--prompt "<text>"]      # drive the runtime hook on a sample prompt
+loadout-os doctor [--profiles <p>] [--json]                    # read-only health screen
+loadout-os report [--index <p>] [--jsonl <p>]                  # observability over usage.jsonl
+loadout-os hook test [--prompt "<text>"]                       # drive the runtime hook on a sample prompt
 loadout-os hook session-start [--project <r>] [--user-prompt-submit]
 loadout-os hook pre-compact   [--project <r>]
 loadout-os hook post-write    [--project <r>] [--snapshot-repo <d>] [--mirror-repo <b>] [--fix]
-loadout-os refresh [--store <d>] [--dest <p>] [--project <r>] [--id-source title|name] [--snapshot-repo <d>] [--mirror-repo <b>] [--fix] [--dry-run]
+loadout-os hook pre-tool      [--mode enforce|log-only] [--profiles <p>] [--log <p>] [--timeout-ms <ms>]
+loadout-os refresh [--store <d>] [--dest <p>] [--project <r>] [--profiles <p>] [--allow-store-change] [--id-source title|name] [--snapshot-repo <d>] [--mirror-repo <b>] [--fix] [--dry-run]
 ```
 
-> **Conflitto di nomi, risolto tramite la definizione di spazi dei nomi.** L'archivio `validate <index>` è il validatore della struttura dell'indice del kernel. Gli archivi e i validatori delle regole sono definiti in spazi dei nomi (`memories validate <MEMORY.md>` e `rules validate`), in modo che tutti e tre possano coesistere. Esegui `loadout-os <command> --help` per visualizzare la sintesi, gli argomenti e i codici di uscita per ogni comando.
+> **Conflitto di nomi, risolto tramite l'uso di spazi dei nomi.** L'archivio piatto `validate <index>` è il validatore della struttura dell'indice del kernel. Gli strumenti di convalida dell'archivio e delle regole utilizzano spazi dei nomi (`memories validate <MEMORY.md>` e `rules validate`), in modo che tutti e tre possano coesistere. Esegui `loadout-os <command> --help` per visualizzare la sintesi, gli argomenti e i codici di uscita per ogni comando.
 
 ## Collegamento della memoria a livello di progetto e del codice Claude
 
 Ogni profilo di progetto può mantenere il proprio archivio `.claude/loadout/index.json`, creato a partire dal suo archivio di memoria (`loadout-os refresh --store <store> --project <root>`).
 
-### 1. Frontmatter per argomento e board
+### 1. Intestazione del tema e del pannello
 
 ```markdown
 ---
@@ -87,10 +89,10 @@ metadata:
 ---
 ```
 
-- I sotto-indici (`index-*.md` o file con `metadata.loadout_role: subindex`) vengono espansi di un livello nell'indice di riferimento con `subindex: true`.
-- `index-archive.md` (o un sotto-indice con `metadata.loadout_default_priority: manual`) imposta le voci su `priority: "manual"` per impostazione predefinita, a meno che un file di argomento non imposti esplicitamente `priority:` nel frontmatter.
-- Le voci `core` con `metadata.loadout_inject: session-start` vengono inserite completamente in `SessionStart` (e vengono escluse dagli slot di puntatore per ogni richiesta, in modo che non "affamino" le voci indirizzate).
-- **Origine dell'ID di voce (`idSource: "title" | "name"`):** Un frontmatter esplicito `id:` ha sempre la precedenza. Quando `id:` viene omesso, gli archivi globali / `--dest` utilizzano `title` per impostazione predefinita (titolo dell'elenco con trattini in `MEMORY.md`, preservando gli ID di voce `v1.0.4`), mentre gli archivi `--project` utilizzano `name` per impostazione predefinita (frontmatter con trattini `name:`). È possibile sovrascrivere per archivio tramite `<store>/.loadout.json` (`{ "idSource": "title" | "name" }`) o il frontmatter `MEMORY.md` (`metadata.id_source: title | name`), oppure per invocazione tramite `--id-source title|name` nei comandi `refresh` e `memories` (che ha la precedenza sull'impostazione dell'archivio).
+- I sotto-indici (`index-*.md` o file con `metadata.loadout_role: subindex`) vengono espansi di un livello nell'indice di dispatch con `subindex: true`.
+- `index-archive.md` (o un sotto-indice con `metadata.loadout_default_priority: manual`) imposta le voci predefinite su `priority: "manual"`, a meno che un file di tema non imposti esplicitamente `priority:` nell'intestazione.
+- Le voci `core` con `metadata.loadout_inject: session-start` vengono inserite completamente in `SessionStart` (e vengono escluse dagli slot di puntatore per ogni richiesta, in modo che non facciano mai "morire di fame" le voci indirizzate).
+- **Origine dell'ID di voce (`idSource: "title" | "name"`):** Un'intestazione esplicita `id:` ha sempre la precedenza. Quando `id:` viene omesso, gli archivi globali / `--dest` utilizzano come valore predefinito `title` (titolo del punto elenco con trattini in `MEMORY.md`, preservando gli ID di voce `v1.0.4`), mentre gli archivi `--project` utilizzano come valore predefinito `name` (intestazione con trattini `name:`). È possibile sovrascrivere per archivio tramite `<store>/.loadout.json` (`{ "idSource": "title" | "name" }`) o l'intestazione `MEMORY.md` (`metadata.id_source: title | name`), oppure per invocazione tramite `--id-source title|name` nei comandi `refresh` e `memories` (che ha la precedenza sull'impostazione dell'archivio).
 
 ### 2. Esempi di blocchi di collegamento `.claude/settings.local.json`
 
@@ -131,6 +133,17 @@ metadata:
         ]
       }
     ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "loadout-os hook pre-tool --mode enforce"
+          }
+        ]
+      }
+    ],
     "PostToolUse": [
       {
         "matcher": "Write|Edit|MultiEdit",
@@ -146,7 +159,55 @@ metadata:
 }
 ```
 
-> **Nota sulle modifiche tramite shell:** Le modifiche apportate ai file di memoria tramite una shell (`Bash` / `PowerShell`) ignorano `PostToolUse` (`Write|Edit`). Come fallback integrato, `loadout-os hook session-start` verifica se esiste un file `<store>/*.md` più recente del progetto `index.json` e aggiorna automaticamente l'indice del progetto (o avvisa se la convalida fallisce).
+> **Nota sulle modifiche della shell:** Le modifiche apportate ai file di memoria tramite una shell (`Bash` / `PowerShell`) ignorano `PostToolUse` (`Write|Edit`). Come fallback integrato, `loadout-os hook session-start` verifica se esiste un file `<store>/*.md` più recente del progetto `index.json` e aggiorna automaticamente l'indice del progetto (o avvisa se la convalida fallisce).
+
+### 3. Collegamento PreToolUse e `profiles.json`
+
+`loadout-os hook pre-tool` protegge le chiamate agli strumenti durante l'esecuzione, passando silenziosamente gli strumenti in sola lettura e le pipeline Bash in sola lettura (`exit 0`), valutando la tabella delle regole del livello A/B per ogni profilo attivo, registrando le decisioni hash (`input_hash`, mai il testo del comando effettivo) in `~/.ai-loadout/hook-decisions.jsonl`, consentendo l'esecuzione in caso di mancata corrispondenza di un blocco e bloccando l'esecuzione (`exit 2` + solo stderr) una volta che una regola di blocco corrisponde.
+
+**Regole integrate:**
+
+| ID regola | Livello | Strumenti | Azione predefinita | Scopo |
+|---|---|---|---|---|
+| `unreviewed-merge` | A | `Bash` | `warn` | Ricorda di verificare il superamento di un test di revisione registrato (`PASS at <head8>`) prima di unire |
+| `quote-gate` | A | `Write`, `Edit`, `MultiEdit`, `Bash` | `block` | Impedisce la citazione letterale di relatori configurati in artefatti o nel testo di commit/PR |
+| `memory-shell-write` | A | `Bash` | `block` | Impedisce la scrittura diretta nella shell negli archivi di memoria |
+| `future-stamp` | A | `Write`, `Edit`, `MultiEdit` | `block` | Impedisce l'uso di timestamp contrassegnati dagli strumenti che sono più di 5 minuti avanti rispetto all'orologio del sistema operativo |
+| `release-reminder` | B | `Bash` | `warn` | Ricorda prima di `npm publish`, `gh release create` o `git push --tags` |
+
+**Profili e configurazione (`~/.ai-loadout/profiles.json`, variabili d'ambiente `AI_LOADOUT_PROFILES_PATH`, `AI_LOADOUT_STORE`):**
+
+L'unico profilo integrato è `default`. I comandi globali `refresh` e `doctor` risolvono l'archivio di memoria predefinito con la precedenza `--store <dir>` > `AI_LOADOUT_STORE` > `defaultStore` in `profiles.json` (e rifiutano con `DEFAULT_STORE_REQUIRED` se non è configurato nulla; non derivano mai da `cwd`). Il prefisso più lungo corrispondente `cwd` seleziona il profilo attivo e le opzioni di override dell'archivio/risposte/regole:
+
+```json
+{
+  "defaultStore": "/stores/global/memory",
+  "profiles": {
+    "/repos/docs-site": { "profile": "docs", "store": "/stores/docs/memory" },
+    "/repos/release-bot": { "profile": "release", "store": "/stores/release/memory" }
+  },
+  "repliesDir": "/var/log/review-replies",
+  "rules": {
+    "unreviewed-merge": {
+      "action": { "docs": "off", "release": "warn" },
+      "memory": { "release": "release-merge-policy" },
+      "skill": "release-checklist",
+      "note": { "release": "Verify changelog and release tag alignment before merging." }
+    },
+    "quote-gate": {
+      "action": { "docs": "warn", "release": "block" }
+    }
+  },
+  "ruleAliases": {
+    "legacy-quote-rule": "quote-gate"
+  },
+  "quoteGate": {
+    "speakers": ["He", "She", "They", "the User", "Maintainer"],
+    "namedSpeakers": ["Maintainer"],
+    "allowlistSuffixes": ["docs/quote-policy.md"]
+  }
+}
+```
 
 ## Installazione
 
@@ -156,7 +217,7 @@ loadout-os --help            # the full command tree
 loadout-os doctor            # confirm the system is healthy
 ```
 
-Il kernel può anche essere importato come libreria: `@mcptoolshop/ai-loadout` espone `planLoad`, `matchLoadout`, `resolveLoadout`, `recordLoad` e i tipi di tabella di riferimento.
+Il kernel può anche essere importato come libreria: `@mcptoolshop/ai-loadout` espone `planLoad`, `matchLoadout`, `resolveLoadout`, `recordLoad` e i tipi di tabella di dispatch.
 
 ## Documentazione
 
@@ -165,25 +226,25 @@ Il kernel può anche essere importato come libreria: `@mcptoolshop/ai-loadout` e
 
 ## Perché consolidare
 
-La decomposizione per segreti (Parnas 1972) era la soluzione ideale per un team di N persone. Per un operatore singolo e un gruppo di LLM, è inefficiente: il lavoro multi-repository frammenta il contesto dell'agente tra le sessioni, gli adattatori non pubblicati si deteriorano (solo il kernel è stato effettivamente rilasciato) e il progresso avviene in modo sequenziale tra i repository. Un unico repository con nome e un'unica CLI servono l'operatore.
+La decomposizione per segreti (Parnas 1972) era la soluzione ideale per un team di N persone. Per un operatore singolo e un gruppo di LLM, è inefficiente: il lavoro multi-repository frammenta il contesto dell'agente tra le sessioni, gli adattatori non pubblicati si deteriorano (solo il kernel è stato rilasciato) e il progresso avviene in modo sequenziale tra i repository. Un unico repository con nome e un'unica CLI servono l'operatore.
 
 ## Stato
 
-Rilasciato. **`@mcptoolshop/loadout-os`** è pubblicato su npm (pubblico) e include il kernel, i due adattatori (memorie + regole) e il collegamento di runtime attivo in un'unica CLI: installalo con `npm install -g @mcptoolshop/loadout-os`. I tre pacchetti legacy che sostituisce sono stati dismessi: il kernel `@mcptoolshop/ai-loadout` è deprecato su npm (ancora installabile, ma non riceverà ulteriori aggiornamenti); `claude-memories` e `claude-rules` erano solo locali e sono stati archiviati. Tutti i nuovi sviluppi avverranno qui.
+Spedito. **`@mcptoolshop/loadout-os`** è stato pubblicato su npm (pubblico) e include il kernel, i due adattatori (memorie + regole) e l'hook di runtime in un'unica interfaccia a riga di comando (CLI): installalo con `npm install -g @mcptoolshop/loadout-os`. I tre pacchetti precedenti, che questo sostituisce, sono stati dismessi: il kernel `@mcptoolshop/ai-loadout` è stato contrassegnato come obsoleto su npm (è ancora installabile, ma non riceverà ulteriori aggiornamenti); `claude-memories` e `claude-rules` erano disponibili solo in locale e sono stati archiviati. Tutti i nuovi sviluppi saranno implementati qui.
 
 ## Modello di fiducia
 
-loadout-os viene eseguito interamente sulla tua macchina. Non ci sono chiamate di rete, né telemetria, né account.
+loadout-os funziona interamente sulla tua macchina. Non ci sono chiamate di rete, né telemetria, né account.
 
-- **Dati a cui accede (solo a livello locale):** la memoria (`MEMORY.md` + file relativi all'argomento), i file di istruzione (`CLAUDE.md` + `.claude/rules/`), l'indice di distribuzione generato accanto alla memoria, l'indice del resolver globale (`~/.ai-loadout/index.json`), l'indice del resolver del progetto (`<project>/.claude/loadout/index.json`) e il registro di utilizzo in modalità di sola aggiunta (`~/.ai-loadout/usage.jsonl`).
-- **Dati a cui NON accede:** nessuna comunicazione di rete, nessun dato di telemetria, nessun servizio remoto, nessuna credenziale o segreto. Nessun dato viene letto, memorizzato o trasmesso al di fuori dei percorsi locali indicati sopra.
-- **Autorizzazioni richieste:** solo il filesystem locale. `doctor` e `report` sono accessi in sola lettura (non effettuano mai scritture). Le uniche scritture riguardano i file di indice, l'output interattivo `rules split` e il registro di utilizzo, il tutto nelle posizioni locali previste. La scrittura irreversibile (`refresh`, che pubblica l'indice globale o dell'ambito del progetto) è protetta da un meccanismo di interruzione in caso di fallimento della validazione e da un `<dest>.bak` compensatore. Gli hook di runtime per l'avvio della sessione e la richiesta sono configurati per consentire il funzionamento anche in caso di errore: ogni percorso di errore esce da `0`, quindi non possono mai bloccare una richiesta.
+- **Dati a cui accede (solo in locale):** il tuo archivio di memoria (`MEMORY.md` + file di argomento), i tuoi file di istruzioni (`CLAUDE.md` + `.claude/rules/`), l'indice di dispatch generato accanto all'archivio, l'indice del resolver globale (`~/.ai-loadout/index.json`), l'indice del resolver di progetto (`<project>/.claude/loadout/index.json`) e il registro di utilizzo in modalità append-only (`~/.ai-loadout/usage.jsonl`).
+- **Dati a cui NON accede:** nessuna comunicazione in rete, nessuna telemetria, nessun servizio remoto, nessuna credenziale o segreto. Nulla viene letto, archiviato o trasmesso al di fuori dei percorsi locali sopra indicati.
+- **Autorizzazioni richieste:** solo il filesystem locale. `doctor` e `report` sono letture pure (non scrivono mai). Le uniche scritture riguardano i file di indice, l'output interattivo `rules split` e il registro di utilizzo, il tutto nelle posizioni locali previste sopra. La scrittura irreversibile (`refresh`, che pubblica l'indice globale o di progetto in runtime) è protetta da un meccanismo di interruzione in caso di fallimento della validazione e da un `<dest>.bak` compensatore. Gli hook di runtime per il prompt e l'avvio della sessione sono configurati per essere "fail-open": ogni percorso di errore esce da `0`, quindi non possono mai bloccare un prompt.
 
 Modello completo delle minacce e processo di segnalazione: [SECURITY.md](./SECURITY.md).
 
 ## Licenza
 
-MIT: corrisponde a tutte le fonti originali.
+MIT — corrisponde a tutte le fonti originali.
 
 ---
 
