@@ -30,6 +30,7 @@ export type {
   DoctorCheck,
   DoctorResult,
   DoctorPaths,
+  DoctorStoreSource,
   CheckStatus,
 } from "./doctor.js";
 
@@ -68,9 +69,11 @@ export {
   defaultRepliesDir,
   DEFAULT_PRETOOL_TIMEOUT_MS,
   READ_ONLY_TOOLS,
+  WARN_ONLY_RULE_IDS,
   ProfileConfigError,
 } from "./pretool.js";
 export type {
+  NormalizePreToolPathOptions,
   PreToolStdinPayload,
   ProfileConfig,
   ProfileName,

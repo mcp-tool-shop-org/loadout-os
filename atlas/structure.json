@@ -51,7 +51,7 @@
       "unresolvedSites": 0
     },
     {
-      "dynamicReads": 10,
+      "dynamicReads": 12,
       "dynamicSpawns": 6,
       "dynamicSpawnsInTests": 5,
       "dynamicWrites": 3,
@@ -59,7 +59,7 @@
       "externals": 0,
       "files": [
         {
-          "hash": "4b9025544a90f36e89333f034f15a6e6ae80e35c7bb9e28ddc06ed86dc483486",
+          "hash": "9de8864c862df32e64a3e48d04da1bf1e32d2b42a662b29b9c4d3a31049575a7",
           "path": "packages/cli/CHANGELOG.md"
         },
         {
@@ -67,7 +67,7 @@
           "path": "packages/cli/LICENSE"
         },
         {
-          "hash": "40be13459f62fe5de644c21f5d6ae12de4f14044db52416960e889df1d6e510d",
+          "hash": "96ef2fae50036156bedefc22daccf048df15e2218919ad0b759e06ac53820b72",
           "path": "packages/cli/README.md"
         },
         {
@@ -83,62 +83,6 @@
             "dispatch",
             "getVersion",
             "topLevelHelp"
-          ],
-          "failurePaths": [
-            {
-              "in": "getVersion",
-              "kind": "catch",
-              "line": 84
-            },
-            {
-              "in": "dispatchMemories",
-              "kind": "throw",
-              "line": 186
-            },
-            {
-              "in": "dispatchRules",
-              "kind": "throw",
-              "line": 213
-            },
-            {
-              "in": "dispatchDoctor",
-              "kind": "throw",
-              "line": 246
-            },
-            {
-              "in": "dispatchDoctor",
-              "kind": "throw",
-              "line": 257
-            },
-            {
-              "in": "dispatchHook",
-              "kind": "catch",
-              "line": 335
-            },
-            {
-              "in": "dispatchHook",
-              "kind": "throw",
-              "line": 435
-            },
-            {
-              "in": "dispatch",
-              "kind": "throw",
-              "line": 512
-            },
-            {
-              "in": "dispatch",
-              "kind": "throw",
-              "line": 514
-            },
-            {
-              "in": "isEntrypoint",
-              "kind": "catch",
-              "line": 526
-            },
-            {
-              "kind": "catch",
-              "line": 534
-            }
           ],
           "hash": "11ee2433096d9f6b789880650a1a3ec9efc3a96574572f421942f6551668396a",
           "importOrder": [
@@ -187,43 +131,6 @@
             "rulesStats",
             "rulesValidate"
           ],
-          "failurePaths": [
-            {
-              "in": "requireFile",
-              "kind": "catch",
-              "line": 104
-            },
-            {
-              "in": "loadKernelIndex",
-              "kind": "catch",
-              "line": 115
-            },
-            {
-              "in": "memoriesPlaceOrMove",
-              "kind": "catch",
-              "line": 395
-            },
-            {
-              "in": "memoriesSplit",
-              "kind": "catch",
-              "line": 484
-            },
-            {
-              "in": "resolveRulesBin",
-              "kind": "catch",
-              "line": 628
-            },
-            {
-              "in": "runSplit",
-              "kind": "catch",
-              "line": 776
-            },
-            {
-              "in": "runSplit",
-              "kind": "catch",
-              "line": 790
-            }
-          ],
           "hash": "53f3aaa2c8d40074f79135139f3dffab8f58a9a9813911ca5c535427524a7e9e",
           "importOrder": [
             "packages/memories/src/index.ts",
@@ -252,13 +159,6 @@
             "positionalArgs",
             "warn"
           ],
-          "failurePaths": [
-            {
-              "in": "fail",
-              "kind": "throw",
-              "line": 60
-            }
-          ],
           "hash": "c9d2a4ddd6072fe9c45c5913a6b9e2614ecfdbda37d1fc053903fd2f74e44d9c",
           "path": "packages/cli/src/console.ts"
         },
@@ -269,82 +169,18 @@
             "resolveScaleThresholds",
             "runDoctor"
           ],
-          "failurePaths": [
-            {
-              "in": "resolveScaleThresholds",
-              "kind": "catch",
-              "line": 144
-            },
-            {
-              "in": "loadIndex",
-              "kind": "catch",
-              "line": 257
-            },
-            {
-              "in": "runDoctor",
-              "kind": "catch",
-              "line": 303
-            },
-            {
-              "in": "runDoctor",
-              "kind": "catch",
-              "line": 417
-            },
-            {
-              "in": "runDoctor",
-              "kind": "catch",
-              "line": 421
-            },
-            {
-              "in": "runDoctor",
-              "kind": "catch",
-              "line": 455
-            },
-            {
-              "in": "runDoctor",
-              "kind": "catch",
-              "line": 530
-            },
-            {
-              "in": "runDoctor",
-              "kind": "catch",
-              "line": 561
-            },
-            {
-              "in": "runDoctor",
-              "kind": "catch",
-              "line": 644
-            },
-            {
-              "in": "runDoctor",
-              "kind": "catch",
-              "line": 689
-            },
-            {
-              "in": "loadStoreMemoryIds",
-              "kind": "catch",
-              "line": 722
-            },
-            {
-              "in": "runDoctor",
-              "kind": "catch",
-              "line": 911
-            }
-          ],
-          "hash": "cf3479e53abe69c2c1f2c769434fde4bc0063ec556a4ecf2f56dc267ca404942",
+          "hash": "a8781fda87f2f6650c3c3fd547f6f1592231ba1d32caa1a86a8351c101986c8e",
           "importOrder": [
             "packages/memories/src/index.ts",
             "packages/kernel/src/index.ts",
             "packages/cli/src/console.ts",
             "packages/cli/src/pretool.ts",
-            "packages/cli/src/pretool-rules.ts",
-            "packages/cli/src/refresh.ts"
+            "packages/cli/src/pretool-rules.ts"
           ],
           "importsFiles": [
             "packages/cli/src/console.ts",
             "packages/cli/src/pretool-rules.ts",
             "packages/cli/src/pretool.ts",
-            "packages/cli/src/refresh.ts",
             "packages/kernel/src/index.ts",
             "packages/memories/src/index.ts"
           ],
@@ -356,7 +192,7 @@
             "renderCommandHelp",
             "wantsHelp"
           ],
-          "hash": "e768f9af1aeeeefeeb2992b8caf8f4a7c983b0b83a1abb8ca27e7064af48c464",
+          "hash": "cd181be31fcf6df81eab6d8d071c2cefbb0ab1414fdc09b54e541894d1b19fff",
           "importsFiles": [
             "packages/cli/src/console.ts"
           ],
@@ -376,68 +212,6 @@
             "runSessionStart",
             "writeUtf8Stdout"
           ],
-          "failurePaths": [
-            {
-              "in": "readHookStdin",
-              "kind": "catch",
-              "line": 73
-            },
-            {
-              "in": "runHookTest",
-              "kind": "catch",
-              "line": 142
-            },
-            {
-              "in": "runHookTest",
-              "kind": "catch",
-              "line": 163
-            },
-            {
-              "in": "isStoreNewerThanIndex",
-              "kind": "catch",
-              "line": 259
-            },
-            {
-              "in": "runSessionStart",
-              "kind": "catch",
-              "line": 363
-            },
-            {
-              "in": "runSessionStart",
-              "kind": "catch",
-              "line": 391
-            },
-            {
-              "in": "runSessionStart",
-              "kind": "catch",
-              "line": 467
-            },
-            {
-              "in": "runSessionStart",
-              "kind": "catch",
-              "line": 471
-            },
-            {
-              "in": "runSessionStart",
-              "kind": "catch",
-              "line": 497
-            },
-            {
-              "in": "parsePostToolUsePayload",
-              "kind": "catch",
-              "line": 679
-            },
-            {
-              "in": "runPostWrite",
-              "kind": "catch",
-              "line": 736
-            },
-            {
-              "in": "runPostWrite",
-              "kind": "catch",
-              "line": 763
-            }
-          ],
           "hash": "bb9a7d24d7e994088ed59b2c83f4de6c3900f7ab30bb69c6e0575421c590c937",
           "importOrder": [
             "packages/kernel/src/index.ts",
@@ -452,7 +226,7 @@
           "path": "packages/cli/src/hook.ts"
         },
         {
-          "hash": "d6267e4e2faeccee046e647147747eb21b0409039ae467b7e9dcd6d49f22f064",
+          "hash": "aabd51e2986819e93fdfa02e62613fdd37449c9b303b4e497b08ef88c8d61346",
           "importOrder": [
             "packages/cli/src/cli.ts",
             "packages/cli/src/console.ts",
@@ -499,33 +273,6 @@
             "quotedSpanAfter",
             "textMentionsMemoryStorePath"
           ],
-          "failurePaths": [
-            {
-              "in": "hasReviewPassAtHead",
-              "kind": "catch",
-              "line": 229
-            },
-            {
-              "in": "hasReviewPassAtHead",
-              "kind": "catch",
-              "line": 262
-            },
-            {
-              "in": "hasReviewPassAtHead",
-              "kind": "catch",
-              "line": 268
-            },
-            {
-              "in": "isReadOnlyScriptInvocation",
-              "kind": "catch",
-              "line": 1234
-            },
-            {
-              "in": "reconstructEditedLinesFromDisk",
-              "kind": "catch",
-              "line": 2062
-            }
-          ],
           "hash": "6570e215ed940064ef63f74421fabef06741e5c2a5d6080201ee80654ea6f77a",
           "importsFiles": [
             "packages/cli/src/pretool.ts"
@@ -561,89 +308,7 @@
             "resolveRuleSkill",
             "runPreTool"
           ],
-          "failurePaths": [
-            {
-              "in": "formatWarnValue",
-              "kind": "catch",
-              "line": 448
-            },
-            {
-              "in": "loadProfileConfig",
-              "kind": "catch",
-              "line": 546
-            },
-            {
-              "in": "loadProfileConfig",
-              "kind": "throw",
-              "line": 558
-            },
-            {
-              "in": "loadProfileConfig",
-              "kind": "catch",
-              "line": 567
-            },
-            {
-              "in": "loadProfileConfig",
-              "kind": "throw",
-              "line": 568
-            },
-            {
-              "in": "loadProfileConfig",
-              "kind": "throw",
-              "line": 575
-            },
-            {
-              "in": "parsePreToolStdin",
-              "kind": "throw",
-              "line": 891
-            },
-            {
-              "in": "parsePreToolStdin",
-              "kind": "throw",
-              "line": 895
-            },
-            {
-              "in": "parsePreToolStdin",
-              "kind": "throw",
-              "line": 899
-            },
-            {
-              "in": "parsePreToolStdin",
-              "kind": "throw",
-              "line": 906
-            },
-            {
-              "in": "parseBashCommand",
-              "kind": "throw",
-              "line": 1230
-            },
-            {
-              "in": "readDecisionLog",
-              "kind": "catch",
-              "line": 2011
-            },
-            {
-              "in": "safeWriteLog",
-              "kind": "catch",
-              "line": 2117
-            },
-            {
-              "in": "runPreTool",
-              "kind": "throw",
-              "line": 2133
-            },
-            {
-              "in": "runPreTool",
-              "kind": "catch",
-              "line": 2198
-            },
-            {
-              "in": "runPreTool",
-              "kind": "catch",
-              "line": 2287
-            }
-          ],
-          "hash": "f82d1394e2d1495765f3b776420dfb310e689ade72db9994cb4cf685e43d0257",
+          "hash": "623b510e9ce807faa2aa3245da1411a0432da2248c4993edbf2171cb8ca685f0",
           "importsFiles": [
             "packages/cli/src/pretool-rules.ts"
           ],
@@ -667,168 +332,6 @@
             "sameResolvedPath",
             "withFileLock"
           ],
-          "failurePaths": [
-            {
-              "in": "resolveDefaultStore",
-              "kind": "catch",
-              "line": 84
-            },
-            {
-              "in": "withFileLock",
-              "kind": "catch",
-              "line": 235
-            },
-            {
-              "in": "withFileLock",
-              "kind": "throw",
-              "line": 238
-            },
-            {
-              "in": "withFileLock",
-              "kind": "catch",
-              "line": 247
-            },
-            {
-              "in": "withFileLock",
-              "kind": "throw",
-              "line": 256
-            },
-            {
-              "in": "withFileLock",
-              "kind": "catch",
-              "line": 268
-            },
-            {
-              "in": "withFileLock",
-              "kind": "catch",
-              "line": 273
-            },
-            {
-              "in": "runGit",
-              "kind": "throw",
-              "line": 297
-            },
-            {
-              "in": "runGit",
-              "kind": "throw",
-              "line": 303
-            },
-            {
-              "in": "runSnapshotAndMirror",
-              "kind": "throw",
-              "line": 342
-            },
-            {
-              "in": "runSnapshotAndMirror",
-              "kind": "catch",
-              "line": 359
-            },
-            {
-              "in": "runSnapshotAndMirror",
-              "kind": "catch",
-              "line": 371
-            },
-            {
-              "in": "runSnapshotAndMirror",
-              "kind": "throw",
-              "line": 378
-            },
-            {
-              "in": "runSnapshotAndMirror",
-              "kind": "throw",
-              "line": 409
-            },
-            {
-              "in": "runSnapshotAndMirror",
-              "kind": "throw",
-              "line": 429
-            },
-            {
-              "in": "runSnapshotAndMirror",
-              "kind": "throw",
-              "line": 439
-            },
-            {
-              "in": "runSnapshotAndMirror",
-              "kind": "throw",
-              "line": 448
-            },
-            {
-              "in": "extractIndexSourceStore",
-              "kind": "catch",
-              "line": 520
-            },
-            {
-              "in": "resolveStoreForProject",
-              "kind": "catch",
-              "line": 551
-            },
-            {
-              "in": "runRefresh",
-              "kind": "throw",
-              "line": 574
-            },
-            {
-              "in": "runRefresh",
-              "kind": "throw",
-              "line": 584
-            },
-            {
-              "in": "runRefresh",
-              "kind": "throw",
-              "line": 610
-            },
-            {
-              "in": "runRefresh",
-              "kind": "throw",
-              "line": 617
-            },
-            {
-              "in": "runRefresh",
-              "kind": "throw",
-              "line": 628
-            },
-            {
-              "in": "runRefresh",
-              "kind": "throw",
-              "line": 666
-            },
-            {
-              "in": "runRefresh",
-              "kind": "catch",
-              "line": 743
-            },
-            {
-              "in": "runRefresh",
-              "kind": "catch",
-              "line": 746
-            },
-            {
-              "in": "runRefresh",
-              "kind": "catch",
-              "line": 752
-            },
-            {
-              "in": "runRefresh",
-              "kind": "throw",
-              "line": 756
-            },
-            {
-              "in": "runRefresh",
-              "kind": "throw",
-              "line": 757
-            },
-            {
-              "in": "dispatchRefresh",
-              "kind": "catch",
-              "line": 941
-            },
-            {
-              "in": "dispatchRefresh",
-              "kind": "throw",
-              "line": 953
-            }
-          ],
           "hash": "4b31c0186a4db4b422d0fec2f80effb17acd8923fe6fc266c89ad220abac52ea",
           "importOrder": [
             "packages/memories/src/index.ts",
@@ -849,13 +352,6 @@
             "buildReport",
             "printReport"
           ],
-          "failurePaths": [
-            {
-              "in": "loadIndex",
-              "kind": "catch",
-              "line": 78
-            }
-          ],
           "hash": "e34a04b1dbdd3a291321afb9ab08f737f7a45bd51a26013eb7e306031a8e8e6e",
           "importOrder": [
             "packages/kernel/src/index.ts",
@@ -872,8 +368,7 @@
           "importsFiles": [
             "packages/cli/src/console.ts"
           ],
-          "path": "packages/cli/src/tests/console.test.ts",
-          "testFramework": "node --test"
+          "path": "packages/cli/src/tests/console.test.ts"
         },
         {
           "hash": "be9ae641bf1ee438038dd55a9e0d664ba3a4dfb73bb41c0308b0ffa7fd38c839",
@@ -882,11 +377,10 @@
             "packages/cli/src/console.ts",
             "packages/cli/src/tests/fixtures.ts"
           ],
-          "path": "packages/cli/src/tests/dispatch.test.ts",
-          "testFramework": "node --test"
+          "path": "packages/cli/src/tests/dispatch.test.ts"
         },
         {
-          "hash": "af1aca528deea0643745c73d6a08881202802cfed22590565972fb1f83b1b9cf",
+          "hash": "fb91b4e911248c03a08f97838784061d504dd8fbd4255d87cd8d75fa6765a5d7",
           "importOrder": [
             "packages/cli/src/doctor.ts",
             "packages/cli/src/cli.ts",
@@ -905,11 +399,7 @@
             "packages/kernel/src/index.ts",
             "packages/memories/src/index.ts"
           ],
-          "names": [
-            "apps/hook/loadout-hook.mjs"
-          ],
-          "path": "packages/cli/src/tests/doctor.test.ts",
-          "testFramework": "node --test"
+          "path": "packages/cli/src/tests/doctor.test.ts"
         },
         {
           "exports": [
@@ -924,14 +414,13 @@
           "path": "packages/cli/src/tests/fixtures.ts"
         },
         {
-          "hash": "745f930d299a258850dca8515e687201158645bae9e519a5e8641812fb69cf7f",
+          "hash": "a34f9c96106ac9f2c8474f60cf6bc2bc699bace951f78c499989cdb60636c516",
           "importsFiles": [
             "packages/cli/src/cli.ts",
             "packages/cli/src/help.ts",
             "packages/cli/src/tests/fixtures.ts"
           ],
-          "path": "packages/cli/src/tests/help.test.ts",
-          "testFramework": "node --test"
+          "path": "packages/cli/src/tests/help.test.ts"
         },
         {
           "hash": "b1148c93fe7f3ef1b2c77c9f083bdd520c551112c7e8946999528f2aa7672877",
@@ -939,14 +428,10 @@
             "packages/cli/src/hook.ts",
             "packages/cli/src/refresh.ts"
           ],
-          "names": [
-            "apps/hook/loadout-hook.mjs"
-          ],
-          "path": "packages/cli/src/tests/hook.test.ts",
-          "testFramework": "node --test"
+          "path": "packages/cli/src/tests/hook.test.ts"
         },
         {
-          "hash": "aa048233972a6ebffde2d64ea2342e7d25d9ad2107b43cd34ad80fd16037cdaf",
+          "hash": "15e2ef500ea087506a8b85147a1cff87fc3de0c54fff11a10492b822d99d3f74",
           "importOrder": [
             "packages/cli/src/pretool.ts",
             "packages/cli/src/cli.ts",
@@ -961,19 +446,14 @@
             "packages/cli/src/pretool.ts",
             "packages/cli/src/tests/fixtures.ts"
           ],
-          "path": "packages/cli/src/tests/pretool.test.ts",
-          "spawns": [
-            "packages/cli/src/cli.ts"
-          ],
-          "testFramework": "node --test"
+          "path": "packages/cli/src/tests/pretool.test.ts"
         },
         {
           "exports": [
             "scanLinesForHits"
           ],
-          "hash": "e66a3a278a7dfdd947fd58ce99a29e6f1d98cfa511b71c4279deaddcc11c84b5",
-          "path": "packages/cli/src/tests/public-hygiene.test.ts",
-          "testFramework": "node --test"
+          "hash": "4845810ad358f6cc63c3a5b2fe58e9defcdf8dd7b0bea64541ca0de3335f7280",
+          "path": "packages/cli/src/tests/public-hygiene.test.ts"
         },
         {
           "hash": "18534a648a8ed55d7cf7b10532950fb07b5304925c14f8b3a9eba06b88b6437c",
@@ -989,8 +469,7 @@
             "packages/cli/src/refresh.ts",
             "packages/cli/src/tests/fixtures.ts"
           ],
-          "path": "packages/cli/src/tests/refresh.test.ts",
-          "testFramework": "node --test"
+          "path": "packages/cli/src/tests/refresh.test.ts"
         },
         {
           "hash": "ee5adba96ee13c1debe2849db428a40c428d0874e73857c0ee8d4cf543bf1beb",
@@ -998,8 +477,7 @@
             "packages/cli/src/report.ts",
             "packages/cli/src/tests/fixtures.ts"
           ],
-          "path": "packages/cli/src/tests/report.test.ts",
-          "testFramework": "node --test"
+          "path": "packages/cli/src/tests/report.test.ts"
         },
         {
           "hash": "eac0c15273d5c1758df9b2a22bc555690386acd3b7ab6bc8e78bf4f473d9826a",
@@ -1007,8 +485,7 @@
             "packages/cli/src/commands.ts",
             "packages/cli/src/tests/fixtures.ts"
           ],
-          "path": "packages/cli/src/tests/split.test.ts",
-          "testFramework": "node --test"
+          "path": "packages/cli/src/tests/split.test.ts"
         },
         {
           "hash": "7a45a379a34731b6821961d4dd18759fbfd649a011d67bde68c82efd3252517c",
@@ -1017,8 +494,7 @@
             "packages/cli/src/console.ts",
             "packages/cli/src/tests/fixtures.ts"
           ],
-          "path": "packages/cli/src/tests/wrapped.test.ts",
-          "testFramework": "node --test"
+          "path": "packages/cli/src/tests/wrapped.test.ts"
         },
         {
           "hash": "faa08245481a7a03084bb1f119e6794a3c554373554779a45b5974c2339e56ab",
@@ -1033,7 +509,7 @@
       "origin": "authored",
       "outsidePlaces": [
         {
-          "reads": 56,
+          "reads": 48,
           "where": [
             "caller"
           ],
@@ -1107,12 +583,9 @@
           "writes": 5
         }
       ],
-      "outsideReads": 79,
+      "outsideReads": 71,
       "outsideWrites": 16,
       "role": "code",
-      "testRunners": [
-        "node --test"
-      ],
       "testedBy": 13,
       "unresolvedSites": 0
     },
@@ -1131,48 +604,6 @@
           "path": "apps/hook/esbuild.config.mjs"
         },
         {
-          "failurePaths": [
-            {
-              "in": "debug",
-              "kind": "catch",
-              "line": 47
-            },
-            {
-              "in": "readStdinSync",
-              "kind": "catch",
-              "line": 53
-            },
-            {
-              "in": "safeExit",
-              "kind": "catch",
-              "line": 59
-            },
-            {
-              "in": "main",
-              "kind": "catch",
-              "line": 190
-            },
-            {
-              "in": "main",
-              "kind": "catch",
-              "line": 202
-            },
-            {
-              "in": "main",
-              "kind": "catch",
-              "line": 215
-            },
-            {
-              "in": "main",
-              "kind": "catch",
-              "line": 244
-            },
-            {
-              "in": "main",
-              "kind": "catch",
-              "line": 308
-            }
-          ],
           "hash": "89a7b208234b8a9b38c988787cdfc0e974f9ea9a0e61b5f6ba7b6d4bcc911ff6",
           "importsFiles": [
             "packages/kernel/src/index.ts"
@@ -1185,9 +616,6 @@
         },
         {
           "hash": "cf694f39f32d925c0a8b9b453811e4b2dec90b7058e7bbfe39409b662e017c62",
-          "names": [
-            "apps/hook/loadout-hook.mjs"
-          ],
           "path": "apps/hook/smoke-test.ps1"
         }
       ],
@@ -1613,18 +1041,6 @@
         {
           "entry": "cmdBudget",
           "entryRule": 1,
-          "failurePaths": [
-            {
-              "in": "loadIndex",
-              "kind": "catch",
-              "line": 97
-            },
-            {
-              "in": "getVersion",
-              "kind": "catch",
-              "line": 119
-            }
-          ],
           "hash": "cdc9716fd051b59cececc345fd34147cb28103e9de28186dc47a913c488ceef9",
           "importsFiles": [
             "packages/kernel/src/analysis.ts",
@@ -2026,18 +1442,6 @@
             "findProjectIndex",
             "resolveLoadout"
           ],
-          "failurePaths": [
-            {
-              "in": "discoverLayers",
-              "kind": "throw",
-              "line": 168
-            },
-            {
-              "in": "discoverLayers",
-              "kind": "catch",
-              "line": 171
-            }
-          ],
           "hash": "823a1b14241b8c9c2c98abc952372b388528f04f9d3a6b51f63da302dd7013bb",
           "importsFiles": [
             "packages/kernel/src/merge.ts",
@@ -2089,16 +1493,14 @@
             "packages/kernel/src/analysis.ts",
             "packages/kernel/src/types.ts"
           ],
-          "path": "packages/kernel/src/tests/analysis.test.ts",
-          "testFramework": "node --test"
+          "path": "packages/kernel/src/tests/analysis.test.ts"
         },
         {
           "hash": "aa253491532a717db5a2358e7e9c64b0d86b7a047f2093960d5a660b6c58e387",
           "importsFiles": [
             "packages/kernel/src/cli-helpers.ts"
           ],
-          "path": "packages/kernel/src/tests/cli-helpers.test.ts",
-          "testFramework": "node --test"
+          "path": "packages/kernel/src/tests/cli-helpers.test.ts"
         },
         {
           "hash": "fef3c709b17aaa80aca58307e1f6067cd99e9a60afae94617236c9edd42103b3",
@@ -2106,8 +1508,7 @@
             "packages/kernel/src/frontmatter.ts",
             "packages/kernel/src/types.ts"
           ],
-          "path": "packages/kernel/src/tests/frontmatter.test.ts",
-          "testFramework": "node --test"
+          "path": "packages/kernel/src/tests/frontmatter.test.ts"
         },
         {
           "hash": "7dee647830e1545a16e94dc9dbdb67d600d20239e09cf4542f9ed947ae28f86c",
@@ -2115,8 +1516,7 @@
             "packages/kernel/src/match.ts",
             "packages/kernel/src/types.ts"
           ],
-          "path": "packages/kernel/src/tests/match.test.ts",
-          "testFramework": "node --test"
+          "path": "packages/kernel/src/tests/match.test.ts"
         },
         {
           "hash": "4060375cfc5564c5d38c48d909e6c58aca14a2608b6d8431f7a57d7b73c7cae8",
@@ -2124,8 +1524,7 @@
             "packages/kernel/src/merge.ts",
             "packages/kernel/src/types.ts"
           ],
-          "path": "packages/kernel/src/tests/merge.test.ts",
-          "testFramework": "node --test"
+          "path": "packages/kernel/src/tests/merge.test.ts"
         },
         {
           "hash": "bf7fbd0a76376fffd0969eef065db93ef09a593ea26962c3c8e846f260b5ad45",
@@ -2139,8 +1538,7 @@
             "packages/kernel/src/resolve.ts",
             "packages/kernel/src/types.ts"
           ],
-          "path": "packages/kernel/src/tests/resolve.test.ts",
-          "testFramework": "node --test"
+          "path": "packages/kernel/src/tests/resolve.test.ts"
         },
         {
           "hash": "82d34eca196534468930ce6555abb1f7afac5386aa87d489fa38314a2f40aaf6",
@@ -2148,16 +1546,14 @@
             "packages/kernel/src/runtime.ts",
             "packages/kernel/src/types.ts"
           ],
-          "path": "packages/kernel/src/tests/runtime.test.ts",
-          "testFramework": "node --test"
+          "path": "packages/kernel/src/tests/runtime.test.ts"
         },
         {
           "hash": "68ae8b5ad128860cce3420316bf1355e86e83914b9eb20595a86ae5747d608c2",
           "importsFiles": [
             "packages/kernel/src/tokens.ts"
           ],
-          "path": "packages/kernel/src/tests/tokens.test.ts",
-          "testFramework": "node --test"
+          "path": "packages/kernel/src/tests/tokens.test.ts"
         },
         {
           "hash": "b51190ebf357755d2cb08e876a8686a6399d8c2f07f4676b87919432149b9389",
@@ -2169,8 +1565,7 @@
             "packages/kernel/src/types.ts",
             "packages/kernel/src/usage.ts"
           ],
-          "path": "packages/kernel/src/tests/usage.test.ts",
-          "testFramework": "node --test"
+          "path": "packages/kernel/src/tests/usage.test.ts"
         },
         {
           "hash": "87a735bac4db2e08d63d8b6ae9d40965a9713e5835119fa892fa64c263b75c6b",
@@ -2182,8 +1577,7 @@
             "packages/kernel/src/types.ts",
             "packages/kernel/src/validate.ts"
           ],
-          "path": "packages/kernel/src/tests/validate.test.ts",
-          "testFramework": "node --test"
+          "path": "packages/kernel/src/tests/validate.test.ts"
         },
         {
           "exports": [
@@ -2203,13 +1597,6 @@
             "recordUsage",
             "summarizeUsage",
             "summaryToJSON"
-          ],
-          "failurePaths": [
-            {
-              "in": "readUsageWithStats",
-              "kind": "catch",
-              "line": 46
-            }
           ],
           "hash": "0581b54d5c3a3c6340487f0674f01829d0595c3d17c25ba8a76aec45c52231dc",
           "importsFiles": [
@@ -2258,9 +1645,6 @@
       "outsideReads": 6,
       "outsideWrites": 1,
       "role": "docs",
-      "testRunners": [
-        "node --test"
-      ],
       "testedBy": 34,
       "unresolvedSites": 0
     },
@@ -2609,43 +1993,6 @@
             "detectSubindex",
             "extractKeywords"
           ],
-          "failurePaths": [
-            {
-              "in": "analyzeMemoryMd",
-              "kind": "catch",
-              "line": 62
-            },
-            {
-              "in": "analyzeMemoryMd",
-              "kind": "throw",
-              "line": 64
-            },
-            {
-              "in": "expandIndexRefs",
-              "kind": "catch",
-              "line": 135
-            },
-            {
-              "in": "analyzeMemoryMd",
-              "kind": "catch",
-              "line": 217
-            },
-            {
-              "in": "analyzeMemoryMd",
-              "kind": "catch",
-              "line": 221
-            },
-            {
-              "in": "scanDir",
-              "kind": "catch",
-              "line": 265
-            },
-            {
-              "in": "scanDir",
-              "kind": "catch",
-              "line": 283
-            }
-          ],
           "hash": "dfa8945572e57ff7ea00a274f1c75c5993407e734d5d643cc7d01cf2e916788d",
           "importsFiles": [
             "packages/kernel/src/index.ts",
@@ -2729,23 +2076,6 @@
         {
           "entry": "cmdIndex",
           "entryRule": 1,
-          "failurePaths": [
-            {
-              "in": "getVersion",
-              "kind": "catch",
-              "line": 127
-            },
-            {
-              "in": "isFile",
-              "kind": "catch",
-              "line": 170
-            },
-            {
-              "in": "runCommand",
-              "kind": "catch",
-              "line": 497
-            }
-          ],
           "hash": "dd1a7811680ce49bac69bdf0ca6c775d37b0d0d1a7ddaf93c94dc80243227129",
           "importsFiles": [
             "packages/memories/src/analyze.ts",
@@ -3087,18 +2417,6 @@
             "nameToId",
             "resolveStoreIdSource"
           ],
-          "failurePaths": [
-            {
-              "in": "resolveStoreIdSource",
-              "kind": "catch",
-              "line": 202
-            },
-            {
-              "in": "resolveStoreIdSource",
-              "kind": "catch",
-              "line": 211
-            }
-          ],
           "hash": "f356985a1518a8a78643ef6fa1da7cd3887aba52d616463803d33f6549d4f105",
           "importsFiles": [
             "packages/kernel/src/index.ts",
@@ -3311,98 +2629,6 @@
             "parseSplitRules",
             "splitMemoryStore"
           ],
-          "failurePaths": [
-            {
-              "in": "normalizeSubindexFilename",
-              "kind": "throw",
-              "line": 144
-            },
-            {
-              "in": "parseSingleRule",
-              "kind": "throw",
-              "line": 217
-            },
-            {
-              "in": "parseSingleRule",
-              "kind": "throw",
-              "line": 239
-            },
-            {
-              "in": "parseSplitRules",
-              "kind": "throw",
-              "line": 279
-            },
-            {
-              "in": "parseSplitRules",
-              "kind": "throw",
-              "line": 291
-            },
-            {
-              "in": "parseSplitRules",
-              "kind": "throw",
-              "line": 308
-            },
-            {
-              "in": "parseSplitRules",
-              "kind": "throw",
-              "line": 356
-            },
-            {
-              "in": "loadSplitRulesFile",
-              "kind": "throw",
-              "line": 375
-            },
-            {
-              "in": "loadSplitRulesFile",
-              "kind": "catch",
-              "line": 384
-            },
-            {
-              "in": "loadSplitRulesFile",
-              "kind": "throw",
-              "line": 386
-            },
-            {
-              "in": "loadSplitRulesFile",
-              "kind": "catch",
-              "line": 394
-            },
-            {
-              "in": "loadSplitRulesFile",
-              "kind": "throw",
-              "line": 396
-            },
-            {
-              "in": "splitMemoryStore",
-              "kind": "throw",
-              "line": 548
-            },
-            {
-              "in": "splitMemoryStore",
-              "kind": "catch",
-              "line": 612
-            },
-            {
-              "in": "splitMemoryStore",
-              "kind": "catch",
-              "line": 647
-            },
-            {
-              "in": "splitMemoryStore",
-              "kind": "throw",
-              "line": 851
-            },
-            {
-              "in": "splitMemoryStore",
-              "kind": "throw",
-              "line": 864
-            },
-            {
-              "in": "splitMemoryStore",
-              "kind": "throw",
-              "line": 871
-            }
-          ],
           "hash": "d2319ddbeadf0c04845aeee9e2c61f4430bacfd777e91f1ec5ce88b5cad51e34",
           "importsFiles": [
             "packages/kernel/src/index.ts",
@@ -3523,48 +2749,6 @@
             "resolveTargetIndexFile",
             "syncSummaries"
           ],
-          "failurePaths": [
-            {
-              "in": "discoverLinkedSubindexes",
-              "kind": "catch",
-              "line": 108
-            },
-            {
-              "in": "discoverLinkedSubindexes",
-              "kind": "catch",
-              "line": 127
-            },
-            {
-              "in": "syncSummaries",
-              "kind": "catch",
-              "line": 174
-            },
-            {
-              "in": "resolveTargetIndexFile",
-              "kind": "throw",
-              "line": 225
-            },
-            {
-              "in": "placeOrMoveEntry",
-              "kind": "throw",
-              "line": 262
-            },
-            {
-              "in": "placeOrMoveEntry",
-              "kind": "throw",
-              "line": 267
-            },
-            {
-              "in": "placeOrMoveEntry",
-              "kind": "throw",
-              "line": 272
-            },
-            {
-              "in": "placeOrMoveEntry",
-              "kind": "throw",
-              "line": 277
-            }
-          ],
           "hash": "09713889c6b19021b8808b211217c3acde2601f69618f6c7f952824bb56bab1f",
           "importOrder": [
             "packages/kernel/src/index.ts",
@@ -3587,16 +2771,11 @@
           "importsFiles": [
             "packages/memories/src/analyze.ts"
           ],
-          "path": "packages/memories/src/tests/analyze.test.ts",
-          "testFramework": "node --test"
+          "path": "packages/memories/src/tests/analyze.test.ts"
         },
         {
           "hash": "73c2653759c24ca54d4b27d55874d9c23f9200e5c929766c85d2b9ccc5dcdc4b",
-          "path": "packages/memories/src/tests/cli.test.ts",
-          "spawns": [
-            "packages/memories/src/cli.ts"
-          ],
-          "testFramework": "node --test"
+          "path": "packages/memories/src/tests/cli.test.ts"
         },
         {
           "hash": "6b12a8e3c2bca3cbb56e324c88f4a00eec147bea0fd72ecebd98f851bcbd6cda",
@@ -3612,8 +2791,7 @@
             "packages/memories/src/index.ts",
             "packages/memories/src/paths.ts"
           ],
-          "path": "packages/memories/src/tests/diagnostics.test.ts",
-          "testFramework": "node --test"
+          "path": "packages/memories/src/tests/diagnostics.test.ts"
         },
         {
           "hash": "19f63c6dae0e97a973646e6d9f09c8b4171a12986ae18e745822aaf54fa2f0e7",
@@ -3657,11 +2835,7 @@
         },
         {
           "hash": "0ec4d53c92ab113c50822ccd5634979b6abcb2f065db957328e47c303c66cb58",
-          "path": "packages/memories/src/tests/health.test.ts",
-          "spawns": [
-            "packages/memories/src/cli.ts"
-          ],
-          "testFramework": "node --test"
+          "path": "packages/memories/src/tests/health.test.ts"
         },
         {
           "hash": "d4dc4a282f726680664fe10794f7ef8c5884451c2cffb7ccb3ad9165805f8365",
@@ -3679,8 +2853,7 @@
             "packages/memories/src/sync.ts",
             "packages/memories/src/validate.ts"
           ],
-          "path": "packages/memories/src/tests/index-gen.test.ts",
-          "testFramework": "node --test"
+          "path": "packages/memories/src/tests/index-gen.test.ts"
         },
         {
           "hash": "92b1ed8f6e93d09baa92830bc1e223df695416efec496d6dff05e607b76443fb",
@@ -3694,16 +2867,14 @@
             "packages/memories/src/parser.ts",
             "packages/memories/src/validate.ts"
           ],
-          "path": "packages/memories/src/tests/parser.test.ts",
-          "testFramework": "node --test"
+          "path": "packages/memories/src/tests/parser.test.ts"
         },
         {
           "hash": "0362c1d3de573d035694c2e9be27244a585208fbe720b0872b14fe814d7fb70a",
           "importsFiles": [
             "packages/memories/src/index.ts"
           ],
-          "path": "packages/memories/src/tests/split.test.ts",
-          "testFramework": "node --test"
+          "path": "packages/memories/src/tests/split.test.ts"
         },
         {
           "hash": "6547839c0b1ebbb51db973ad6f6dc79ef81a665ca7f960136d95a95044689811",
@@ -3712,8 +2883,7 @@
             "packages/memories/src/index-gen.ts",
             "packages/memories/src/stats.ts"
           ],
-          "path": "packages/memories/src/tests/stats.test.ts",
-          "testFramework": "node --test"
+          "path": "packages/memories/src/tests/stats.test.ts"
         },
         {
           "hash": "569f4044b5ad971366c0d80138debf090ae9ac12d4bfde519e25ce2f24b6745c",
@@ -3722,8 +2892,7 @@
             "packages/memories/src/index-gen.ts",
             "packages/memories/src/validate.ts"
           ],
-          "path": "packages/memories/src/tests/validate.test.ts",
-          "testFramework": "node --test"
+          "path": "packages/memories/src/tests/validate.test.ts"
         },
         {
           "hash": "326bad9958bbd716ddc54585fac65748ae9448f370362881ec3b51ef67d34f2b",
@@ -3739,23 +2908,6 @@
             "summariesMatch",
             "validateMemory",
             "validateMemoryIndex"
-          ],
-          "failurePaths": [
-            {
-              "in": "resolveStoreLimitOptIn",
-              "kind": "catch",
-              "line": 95
-            },
-            {
-              "in": "validateMemory",
-              "kind": "catch",
-              "line": 168
-            },
-            {
-              "in": "validateMemory",
-              "kind": "catch",
-              "line": 269
-            }
           ],
           "hash": "abb9838af6e3050e8aab0012253b90eabafd2f17c825cfb1a295a68ffdbd1322",
           "importsFiles": [
@@ -3964,10 +3116,7 @@
       "outsideReads": 25,
       "outsideWrites": 8,
       "role": "docs",
-      "testRunners": [
-        "node --test"
-      ],
-      "testedBy": 20,
+      "testedBy": 19,
       "unresolvedSites": 0
     },
     {
@@ -3983,7 +3132,7 @@
           "path": ".gitignore"
         },
         {
-          "hash": "73e230c4ff27c81ecc54261fdd45e096fc13e05a42daf09156ec05fcb6e11141",
+          "hash": "d5ff6a6382f773db85fa0d951c6b8540c7bf699a11fe3ae7d82b7cdd7957199b",
           "path": "CHANGELOG.md"
         },
         {
@@ -4011,7 +3160,7 @@
           "path": "README.ja.md"
         },
         {
-          "hash": "dd655af9c3a5a2eedfb9a5e5183827526673e194b0a84feeb2a1ea8aa4d01004",
+          "hash": "c6b41b353f65d597867aa5496a15764b87de4d5a686aa2942ed49293fff76c71",
           "path": "README.md"
         },
         {
@@ -5148,13 +4297,6 @@
             "generateDefaultSignalsJson",
             "loadSignals"
           ],
-          "failurePaths": [
-            {
-              "in": "loadSignals",
-              "kind": "catch",
-              "line": 56
-            }
-          ],
           "hash": "355c79814f56f5495626135dbc9347ffa5660a2916d3c3c2f009bda5e33325ff",
           "importsFiles": [
             "packages/rules/src/console.ts",
@@ -5232,23 +4374,6 @@
             "generateClaudeMd",
             "generateIndex",
             "generateRuleFile"
-          ],
-          "failurePaths": [
-            {
-              "in": "cmdSplit",
-              "kind": "catch",
-              "line": 348
-            },
-            {
-              "in": "cmdSplit",
-              "kind": "catch",
-              "line": 364
-            },
-            {
-              "in": "cmdSplit",
-              "kind": "catch",
-              "line": 373
-            }
           ],
           "hash": "11bc95de974fe0ff65f6d0be1abc61464e51d14707f9c9c1bc092928e5d87bda",
           "importsFiles": [
@@ -5461,13 +4586,6 @@
           "exports": [
             "cmdStats"
           ],
-          "failurePaths": [
-            {
-              "in": "cmdStats",
-              "kind": "catch",
-              "line": 75
-            }
-          ],
           "hash": "c6d2f73e83cb92f23ab61c248c807df748cb331f03c567b35793631141b1db7c",
           "importsFiles": [
             "packages/rules/src/analyze.ts",
@@ -5582,27 +4700,21 @@
             "packages/rules/src/analyze.ts",
             "packages/rules/src/types.ts"
           ],
-          "path": "packages/rules/src/tests/analyze.test.ts",
-          "testFramework": "node --test"
+          "path": "packages/rules/src/tests/analyze.test.ts"
         },
         {
           "hash": "2974cb5514ed878feed987f0d6a8404c2b60b1fc121014e12a83d1a335b6977c",
           "importsFiles": [
             "packages/rules/src/console.ts"
           ],
-          "path": "packages/rules/src/tests/cli.test.ts",
-          "spawns": [
-            "packages/rules/src/cli.ts"
-          ],
-          "testFramework": "node --test"
+          "path": "packages/rules/src/tests/cli.test.ts"
         },
         {
           "hash": "9f5072c0f340899145870f2994b9b7e13414c462753cd5b87f995590ca15ec88",
           "importsFiles": [
             "packages/rules/src/index.ts"
           ],
-          "path": "packages/rules/src/tests/index.test.ts",
-          "testFramework": "node --test"
+          "path": "packages/rules/src/tests/index.test.ts"
         },
         {
           "hash": "d0fdfc1f1ac5346fdd59240f44c5d7063a361a259d3f3281d24056045b5edb6c",
@@ -5610,8 +4722,7 @@
             "packages/rules/src/parser.ts",
             "packages/rules/src/types.ts"
           ],
-          "path": "packages/rules/src/tests/parser.test.ts",
-          "testFramework": "node --test"
+          "path": "packages/rules/src/tests/parser.test.ts"
         },
         {
           "hash": "11f0ef20bc724d8c5ad4ddeba3c907fb9d471cb9dfc3122b91674ffc89a5a713",
@@ -5625,8 +4736,7 @@
             "packages/rules/src/signals.ts",
             "packages/rules/src/types.ts"
           ],
-          "path": "packages/rules/src/tests/signals.test.ts",
-          "testFramework": "node --test"
+          "path": "packages/rules/src/tests/signals.test.ts"
         },
         {
           "hash": "922b0faf7d5eb9f90eceff92739847f704612d6d06f7230dceda09093b339ceb",
@@ -5640,16 +4750,14 @@
             "packages/rules/src/split.ts",
             "packages/rules/src/types.ts"
           ],
-          "path": "packages/rules/src/tests/split.test.ts",
-          "testFramework": "node --test"
+          "path": "packages/rules/src/tests/split.test.ts"
         },
         {
           "hash": "c60e5e729e7d665ecaaf8d79e0ade1d2f9bd69458c81415fc5049eea78362936",
           "importsFiles": [
             "packages/rules/src/validate.ts"
           ],
-          "path": "packages/rules/src/tests/validate.test.ts",
-          "testFramework": "node --test"
+          "path": "packages/rules/src/tests/validate.test.ts"
         },
         {
           "hash": "6da33d7ec1b9523ccdd46d80a1661826d0f4e38ce3d83ce9f89051923564f13b",
@@ -5664,13 +4772,6 @@
           "exports": [
             "cmdValidate",
             "validateRules"
-          ],
-          "failurePaths": [
-            {
-              "in": "validateRules",
-              "kind": "catch",
-              "line": 75
-            }
           ],
           "hash": "a38074f6cac13e6407bfaf3bb29b4c99b8816ed36d6cf04d0c5e8f8e62067651",
           "importsFiles": [
@@ -5825,9 +4926,6 @@
       "outsideReads": 25,
       "outsideWrites": 3,
       "role": "docs",
-      "testRunners": [
-        "node --test"
-      ],
       "testedBy": 16,
       "unresolvedSites": 0
     },
@@ -5881,7 +4979,7 @@
           "path": "site/src/content/docs/handbook/reference.md"
         },
         {
-          "hash": "6c2b16430fd2f9f904f4d8f9c00bf6adaa224c8ada751df2ffcaf9e2887b8b33",
+          "hash": "ac7bab37c96cf180c7d0512ccd2e3eed0ef7097ef8a88fe4e70448e65fb8e444",
           "path": "site/src/content/docs/handbook/rituals.md"
         },
         {
@@ -5930,7 +5028,6 @@
       "checksCount": 0,
       "commands": [
         {
-          "dir": "",
           "job": "build-and-test",
           "programs": [
             "npx"
@@ -5938,7 +5035,6 @@
           "step": "Atlas check"
         },
         {
-          "dir": "",
           "job": "build-and-test",
           "programs": [
             "npm"
@@ -5946,7 +5042,6 @@
           "step": "3"
         },
         {
-          "dir": "",
           "job": "build-and-test",
           "programs": [
             "npm"
@@ -5954,7 +5049,6 @@
           "step": "4"
         },
         {
-          "dir": "",
           "job": "build-and-test",
           "programs": [
             "npm"
@@ -5962,7 +5056,6 @@
           "step": "5"
         },
         {
-          "dir": "",
           "job": "build-and-test",
           "programs": [
             "npx"
@@ -5970,7 +5063,6 @@
           "step": "Coverage report for Codecov"
         },
         {
-          "dir": "",
           "job": "build-and-test",
           "programs": [
             "npm"
@@ -5978,7 +5070,6 @@
           "step": "9"
         },
         {
-          "dir": "site",
           "job": "deploy-pages",
           "programs": [
             "npm"
@@ -5986,7 +5077,6 @@
           "step": "Install site dependencies"
         },
         {
-          "dir": "site",
           "job": "deploy-pages",
           "programs": [
             "npm"
@@ -6012,89 +5102,6 @@
             ],
             "event": "push"
           }
-        }
-      ],
-      "jobs": [
-        {
-          "basis": "declared",
-          "name": "build-and-test",
-          "runsOn": [
-            {
-              "labels": [
-                "ubuntu-latest"
-              ],
-              "platform": {
-                "cpu": "x64",
-                "libc": "glibc",
-                "os": "linux"
-              }
-            }
-          ],
-          "setup": [
-            {
-              "ranges": [
-                {
-                  "from": "20",
-                  "range": ">=20.0.0 <21.0.0-0"
-                },
-                {
-                  "from": "22",
-                  "range": ">=22.0.0 <23.0.0-0"
-                }
-              ],
-              "step": "1",
-              "uses": "actions/setup-node",
-              "version": "${{ matrix.node-version }}"
-            }
-          ]
-        },
-        {
-          "basis": "declared",
-          "name": "codecov",
-          "runsOn": [
-            {
-              "labels": [
-                "ubuntu-latest"
-              ],
-              "platform": {
-                "cpu": "x64",
-                "libc": "glibc",
-                "os": "linux"
-              }
-            }
-          ]
-        },
-        {
-          "basis": "declared",
-          "environment": {
-            "name": "github-pages"
-          },
-          "name": "deploy-pages",
-          "runsOn": [
-            {
-              "labels": [
-                "ubuntu-latest"
-              ],
-              "platform": {
-                "cpu": "x64",
-                "libc": "glibc",
-                "os": "linux"
-              }
-            }
-          ],
-          "setup": [
-            {
-              "ranges": [
-                {
-                  "from": "22",
-                  "range": ">=22.0.0 <23.0.0-0"
-                }
-              ],
-              "step": "1",
-              "uses": "actions/setup-node",
-              "version": "22"
-            }
-          ]
         }
       ],
       "landings": [],
@@ -6309,60 +5316,6 @@
         "releases": false
       },
       "stages": [],
-      "tests": [
-        {
-          "coverage": true,
-          "dir": "packages/kernel",
-          "files": 10,
-          "job": "build-and-test",
-          "junit": true,
-          "runner": "node --test",
-          "step": "5",
-          "through": [
-            "npm test",
-            "npm test (packages/kernel)"
-          ]
-        },
-        {
-          "coverage": true,
-          "dir": "packages/memories",
-          "files": 9,
-          "job": "build-and-test",
-          "junit": true,
-          "runner": "node --test",
-          "step": "5",
-          "through": [
-            "npm test",
-            "npm test (packages/memories)"
-          ]
-        },
-        {
-          "coverage": true,
-          "dir": "packages/rules",
-          "files": 7,
-          "job": "build-and-test",
-          "junit": true,
-          "runner": "node --test",
-          "step": "5",
-          "through": [
-            "npm test",
-            "npm test (packages/rules)"
-          ]
-        },
-        {
-          "coverage": true,
-          "dir": "packages/cli",
-          "files": 11,
-          "job": "build-and-test",
-          "junit": true,
-          "runner": "node --test",
-          "step": "5",
-          "through": [
-            "npm test",
-            "npm test (packages/cli)"
-          ]
-        }
-      ],
       "triggers": [
         {
           "event": "pull_request",
@@ -6417,7 +5370,6 @@
       "checksCount": 0,
       "commands": [
         {
-          "dir": "",
           "job": "release",
           "programs": [
             "echo",
@@ -6429,7 +5381,6 @@
           "step": "Install npm >=11.5 in sandbox for OIDC trusted-publishing auth"
         },
         {
-          "dir": "",
           "job": "release",
           "programs": [
             "echo",
@@ -6438,7 +5389,6 @@
           "step": "Verify tag matches packages/cli/package.json version"
         },
         {
-          "dir": "",
           "job": "release",
           "programs": [
             "npm"
@@ -6446,7 +5396,6 @@
           "step": "Install dependencies"
         },
         {
-          "dir": "",
           "job": "release",
           "programs": [
             "npm"
@@ -6454,7 +5403,6 @@
           "step": "Build (kernel -> memories -> rules -> cli)"
         },
         {
-          "dir": "",
           "job": "release",
           "programs": [
             "npm"
@@ -6462,7 +5410,6 @@
           "step": "Bundle the CLI (self-contained publish artifact)"
         },
         {
-          "dir": "",
           "job": "release",
           "programs": [
             "npm"
@@ -6470,7 +5417,6 @@
           "step": "Test"
         },
         {
-          "dir": "",
           "job": "release",
           "programs": [
             "npm"
@@ -6478,7 +5424,6 @@
           "step": "npm pack dry-run (verify shape)"
         },
         {
-          "dir": "",
           "job": "release",
           "programs": [
             "npm"
@@ -6486,7 +5431,6 @@
           "step": "Publish to npm with provenance (OIDC trusted publisher)"
         },
         {
-          "dir": "",
           "job": "release",
           "programs": [
             "gh"
@@ -6496,37 +5440,6 @@
       ],
       "elsewhere": [],
       "file": ".github/workflows/release.yml",
-      "jobs": [
-        {
-          "basis": "declared",
-          "name": "release",
-          "runsOn": [
-            {
-              "labels": [
-                "ubuntu-latest"
-              ],
-              "platform": {
-                "cpu": "x64",
-                "libc": "glibc",
-                "os": "linux"
-              }
-            }
-          ],
-          "setup": [
-            {
-              "ranges": [
-                {
-                  "from": "22",
-                  "range": ">=22.0.0 <23.0.0-0"
-                }
-              ],
-              "step": "Setup Node",
-              "uses": "actions/setup-node",
-              "version": "22"
-            }
-          ]
-        }
-      ],
       "landings": [],
       "mentions": [
         {
@@ -6731,52 +5644,6 @@
         "releases": true
       },
       "stages": [],
-      "tests": [
-        {
-          "dir": "packages/kernel",
-          "files": 10,
-          "job": "release",
-          "runner": "node --test",
-          "step": "Test",
-          "through": [
-            "npm test",
-            "npm test (packages/kernel)"
-          ]
-        },
-        {
-          "dir": "packages/memories",
-          "files": 9,
-          "job": "release",
-          "runner": "node --test",
-          "step": "Test",
-          "through": [
-            "npm test",
-            "npm test (packages/memories)"
-          ]
-        },
-        {
-          "dir": "packages/rules",
-          "files": 7,
-          "job": "release",
-          "runner": "node --test",
-          "step": "Test",
-          "through": [
-            "npm test",
-            "npm test (packages/rules)"
-          ]
-        },
-        {
-          "dir": "packages/cli",
-          "files": 11,
-          "job": "release",
-          "runner": "node --test",
-          "step": "Test",
-          "through": [
-            "npm test",
-            "npm test (packages/cli)"
-          ]
-        }
-      ],
       "triggers": [
         {
           "event": "push",
@@ -7003,9 +5870,9 @@
       "to": "kernel"
     }
   ],
-  "engine": "1.26.0",
+  "engine": "1.23.0",
   "generatedFrom": {
-    "commit": "a36f1ed763fef108b054c9c4a86e51371718d9e4",
+    "commit": "ee3cb4c6e5a46d43421ed10dae7a8a3484fd00b7",
     "tracked": 389
   },
   "landings": [
@@ -7056,8 +5923,7 @@
       "writers": [
         {
           "by": "packages/cli/src/refresh.ts",
-          "confidence": "ast",
-          "untrackedInputs": true
+          "confidence": "ast"
         }
       ]
     },
@@ -7173,6 +6039,12 @@
           "by": "packages/cli/esbuild.config.mjs",
           "call": "readFileSync",
           "confidence": "ast"
+        },
+        {
+          "by": "packages/cli/src/tests/public-hygiene.test.ts",
+          "call": "readdirSync",
+          "confidence": "ast",
+          "fromTests": true
         }
       ],
       "target": "packages/cli",
@@ -7523,12 +6395,5 @@
   "submodules": [],
   "symlinks": [],
   "testFiles": 48,
-  "unassigned": [],
-  "workspaces": [
-    "apps/hook",
-    "packages/cli",
-    "packages/kernel",
-    "packages/memories",
-    "packages/rules"
-  ]
+  "unassigned": []
 }

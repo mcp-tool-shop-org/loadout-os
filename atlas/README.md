@@ -1,14 +1,15 @@
 # loadout-os: how it works
 
-Mapped at 2026-11-26 from commit a36f1ed by Atlas 1.26.0.
+Mapped at 2026-11-26 from commit ee3cb4c by Atlas 1.23.0.
 
 ## What this is
 
 9 parts, mostly Markdown (236 files); code in TypeScript (91), CSS (8), JavaScript (7), Astro (4) and PowerShell (1). Work enters through 6 doors; the busiest is CI, which reaches 6 parts. It publishes @mcptoolshop/loadout-os to npm. It deploys a site to GitHub Pages. People run ai-loadout, claude-memories, claude-rules and loadout-os.
 
-## What changed since 2026-11-26 (e3fdae4)
+## What changed since 2026-11-26 (a36f1ed)
 
-Nothing structural changed since 2026-11-26; 13 files changed content.
+- packages/cli/ is now also read by packages/cli/src/tests/public-hygiene.test.ts.
+- 13 files changed content, across 3 parts.
 
 ## What comes in
 
@@ -53,11 +54,11 @@ CI writes only to .claude/loadout/, which is not tracked.
 
 ## What tends to change together
 
-- **packages/cli/src/pretool-rules.ts** and **packages/cli/src/tests/pretool.test.ts** changed together in 6 of 7 commits, inside the cli part.
-- **packages/cli/src/cli.ts** and **packages/cli/src/doctor.ts** changed together in 7 of 9 commits, inside the cli part.
-- **packages/cli/src/cli.ts** and **packages/cli/src/help.ts** changed together in 7 of 9 commits, inside the cli part.
-- **packages/cli/src/doctor.ts** and **packages/cli/src/help.ts** changed together in 6 of 8 commits, inside the cli part.
-- **packages/cli/src/index.ts** and **packages/cli/src/tests/fixtures.ts** changed together in 5 of 7 commits, inside the cli part.
+- **packages/cli/src/pretool-rules.ts** and **packages/cli/src/tests/pretool.test.ts** changed together in 5 of 5 commits, inside the cli part.
+- **packages/cli/src/cli.ts** and **packages/cli/src/doctor.ts** changed together in 6 of 8 commits, inside the cli part.
+- **packages/cli/src/cli.ts** and **packages/cli/src/help.ts** changed together in 6 of 8 commits, inside the cli part.
+- **packages/cli/src/doctor.ts** and **packages/cli/src/help.ts** changed together in 5 of 7 commits, inside the cli part.
+- **packages/cli/src/cli.ts** and **packages/cli/src/tests/doctor.test.ts** changed together in 6 of 9 commits, inside the cli part.
 
 3 files changed together with their own tests, as expected.
 
@@ -102,9 +103,9 @@ Read those in order to follow one pull request end to end.
 
 ## What this map cannot see
 
-- 6 writes and 29 reads use paths built at run time and are not named here.
+- 6 writes and 31 reads use paths built at run time and are not named here.
 - 1 write goes to places this repository does not track, so it is not listed as generated.
-- 7 writes and 74 reads go to a path their caller passes, not to this repository.
+- 7 writes and 66 reads go to a path their caller passes, not to this repository.
 - 2 writes and 32 reads go to the directory the command is run in, not to this repository.
 - 7 writes and 15 reads go to the home directory (.ai-loadout/) or a path their caller passes, not to this repository.
 - 8 writes and 1 read go to a temporary directory, not to this repository.

@@ -187,6 +187,13 @@ function collectGuardedFiles(): { nonTestFiles: string[]; testFiles: string[] } 
     }
   }
 
+  const cliDir = join(REPO_ROOT, "packages", "cli");
+  for (const entry of readdirSync(cliDir)) {
+    if (extname(entry).toLowerCase() === ".md") {
+      nonTestFiles.push(join(cliDir, entry));
+    }
+  }
+
   for (const dirName of ["site", ".claude"]) {
     const subDir = join(REPO_ROOT, dirName);
     try {
@@ -265,7 +272,7 @@ describe("public-hygiene: no internal roles, memory ids, project slug, personal 
     assert.deepEqual(hits, []);
   });
 
-  it("repository scan: packages/*/src/** (including tests), README*.md, site/**, .claude/**, ROADMAP.md, and CHANGELOG.md are clean", () => {
+  it("repository scan: packages/*/src/** (including tests), packages/cli/*.md, README*.md, site/**, .claude/**, ROADMAP.md, and CHANGELOG.md are clean", () => {
     const { nonTestFiles, testFiles } = collectGuardedFiles();
     assert.ok(nonTestFiles.length > 0, "Expected non-test guarded files");
     assert.ok(testFiles.length > 0, "Expected test files");

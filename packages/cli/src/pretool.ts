@@ -344,17 +344,26 @@ export function defaultRepliesDir(): string | undefined {
 
 // ── Path Normalization & Profile Resolution ───────────────────
 
+export interface NormalizePreToolPathOptions {
+  /** Override host platform (`process.platform` by default). MSYS `/<drive>/...` conversion runs only on `win32`. */
+  platform?: NodeJS.Platform;
+}
+
 /**
  * Normalize a path for prefix comparison:
  * - Strips surrounding quotes (`"..."` or `'...'`)
  * - Converts `\` to `/` and collapses duplicate slashes
  * - Strips Windows extended-length prefixes (`\\?\`, `//?/`)
  * - Expands leading `~`, `%USERPROFILE%`, `$USERPROFILE`, `${USERPROFILE}`, `$HOME`, `${HOME}`
- * - Converts MSYS `/e/...` drive prefixes to `e:/...`
- * - Folds case to lowercase on Windows or whenever a drive-letter prefix is present
+ * - Converts MSYS `/e/...` drive prefixes to `e:/...` on `win32`
+ * - Folds case to lowercase on `win32` or whenever a drive-letter prefix is present
  * - Strips trailing slashes (keeping `"/"` for POSIX root)
  */
-export function normalizePreToolPath(rawPath: string): string {
+export function normalizePreToolPath(
+  rawPath: string,
+  opts?: NormalizePreToolPathOptions,
+): string {
+  const platform = opts?.platform ?? process.platform;
   let p = rawPath.trim();
   if (!p) return "";
 
@@ -394,14 +403,14 @@ export function normalizePreToolPath(rawPath: string): string {
   }
 
   const msysMatch = p.match(/^\/([a-zA-Z])(\/.*|$)/);
-  if (msysMatch && (process.platform === "win32" || msysMatch[2].startsWith("/AI/"))) {
+  if (msysMatch && platform === "win32") {
     const drive = msysMatch[1].toLowerCase();
     const tail = msysMatch[2] || "/";
     p = `${drive}:${tail}`;
   }
 
   // Case-fold on Windows or for Windows drive-letter paths so cross-platform tests behave identically.
-  if (process.platform === "win32" || /^[a-zA-Z]:/.test(p)) {
+  if (platform === "win32" || /^[a-zA-Z]:/.test(p)) {
     p = p.toLowerCase();
   }
 
@@ -416,6 +425,12 @@ function isPlainObject(val: unknown): val is Record<string, unknown> {
 }
 
 const VALID_RULE_ACTIONS = new Set<RuleAction>(["block", "warn", "off"]);
+
+/** Rule IDs that are permanently warn-only (cannot be overridden to `"block"`, though `"off"` is allowed). */
+export const WARN_ONLY_RULE_IDS: ReadonlySet<string> = new Set([
+  "unreviewed-merge",
+  "release-reminder",
+]);
 
 const TOP_LEVEL_CONFIG_KEYS = new Set([
   "defaultStore",
@@ -722,6 +737,7 @@ export function loadProfileConfig(
           warn(`Invalid profiles.json 'rules.${rawRuleId}' value (${formatWarnValue(rawOverride)}): expected a JSON object; dropping rule override`);
           continue;
         }
+        const canonicalId = ruleAliases[rawRuleId] ?? rawRuleId;
         for (const k of Object.keys(rawOverride)) {
           if (!RULE_OVERRIDE_KEYS.has(k)) {
             warn(`Unknown key '${k}' in rule '${rawRuleId}'`);
@@ -739,6 +755,13 @@ export function loadProfileConfig(
                 warn(
                   `Invalid profiles.json 'rules.${rawRuleId}.action.${prof}' value (${formatWarnValue(act)}): expected 'block', 'warn', or 'off'; dropping invalid override`,
                 );
+                continue;
+              }
+              if (act === "block" && WARN_ONLY_RULE_IDS.has(canonicalId)) {
+                warn(
+                  `Invalid profiles.json 'rules.${canonicalId}.action.${prof}': block is not allowed for a warn-only rule; using warn`,
+                );
+                actionMap[prof] = "warn";
                 continue;
               }
               actionMap[prof] = act as RuleAction;
@@ -782,7 +805,6 @@ export function loadProfileConfig(
           override.skill !== undefined ||
           override.note !== undefined
         ) {
-          const canonicalId = ruleAliases[rawRuleId] ?? rawRuleId;
           const isCanonicalKey = canonicalId === rawRuleId;
           rules[canonicalId] = mergeRuleOverride(rules[canonicalId], override, isCanonicalKey);
         }
@@ -851,15 +873,19 @@ export function loadProfileConfig(
  * Resolve the active profile from `cwd` and a loaded `ProfileConfig`.
  * The longest matching path-boundary prefix wins; returns `"default"` when no prefix matches.
  */
-export function resolveProfile(cwd: string, config: ProfileConfig): ProfileName {
-  const normCwd = normalizePreToolPath(cwd);
+export function resolveProfile(
+  cwd: string,
+  config: ProfileConfig,
+  opts?: NormalizePreToolPathOptions,
+): ProfileName {
+  const normCwd = normalizePreToolPath(cwd, opts);
   if (!normCwd) return "default";
 
   let bestProfile: ProfileName = "default";
   let bestLen = -1;
 
   for (const [rawPrefix, profile] of Object.entries(config.profiles)) {
-    const normPrefix = normalizePreToolPath(rawPrefix);
+    const normPrefix = normalizePreToolPath(rawPrefix, opts);
     if (!normPrefix) continue;
 
     // Compare case-insensitively if either side is case-folded
@@ -1864,19 +1890,20 @@ export function resolveRuleAction(
 ): RuleAction {
   const override = findRuleOverride(rule.id, profileConfig);
   const cfgProfileAction = override?.action?.[profile];
-  if (cfgProfileAction === "block" || cfgProfileAction === "warn" || cfgProfileAction === "off") {
-    return cfgProfileAction;
-  }
   const cfgDefaultAction = override?.action?.default;
-  if (cfgDefaultAction === "block" || cfgDefaultAction === "warn" || cfgDefaultAction === "off") {
-    return cfgDefaultAction;
-  }
-
   const profileAction = rule.action[profile];
-  if (profileAction === "block" || profileAction === "warn" || profileAction === "off") {
-    return profileAction;
+  const rawAction =
+    cfgProfileAction === "block" || cfgProfileAction === "warn" || cfgProfileAction === "off"
+      ? cfgProfileAction
+      : cfgDefaultAction === "block" || cfgDefaultAction === "warn" || cfgDefaultAction === "off"
+        ? cfgDefaultAction
+        : profileAction === "block" || profileAction === "warn" || profileAction === "off"
+          ? profileAction
+          : rule.action.default;
+  if (WARN_ONLY_RULE_IDS.has(rule.id) && rawAction === "block") {
+    return "warn";
   }
-  return rule.action.default;
+  return rawAction;
 }
 
 export function resolveRuleMemory(
@@ -2027,11 +2054,9 @@ export function collectStorePaths(
   for (const p of profileConfig.storePaths) {
     if (p.trim()) out.add(p.trim());
   }
-  const envStores = process.env.AI_LOADOUT_STORE_PATHS?.trim();
-  if (envStores) {
-    for (const part of envStores.split(/[;,]/)) {
-      if (part.trim()) out.add(part.trim());
-    }
+  const envStore = process.env.AI_LOADOUT_STORE?.trim();
+  if (envStore) {
+    out.add(envStore);
   }
   if (extraStorePaths) {
     for (const p of extraStorePaths) {

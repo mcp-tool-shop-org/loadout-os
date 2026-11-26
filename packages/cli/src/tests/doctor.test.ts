@@ -6,13 +6,28 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readdirSync, existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import {
+  readdirSync,
+  existsSync,
+  readFileSync,
+  writeFileSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+} from "node:fs";
 import { dirname, join, resolve } from "node:path";
+import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 
-import { runDoctor, defaultDoctorPaths, type DoctorCheck, type DoctorPaths } from "../doctor.js";
+import {
+  runDoctor,
+  printDoctor,
+  defaultDoctorPaths,
+  type DoctorCheck,
+  type DoctorPaths,
+} from "../doctor.js";
 import { dispatch } from "../cli.js";
-import { makeSandbox } from "./fixtures.js";
+import { captureLog, makeSandbox } from "./fixtures.js";
 
 function pathsFor(sb: ReturnType<typeof makeSandbox>): DoctorPaths {
   return {
@@ -1213,13 +1228,17 @@ test("FIX-2 Item 1: doctor reports DEFAULT_STORE_REQUIRED fail when no default s
     });
     assert.equal(find(cfgDoc.checks, "store-validates").status, "pass");
 
-    // 3. AI_LOADOUT_STORE overrides defaultStore in profiles.json
+    // 3. defaultDoctorPaths leaves store empty; runDoctor resolves AI_LOADOUT_STORE over defaultStore in profiles.json
     const sbEnv = makeSandbox({ withSettingsHook: true });
     try {
       process.env.AI_LOADOUT_STORE = sbEnv.storeDir;
       process.env.AI_LOADOUT_PROFILES_PATH = cfgProfiles;
       const envPaths = defaultDoctorPaths(sbDecoy.dir, sb.dir);
-      assert.equal(envPaths.store, resolve(sbEnv.storeDir));
+      assert.equal(envPaths.store, "", "defaultDoctorPaths must leave store empty unless explicitly set");
+      const envDoc = runDoctor({ ...pathsFor(sb), store: "", profilesPath: cfgProfiles });
+      assert.equal(envDoc.store, resolve(sbEnv.storeDir));
+      assert.equal(envDoc.storeSource, "env");
+      assert.equal(find(envDoc.checks, "store-validates").status, "pass");
     } finally {
       sbEnv.cleanup();
     }
@@ -1231,5 +1250,178 @@ test("FIX-2 Item 1: doctor reports DEFAULT_STORE_REQUIRED fail when no default s
     else process.env.AI_LOADOUT_PROFILES_PATH = prevEnvProfiles;
     sb.cleanup();
     sbDecoy.cleanup();
+  }
+});
+
+test("F1: doctor store precedence (--store > AI_LOADOUT_STORE > active profiles defaultStore), --profiles isolation, and printDoctor store+source", () => {
+  const tempHome = mkdtempSync(join(tmpdir(), "loadout-doc-f1-home-"));
+  const sbAmbient = makeSandbox({ withSettingsHook: true });
+  const sbFlag = makeSandbox({ withSettingsHook: true });
+  const sbEnv = makeSandbox({ withSettingsHook: true });
+  const sbProf = makeSandbox({ withSettingsHook: true });
+
+  const prevHome = process.env.HOME;
+  const prevUserProfile = process.env.USERPROFILE;
+  const prevEnvStore = process.env.AI_LOADOUT_STORE;
+  const prevEnvProfiles = process.env.AI_LOADOUT_PROFILES_PATH;
+  const prevExitCode = process.exitCode;
+
+  try {
+    process.env.HOME = tempHome;
+    process.env.USERPROFILE = tempHome;
+    delete process.env.AI_LOADOUT_STORE;
+    delete process.env.AI_LOADOUT_PROFILES_PATH;
+
+    const loadoutDir = join(tempHome, ".ai-loadout");
+    mkdirSync(loadoutDir, { recursive: true });
+    const ambientProfiles = join(loadoutDir, "profiles.json");
+    const emptyProfiles = join(sbProf.dir, "empty-profiles.json");
+    const profWithStore = join(sbProf.dir, "with-store-profiles.json");
+
+    writeFileSync(emptyProfiles, JSON.stringify({}), "utf-8");
+    writeFileSync(profWithStore, JSON.stringify({ defaultStore: sbProf.storeDir }), "utf-8");
+
+    // (a) Ambient HOME/.ai-loadout/profiles.json has defaultStore, plus `doctor --profiles <file with no defaultStore>` -> DEFAULT_STORE_REQUIRED
+    writeFileSync(ambientProfiles, JSON.stringify({ defaultStore: sbAmbient.storeDir }), "utf-8");
+    process.exitCode = undefined;
+    const outA = captureLog(() =>
+      dispatch([
+        "doctor",
+        "--profiles",
+        emptyProfiles,
+        "--index",
+        sbAmbient.indexPath,
+        "--settings",
+        sbAmbient.settingsPath,
+        "--usage",
+        sbAmbient.usagePath,
+        "--skills",
+        sbAmbient.dir,
+        "--repo-root",
+        sbAmbient.dir,
+        "--json",
+      ]),
+    );
+    const parsedA = JSON.parse(outA) as {
+      ok: boolean;
+      store?: string;
+      checks: DoctorCheck[];
+    };
+    assert.equal(find(parsedA.checks, "store-validates").code, "DEFAULT_STORE_REQUIRED");
+    assert.equal(parsedA.store, undefined);
+    assert.equal(process.exitCode, 1);
+
+    // Confirm human printDoctor renders `(unconfigured)` when unset
+    const outUnconfigured = captureLog(() => printDoctor(parsedA, { ...pathsFor(sbAmbient), store: "" }));
+    assert.match(outUnconfigured, /store:\s+\(unconfigured\)/);
+
+    // (b) AI_LOADOUT_STORE beats profiles.json defaultStore for programmatic `runDoctor(defaultDoctorPaths())`
+    process.env.AI_LOADOUT_STORE = sbEnv.storeDir;
+    const defaultsB = defaultDoctorPaths(sbAmbient.dir, tempHome);
+    assert.equal(defaultsB.store, "");
+    const resB = runDoctor({
+      ...defaultsB,
+      index: sbEnv.indexPath,
+      settings: sbEnv.settingsPath,
+      usage: sbEnv.usagePath,
+      skillsDir: sbEnv.dir,
+      hookSource: sbEnv.hookSource,
+      hookMirror: sbEnv.hookMirror,
+    });
+    assert.equal(resB.store, resolve(sbEnv.storeDir));
+    assert.equal(resB.storeSource, "env");
+    const outEnv = captureLog(() => printDoctor(resB, defaultsB));
+    assert.ok(outEnv.includes(resolve(sbEnv.storeDir)));
+    assert.match(outEnv, /\(env\)/);
+
+    // (c) `--profiles <file with defaultStore>` while ambient HOME file has no defaultStore resolves to that store & printDoctor shows it
+    delete process.env.AI_LOADOUT_STORE;
+    writeFileSync(ambientProfiles, JSON.stringify({}), "utf-8");
+    process.exitCode = undefined;
+    const outC = captureLog(() =>
+      dispatch([
+        "doctor",
+        "--profiles",
+        profWithStore,
+        "--index",
+        sbProf.indexPath,
+        "--settings",
+        sbProf.settingsPath,
+        "--usage",
+        sbProf.usagePath,
+        "--skills",
+        sbProf.dir,
+        "--repo-root",
+        sbProf.dir,
+      ]),
+    );
+    assert.ok(outC.includes(resolve(sbProf.storeDir)), "printDoctor must display resolved --profiles store");
+    assert.match(outC, /\(profiles\)/);
+
+    // (d) `--store` beats AI_LOADOUT_STORE and `--profiles <file with defaultStore>`, and printDoctor shows `(flag)`
+    process.env.AI_LOADOUT_STORE = sbEnv.storeDir;
+    process.exitCode = undefined;
+    const outD = captureLog(() =>
+      dispatch([
+        "doctor",
+        "--store",
+        sbFlag.storeDir,
+        "--profiles",
+        profWithStore,
+        "--index",
+        sbFlag.indexPath,
+        "--settings",
+        sbFlag.settingsPath,
+        "--usage",
+        sbFlag.usagePath,
+        "--skills",
+        sbFlag.dir,
+        "--repo-root",
+        sbFlag.dir,
+      ]),
+    );
+    assert.ok(outD.includes(resolve(sbFlag.storeDir)), "printDoctor must display --store path");
+    assert.match(outD, /\(flag\)/);
+  } finally {
+    process.exitCode = prevExitCode;
+    if (prevHome === undefined) delete process.env.HOME;
+    else process.env.HOME = prevHome;
+    if (prevUserProfile === undefined) delete process.env.USERPROFILE;
+    else process.env.USERPROFILE = prevUserProfile;
+    if (prevEnvStore === undefined) delete process.env.AI_LOADOUT_STORE;
+    else process.env.AI_LOADOUT_STORE = prevEnvStore;
+    if (prevEnvProfiles === undefined) delete process.env.AI_LOADOUT_PROFILES_PATH;
+    else process.env.AI_LOADOUT_PROFILES_PATH = prevEnvProfiles;
+    rmSync(tempHome, { recursive: true, force: true });
+    sbAmbient.cleanup();
+    sbFlag.cleanup();
+    sbEnv.cleanup();
+    sbProf.cleanup();
+  }
+});
+
+test("F2: doctor surfaces config warnings when profiles.json tries to set block on warn-only rules", () => {
+  const sb = makeSandbox();
+  try {
+    const warnProfiles = join(sb.dir, "warn-only-block.json");
+    writeFileSync(
+      warnProfiles,
+      JSON.stringify({
+        rules: {
+          "unreviewed-merge": { action: { default: "block" } },
+          "release-reminder": { action: { release: "block", docs: "off" } },
+        },
+      }),
+      "utf-8",
+    );
+    const res = runDoctor({ ...pathsFor(sb), profilesPath: warnProfiles });
+    const cfgCheck = find(res.checks, "profiles-config");
+    assert.equal(cfgCheck.status, "warn");
+    assert.match(cfgCheck.message, /unreviewed-merge.*default/);
+    assert.match(cfgCheck.message, /release-reminder.*release/);
+    assert.match(cfgCheck.message, /block is not allowed for a warn-only rule; using warn/);
+    assert.doesNotMatch(cfgCheck.message, /docs/);
+  } finally {
+    sb.cleanup();
   }
 });

@@ -99,6 +99,7 @@ test("every dispatched leaf command has a per-command help entry", () => {
     "memories sync-summaries",
     "memories place",
     "memories move",
+    "memories split",
     "rules analyze",
     "rules validate",
     "rules stats",
@@ -186,4 +187,9 @@ test("Q7-2: --help, cli.ts memoriesHelp, README.md, and packages/cli/README.md m
     process.chdir(prevCwd);
     rmSync(scratch, { recursive: true, force: true });
   }
+});
+
+test("F7: refresh --help documents --allow-store-change", () => {
+  const out = captureLog(() => dispatch(["refresh", "--help"]));
+  assert.match(out, /--allow-store-change/);
 });
