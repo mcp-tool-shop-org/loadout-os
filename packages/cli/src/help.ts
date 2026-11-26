@@ -50,7 +50,7 @@ export const COMMAND_HELP: Record<string, HelpEntry> = {
       ["--lazy", "generate a lazy-load index (on-demand topic loading)"],
       ["--json", "machine-readable output"],
     ],
-    example: "loadout-os memories index ~/.claude/projects/F--AI/memory/MEMORY.md",
+    example: "loadout-os memories index ~/.claude/projects/my-project/memory/MEMORY.md",
     exits: [["0", "index generated"], ["1", "MEMORY.md missing / unreadable"]],
   },
   "memories validate": {

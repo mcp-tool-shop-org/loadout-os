@@ -68,6 +68,7 @@ export interface RuleConfigOverride {
 
 export interface QuoteGateConfig {
   speakers?: string[];
+  namedSpeakers?: string[];
   allowlistSuffixes?: string[];
 }
 
@@ -435,46 +436,59 @@ const PROFILE_ENTRY_KEYS = new Set([
 ]);
 
 const RULE_OVERRIDE_KEYS = new Set(["action", "memory", "skill", "note"]);
-const QUOTE_GATE_KEYS = new Set(["speakers", "allowlistSuffixes"]);
+const QUOTE_GATE_KEYS = new Set(["speakers", "namedSpeakers", "allowlistSuffixes"]);
 
-function readStringArray(
+function formatWarnValue(val: unknown): string {
+  try {
+    const raw = JSON.stringify(val);
+    return raw === undefined ? String(val) : raw;
+  } catch {
+    return String(val);
+  }
+}
+
+function readSoftStringArray(
   val: unknown,
-  code: string,
   context: string,
-): string[] {
+  warn: (msg: string) => void,
+): { valid: boolean; items: string[] } {
   if (!Array.isArray(val)) {
-    throw new ProfileConfigError(code, `${context} must be an array of strings`);
+    warn(`Invalid profiles.json '${context}' value (${formatWarnValue(val)}): expected an array of strings; ignoring`);
+    return { valid: false, items: [] };
   }
   const out: string[] = [];
-  for (const item of val) {
+  for (let i = 0; i < val.length; i++) {
+    const item = val[i];
     if (typeof item !== "string" || !item.trim()) {
-      throw new ProfileConfigError(code, `${context} must contain only non-empty strings`);
+      warn(`Invalid profiles.json '${context}[${i}]' value (${formatWarnValue(item)}): expected a non-empty string; skipping`);
+      continue;
     }
     out.push(item.trim());
   }
-  return out;
+  return { valid: true, items: out };
 }
 
-function readStringRecord(
+function readSoftStringRecord(
   val: unknown,
-  code: string,
   context: string,
+  warn: (msg: string) => void,
   allowEmptyValue: boolean = false,
-): Record<string, string> {
+): Record<string, string> | undefined {
   if (!isPlainObject(val)) {
-    throw new ProfileConfigError(code, `${context} must be a JSON object`);
+    warn(`Invalid profiles.json '${context}' value (${formatWarnValue(val)}): expected a JSON object; ignoring`);
+    return undefined;
   }
   const out: Record<string, string> = {};
   for (const [k, v] of Object.entries(val)) {
     if (!k.trim() || typeof v !== "string" || (!allowEmptyValue && !v.trim())) {
-      throw new ProfileConfigError(
-        code,
-        `${context} entry '${k}' must map to a ${allowEmptyValue ? "string" : "non-empty string"}`,
+      warn(
+        `Invalid profiles.json '${context}.${k}' value (${formatWarnValue(v)}): expected a ${allowEmptyValue ? "string" : "non-empty string"}; dropping entry`,
       );
+      continue;
     }
     out[k.trim()] = allowEmptyValue ? v.trimEnd() : v.trim();
   }
-  return out;
+  return Object.keys(out).length > 0 ? out : undefined;
 }
 
 function mergeRuleOverride(
@@ -580,109 +594,100 @@ export function loadProfileConfig(
 
   if (parsed.repliesDir !== undefined) {
     if (typeof parsed.repliesDir !== "string" || !parsed.repliesDir.trim()) {
-      throw new ProfileConfigError("INVALID_REPLIES_DIR", "profiles.json 'repliesDir' must be a non-empty string");
+      warn(`Invalid profiles.json 'repliesDir' value (${formatWarnValue(parsed.repliesDir)}): expected a non-empty string; ignoring`);
+    } else {
+      repliesDir = parsed.repliesDir.trim();
     }
-    repliesDir = parsed.repliesDir.trim();
   } else if (parsed.replies_dir !== undefined) {
     if (typeof parsed.replies_dir !== "string" || !parsed.replies_dir.trim()) {
-      throw new ProfileConfigError("INVALID_REPLIES_DIR", "profiles.json 'replies_dir' must be a non-empty string");
+      warn(`Invalid profiles.json 'replies_dir' value (${formatWarnValue(parsed.replies_dir)}): expected a non-empty string; ignoring`);
+    } else {
+      repliesDir = parsed.replies_dir.trim();
     }
-    repliesDir = parsed.replies_dir.trim();
   }
 
   if (parsed.stores !== undefined) {
-    storePaths.push(
-      ...readStringArray(parsed.stores, "INVALID_STORE_PATH", "profiles.json 'stores'"),
-    );
+    storePaths.push(...readSoftStringArray(parsed.stores, "stores", warn).items);
   }
 
   if (parsed.profiles !== undefined) {
     if (!isPlainObject(parsed.profiles)) {
-      throw new ProfileConfigError("INVALID_PROFILES_MAP", "profiles.json 'profiles' must be a JSON object");
-    }
-    for (const [prefix, val] of Object.entries(parsed.profiles)) {
-      if (typeof val === "string") {
-        if (!val.trim()) {
-          throw new ProfileConfigError(
-            "MISSING_PROFILE_NAME",
-            `Profile entry for '${prefix}' must not be an empty string`,
-          );
+      warn(`Invalid profiles.json 'profiles' value (${formatWarnValue(parsed.profiles)}): expected a JSON object; ignoring`);
+    } else {
+      for (const [prefix, val] of Object.entries(parsed.profiles)) {
+        if (typeof val === "string") {
+          if (!val.trim()) {
+            warn(`Invalid profiles.json 'profiles.${prefix}' value (${formatWarnValue(val)}): expected a non-empty string; dropping entry`);
+            continue;
+          }
+          profiles[prefix] = val.trim();
+          continue;
         }
-        profiles[prefix] = val.trim();
-        continue;
-      }
-      if (!isPlainObject(val)) {
-        throw new ProfileConfigError(
-          "INVALID_PROFILE_ENTRY",
-          `Invalid profile entry value for prefix '${prefix}'`,
-        );
-      }
-      for (const k of Object.keys(val)) {
-        if (!PROFILE_ENTRY_KEYS.has(k)) {
-          warn(`Unknown key '${k}' in profile entry '${prefix}'`);
+        if (!isPlainObject(val)) {
+          warn(`Invalid profiles.json 'profiles.${prefix}' value (${formatWarnValue(val)}): expected a string or object; dropping entry`);
+          continue;
         }
-      }
-      if (typeof val.profile !== "string" || !val.profile.trim()) {
-        throw new ProfileConfigError(
-          "MISSING_PROFILE_NAME",
-          `Profile entry for '${prefix}' is missing a non-empty 'profile' string`,
-        );
-      }
-      const profileName = val.profile.trim();
-      profiles[prefix] = profileName;
+        for (const k of Object.keys(val)) {
+          if (!PROFILE_ENTRY_KEYS.has(k)) {
+            warn(`Unknown key '${k}' in profile entry '${prefix}'`);
+          }
+        }
+        if (typeof val.profile !== "string" || !val.profile.trim()) {
+          warn(`Invalid profiles.json 'profiles.${prefix}.profile' value (${formatWarnValue(val.profile)}): expected a non-empty string; dropping entry`);
+          continue;
+        }
+        const profileName = val.profile.trim();
+        profiles[prefix] = profileName;
 
-      if (val.worktrees !== undefined) {
-        for (const pfx of readStringArray(
-          val.worktrees,
-          "INVALID_PROFILE_PREFIXES",
-          `Profile entry '${prefix}'.worktrees`,
-        )) {
-          profiles[pfx] = profileName;
+        if (val.worktrees !== undefined) {
+          for (const pfx of readSoftStringArray(
+            val.worktrees,
+            `profiles.${prefix}.worktrees`,
+            warn,
+          ).items) {
+            profiles[pfx] = profileName;
+          }
         }
-      }
-      if (val.prefixes !== undefined) {
-        for (const pfx of readStringArray(
-          val.prefixes,
-          "INVALID_PROFILE_PREFIXES",
-          `Profile entry '${prefix}'.prefixes`,
-        )) {
-          profiles[pfx] = profileName;
+        if (val.prefixes !== undefined) {
+          for (const pfx of readSoftStringArray(
+            val.prefixes,
+            `profiles.${prefix}.prefixes`,
+            warn,
+          ).items) {
+            profiles[pfx] = profileName;
+          }
         }
-      }
 
-      const entryRepliesDir = val.repliesDir ?? val.replies_dir;
-      if (entryRepliesDir !== undefined) {
-        if (typeof entryRepliesDir !== "string" || !entryRepliesDir.trim()) {
-          throw new ProfileConfigError(
-            "INVALID_REPLIES_DIR",
-            `Profile entry '${prefix}'.repliesDir must be a non-empty string`,
-          );
+        const entryRepliesDir = val.repliesDir ?? val.replies_dir;
+        if (entryRepliesDir !== undefined) {
+          if (typeof entryRepliesDir !== "string" || !entryRepliesDir.trim()) {
+            warn(`Invalid profiles.json 'profiles.${prefix}.repliesDir' value (${formatWarnValue(entryRepliesDir)}): expected a non-empty string; ignoring`);
+          } else if (!repliesDir) {
+            repliesDir = entryRepliesDir.trim();
+          }
         }
-        if (!repliesDir) repliesDir = entryRepliesDir.trim();
-      }
 
-      if (val.store !== undefined) {
-        if (typeof val.store !== "string" || !val.store.trim()) {
-          throw new ProfileConfigError(
-            "INVALID_STORE_PATH",
-            `Profile entry '${prefix}'.store must be a non-empty string`,
-          );
+        if (val.store !== undefined) {
+          if (typeof val.store !== "string" || !val.store.trim()) {
+            warn(`Invalid profiles.json 'profiles.${prefix}.store' value (${formatWarnValue(val.store)}): expected a non-empty string; ignoring`);
+          } else {
+            const st = val.store.trim();
+            storePaths.push(st);
+            if (!profileStores[profileName]) profileStores[profileName] = st;
+            projectStores[prefix] = st;
+          }
         }
-        const st = val.store.trim();
-        storePaths.push(st);
-        if (!profileStores[profileName]) profileStores[profileName] = st;
-        projectStores[prefix] = st;
-      }
 
-      if (val.stores !== undefined) {
-        for (const st of readStringArray(
-          val.stores,
-          "INVALID_STORE_PATH",
-          `Profile entry '${prefix}'.stores`,
-        )) {
-          storePaths.push(st);
-          if (!profileStores[profileName]) profileStores[profileName] = st;
-          if (!projectStores[prefix]) projectStores[prefix] = st;
+        if (val.stores !== undefined) {
+          for (const st of readSoftStringArray(
+            val.stores,
+            `profiles.${prefix}.stores`,
+            warn,
+          ).items) {
+            storePaths.push(st);
+            if (!profileStores[profileName]) profileStores[profileName] = st;
+            if (!projectStores[prefix]) projectStores[prefix] = st;
+          }
         }
       }
     }
@@ -690,105 +695,127 @@ export function loadProfileConfig(
 
   const ruleAliases =
     parsed.ruleAliases !== undefined
-      ? readStringRecord(parsed.ruleAliases, "INVALID_RULE_ALIASES", "profiles.json 'ruleAliases'")
+      ? (readSoftStringRecord(parsed.ruleAliases, "ruleAliases", warn) ?? {})
       : {};
 
   const rules: Record<string, RuleConfigOverride> = {};
   if (parsed.rules !== undefined) {
     if (!isPlainObject(parsed.rules)) {
-      throw new ProfileConfigError("INVALID_RULES_MAP", "profiles.json 'rules' must be a JSON object");
-    }
-    for (const [rawRuleId, rawOverride] of Object.entries(parsed.rules)) {
-      if (!isPlainObject(rawOverride)) {
-        throw new ProfileConfigError(
-          "INVALID_RULE_OVERRIDE",
-          `profiles.json 'rules.${rawRuleId}' must be a JSON object`,
-        );
-      }
-      for (const k of Object.keys(rawOverride)) {
-        if (!RULE_OVERRIDE_KEYS.has(k)) {
-          warn(`Unknown key '${k}' in rule '${rawRuleId}'`);
+      warn(`Invalid profiles.json 'rules' value (${formatWarnValue(parsed.rules)}): expected a JSON object; ignoring`);
+    } else {
+      for (const [rawRuleId, rawOverride] of Object.entries(parsed.rules)) {
+        if (!isPlainObject(rawOverride)) {
+          warn(`Invalid profiles.json 'rules.${rawRuleId}' value (${formatWarnValue(rawOverride)}): expected a JSON object; dropping rule override`);
+          continue;
         }
-      }
-
-      const override: RuleConfigOverride = {};
-      if (rawOverride.action !== undefined) {
-        if (!isPlainObject(rawOverride.action)) {
-          throw new ProfileConfigError(
-            "INVALID_RULE_ACTION",
-            `profiles.json 'rules.${rawRuleId}.action' must be a JSON object`,
-          );
-        }
-        const actionMap: Record<string, RuleAction> = {};
-        for (const [prof, act] of Object.entries(rawOverride.action)) {
-          if (typeof act !== "string" || !VALID_RULE_ACTIONS.has(act as RuleAction)) {
-            throw new ProfileConfigError(
-              "INVALID_RULE_ACTION",
-              `profiles.json 'rules.${rawRuleId}.action.${prof}' must be 'block', 'warn', or 'off'`,
-            );
+        for (const k of Object.keys(rawOverride)) {
+          if (!RULE_OVERRIDE_KEYS.has(k)) {
+            warn(`Unknown key '${k}' in rule '${rawRuleId}'`);
           }
-          actionMap[prof] = act as RuleAction;
         }
-        override.action = actionMap;
-      }
 
-      if (rawOverride.memory !== undefined) {
-        override.memory = readStringRecord(
-          rawOverride.memory,
-          "INVALID_RULE_MEMORY",
-          `profiles.json 'rules.${rawRuleId}.memory'`,
-        );
-      }
+        const override: RuleConfigOverride = {};
+        if (rawOverride.action !== undefined) {
+          if (!isPlainObject(rawOverride.action)) {
+            warn(`Invalid profiles.json 'rules.${rawRuleId}.action' value (${formatWarnValue(rawOverride.action)}): expected a JSON object; ignoring`);
+          } else {
+            const actionMap: Record<string, RuleAction> = {};
+            for (const [prof, act] of Object.entries(rawOverride.action)) {
+              if (typeof act !== "string" || !VALID_RULE_ACTIONS.has(act as RuleAction)) {
+                warn(
+                  `Invalid profiles.json 'rules.${rawRuleId}.action.${prof}' value (${formatWarnValue(act)}): expected 'block', 'warn', or 'off'; dropping invalid override`,
+                );
+                continue;
+              }
+              actionMap[prof] = act as RuleAction;
+            }
+            if (Object.keys(actionMap).length > 0) {
+              override.action = actionMap;
+            }
+          }
+        }
 
-      if (rawOverride.skill !== undefined) {
-        if (typeof rawOverride.skill !== "string" || !rawOverride.skill.trim()) {
-          throw new ProfileConfigError(
-            "INVALID_RULE_SKILL",
-            `profiles.json 'rules.${rawRuleId}.skill' must be a non-empty string`,
+        if (rawOverride.memory !== undefined) {
+          const memMap = readSoftStringRecord(
+            rawOverride.memory,
+            `rules.${rawRuleId}.memory`,
+            warn,
           );
+          if (memMap) override.memory = memMap;
         }
-        override.skill = rawOverride.skill.trim();
-      }
 
-      if (rawOverride.note !== undefined) {
-        override.note = readStringRecord(
-          rawOverride.note,
-          "INVALID_RULE_NOTE",
-          `profiles.json 'rules.${rawRuleId}.note'`,
-          true,
-        );
-      }
+        if (rawOverride.skill !== undefined) {
+          if (typeof rawOverride.skill !== "string" || !rawOverride.skill.trim()) {
+            warn(`Invalid profiles.json 'rules.${rawRuleId}.skill' value (${formatWarnValue(rawOverride.skill)}): expected a non-empty string; ignoring`);
+          } else {
+            override.skill = rawOverride.skill.trim();
+          }
+        }
 
-      const canonicalId = ruleAliases[rawRuleId] ?? rawRuleId;
-      const isCanonicalKey = canonicalId === rawRuleId;
-      rules[canonicalId] = mergeRuleOverride(rules[canonicalId], override, isCanonicalKey);
+        if (rawOverride.note !== undefined) {
+          const noteMap = readSoftStringRecord(
+            rawOverride.note,
+            `rules.${rawRuleId}.note`,
+            warn,
+            true,
+          );
+          if (noteMap) override.note = noteMap;
+        }
+
+        if (
+          override.action !== undefined ||
+          override.memory !== undefined ||
+          override.skill !== undefined ||
+          override.note !== undefined
+        ) {
+          const canonicalId = ruleAliases[rawRuleId] ?? rawRuleId;
+          const isCanonicalKey = canonicalId === rawRuleId;
+          rules[canonicalId] = mergeRuleOverride(rules[canonicalId], override, isCanonicalKey);
+        }
+      }
     }
   }
 
   let quoteGate: QuoteGateConfig | undefined;
   if (parsed.quoteGate !== undefined) {
     if (!isPlainObject(parsed.quoteGate)) {
-      throw new ProfileConfigError("INVALID_QUOTE_GATE", "profiles.json 'quoteGate' must be a JSON object");
-    }
-    for (const k of Object.keys(parsed.quoteGate)) {
-      if (!QUOTE_GATE_KEYS.has(k)) {
-        warn(`Unknown key '${k}' in quoteGate`);
+      warn(`Invalid profiles.json 'quoteGate' value (${formatWarnValue(parsed.quoteGate)}): expected a JSON object; ignoring`);
+    } else {
+      for (const k of Object.keys(parsed.quoteGate)) {
+        if (!QUOTE_GATE_KEYS.has(k)) {
+          warn(`Unknown key '${k}' in quoteGate`);
+        }
       }
-    }
-    quoteGate = {};
-    if (parsed.quoteGate.speakers !== undefined) {
-      quoteGate.speakers = readStringArray(
-        parsed.quoteGate.speakers,
-        "INVALID_QUOTE_GATE_SPEAKERS",
-        "profiles.json 'quoteGate.speakers'",
-      );
-    }
-    if (parsed.quoteGate.allowlistSuffixes !== undefined) {
-      quoteGate.allowlistSuffixes = readStringArray(
-        parsed.quoteGate.allowlistSuffixes,
-        "INVALID_QUOTE_GATE_ALLOWLIST",
-        "profiles.json 'quoteGate.allowlistSuffixes'",
-      );
+      const nextGate: QuoteGateConfig = {};
+      if (parsed.quoteGate.speakers !== undefined) {
+        const res = readSoftStringArray(parsed.quoteGate.speakers, "quoteGate.speakers", warn);
+        if (res.valid && (res.items.length > 0 || (parsed.quoteGate.speakers as unknown[]).length === 0)) {
+          nextGate.speakers = res.items;
+        }
+      }
+      if (parsed.quoteGate.namedSpeakers !== undefined) {
+        const res = readSoftStringArray(parsed.quoteGate.namedSpeakers, "quoteGate.namedSpeakers", warn);
+        if (res.valid && (res.items.length > 0 || (parsed.quoteGate.namedSpeakers as unknown[]).length === 0)) {
+          nextGate.namedSpeakers = res.items;
+        }
+      }
+      if (parsed.quoteGate.allowlistSuffixes !== undefined) {
+        const res = readSoftStringArray(
+          parsed.quoteGate.allowlistSuffixes,
+          "quoteGate.allowlistSuffixes",
+          warn,
+        );
+        if (res.valid && (res.items.length > 0 || (parsed.quoteGate.allowlistSuffixes as unknown[]).length === 0)) {
+          nextGate.allowlistSuffixes = res.items;
+        }
+      }
+      if (
+        nextGate.speakers !== undefined ||
+        nextGate.namedSpeakers !== undefined ||
+        nextGate.allowlistSuffixes !== undefined
+      ) {
+        quoteGate = nextGate;
+      }
     }
   }
 
@@ -2231,9 +2258,9 @@ export function runPreTool(opts: PreToolOptions = {}): PreToolResult {
           typeof rule.message === "function"
             ? rule.message(res, matchInput)
             : rule.message;
+        const cappedBase = capRuleMessage(rawMsg);
         const noteLine = resolveRuleNote(rule, profile, profileConfig);
-        const withNote = noteLine ? `${rawMsg}\n${noteLine}` : rawMsg;
-        const msg = capRuleMessage(withNote);
+        const msg = noteLine ? `${cappedBase}\n${noteLine}` : cappedBase;
 
         if (action === "block") {
           blockMatched = true;

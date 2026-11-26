@@ -66,7 +66,7 @@ export const config: SiteConfig = {
         },
         {
           title: 'Index a memory store',
-          code: '# MEMORY.md → dispatch table\nloadout-os memories index ~/.claude/projects/F--AI/memory/MEMORY.md',
+          code: '# MEMORY.md → dispatch table\nloadout-os memories index ~/.claude/projects/my-project/memory/MEMORY.md',
         },
         {
           title: 'See where context goes',

@@ -9,7 +9,7 @@
       "externals": 0,
       "files": [
         {
-          "hash": "57087f7783944e70f42e9c8050a9c5c1f41d7476568a5b2376a848fb657b5c09",
+          "hash": "0f41db8fc63d6a37f4c58e77da832b4f0735713ae8f9f7207c4ee667157ddc39",
           "path": ".claude/CLAUDE.md"
         }
       ],
@@ -140,7 +140,7 @@
               "line": 534
             }
           ],
-          "hash": "b08c47a77fe6d0865de0030a1f70423189ef5a376e2ca368ac17426110cdeb0d",
+          "hash": "11ee2433096d9f6b789880650a1a3ec9efc3a96574572f421942f6551668396a",
           "importOrder": [
             "packages/cli/src/console.ts",
             "packages/cli/src/commands.ts",
@@ -273,76 +273,78 @@
             {
               "in": "resolveScaleThresholds",
               "kind": "catch",
-              "line": 135
+              "line": 142
             },
             {
               "in": "loadIndex",
               "kind": "catch",
-              "line": 243
+              "line": 253
             },
             {
               "in": "runDoctor",
               "kind": "catch",
-              "line": 360
+              "line": 370
             },
             {
               "in": "runDoctor",
               "kind": "catch",
-              "line": 364
+              "line": 374
             },
             {
               "in": "runDoctor",
               "kind": "catch",
-              "line": 398
+              "line": 408
             },
             {
               "in": "runDoctor",
               "kind": "catch",
-              "line": 472
+              "line": 482
             },
             {
               "in": "runDoctor",
               "kind": "catch",
-              "line": 503
+              "line": 513
             },
             {
               "in": "runDoctor",
               "kind": "catch",
-              "line": 586
+              "line": 596
             },
             {
               "in": "runDoctor",
               "kind": "catch",
-              "line": 631
+              "line": 641
             },
             {
               "in": "loadStoreMemoryIds",
               "kind": "catch",
-              "line": 664
+              "line": 674
             },
             {
               "in": "runDoctor",
               "kind": "catch",
-              "line": 680
+              "line": 693
             },
             {
               "in": "runDoctor",
               "kind": "catch",
-              "line": 824
+              "line": 881
             }
           ],
-          "hash": "878142e5ba6c3f036ed6d8ccae99534cd2ac22e7c5a1a985d4bd4e3f2dcd290d",
+          "hash": "933b9369d9c376a96cbf7323075267c38e91dd6b464e96058a6cacf16670c599",
           "importOrder": [
             "packages/memories/src/index.ts",
             "packages/kernel/src/index.ts",
             "packages/cli/src/console.ts",
             "packages/cli/src/pretool.ts",
-            "packages/cli/src/pretool-rules.ts"
+            "packages/cli/src/pretool-rules.ts",
+            "packages/cli/src/refresh.ts"
           ],
           "importsFiles": [
             "packages/cli/src/console.ts",
             "packages/cli/src/pretool-rules.ts",
             "packages/cli/src/pretool.ts",
+            "packages/cli/src/refresh.ts",
             "packages/kernel/src/index.ts",
             "packages/memories/src/index.ts"
           ],
@@ -354,7 +356,7 @@
             "renderCommandHelp",
             "wantsHelp"
           ],
-          "hash": "ae785cc1d8f8c455f103386d2bd70ac710e3451f9a4a4ab7897ef0abbe88400f",
+          "hash": "577a5de643658622e0b29d4ab863649075015f7e272e846059c253982d3324a8",
           "importsFiles": [
             "packages/cli/src/console.ts"
           ],
@@ -436,7 +438,7 @@
               "line": 763
             }
           ],
-          "hash": "2926b290a205ec24f9e27b2b6c1cd7edcb1522591976038a4f76133e54ff3922",
+          "hash": "bb9a7d24d7e994088ed59b2c83f4de6c3900f7ab30bb69c6e0575421c590c937",
           "importOrder": [
             "packages/kernel/src/index.ts",
             "packages/cli/src/console.ts",
@@ -450,7 +452,7 @@
           "path": "packages/cli/src/hook.ts"
         },
         {
-          "hash": "d9262bf03383b3765b332a9c4ea5b08b573ad1fc2a69f3d7f7545df2c636d7e7",
+          "hash": "2fd7f5cdc35ab4b4ad98a8dbd2a198f1732c68eabe1f52bda10c77480d2ba377",
           "importOrder": [
             "packages/cli/src/cli.ts",
             "packages/cli/src/console.ts",
@@ -479,6 +481,7 @@
         {
           "exports": [
             "bashTargetsQuoteGateAllowlisted",
+            "compileQuoteGatePatterns",
             "extractToolStampedFields",
             "findQuoteViolations",
             "hasReviewPassAtHead",
@@ -486,9 +489,9 @@
             "isQuoteGateAllowlisted",
             "isSpeechSpan",
             "isStoreOrBoardFile",
-            "matchDirectorQuote",
             "matchFutureStamp",
             "matchMemoryShellWrite",
+            "matchQuoteGate",
             "matchReleaseReminder",
             "matchUnreviewedMerge",
             "parseToolStampedTime",
@@ -500,30 +503,30 @@
             {
               "in": "hasReviewPassAtHead",
               "kind": "catch",
-              "line": 224
+              "line": 229
             },
             {
               "in": "hasReviewPassAtHead",
               "kind": "catch",
-              "line": 257
+              "line": 262
             },
             {
               "in": "hasReviewPassAtHead",
               "kind": "catch",
-              "line": 263
+              "line": 268
             },
             {
               "in": "isReadOnlyScriptInvocation",
               "kind": "catch",
-              "line": 1108
+              "line": 1234
             },
             {
               "in": "reconstructEditedLinesFromDisk",
               "kind": "catch",
-              "line": 1939
+              "line": 2062
             }
           ],
-          "hash": "695345b73e1329611d1fba5d54e1d2841e1ed451afe61604876045076da46f10",
+          "hash": "720343aa5d52ddae68838d19af37d82176d6ccf8531b6daa4e86f59697169370",
           "importsFiles": [
             "packages/cli/src/pretool.ts"
           ],
@@ -535,102 +538,112 @@
             "capRuleMessage",
             "collectStorePaths",
             "defaultDecisionLogPath",
+            "defaultProfilesPath",
             "defaultRepliesDir",
-            "defaultSeatsPath",
             "extractSedWriteTargets",
             "extractWritePayload",
+            "formatMemorySuffix",
             "hashToolInput",
             "isBashCommandReadOnly",
             "isReadOnlyPassThrough",
             "isSegmentReadOnly",
-            "loadSeatConfig",
+            "loadProfileConfig",
             "normalizePreToolPath",
             "parseBashCommand",
             "parsePreToolStdin",
             "prenormalizeStorePaths",
+            "readDecisionLog",
+            "resolveCanonicalRuleId",
+            "resolveProfile",
             "resolveRuleAction",
             "resolveRuleMemory",
-            "resolveSeat",
+            "resolveRuleNote",
+            "resolveRuleSkill",
             "runPreTool"
           ],
           "failurePaths": [
             {
-              "in": "loadSeatConfig",
+              "in": "formatWarnValue",
               "kind": "catch",
-              "line": 400
+              "line": 445
             },
             {
-              "in": "loadSeatConfig",
-              "kind": "throw",
-              "line": 404
+              "in": "loadProfileConfig",
+              "kind": "catch",
+              "line": 542
             },
             {
-              "in": "loadSeatConfig",
+              "in": "loadProfileConfig",
               "kind": "throw",
-              "line": 409
+              "line": 554
             },
             {
-              "in": "parseSeatEntries",
-              "kind": "throw",
-              "line": 438
+              "in": "loadProfileConfig",
+              "kind": "catch",
+              "line": 563
             },
             {
-              "in": "parseSeatEntries",
+              "in": "loadProfileConfig",
               "kind": "throw",
-              "line": 448
+              "line": 564
             },
             {
-              "in": "parseSeatEntries",
+              "in": "loadProfileConfig",
               "kind": "throw",
-              "line": 485
-            },
-            {
-              "in": "parsePreToolStdin",
-              "kind": "throw",
-              "line": 551
+              "line": 571
             },
             {
               "in": "parsePreToolStdin",
               "kind": "throw",
-              "line": 555
+              "line": 876
             },
             {
               "in": "parsePreToolStdin",
               "kind": "throw",
-              "line": 559
+              "line": 880
             },
             {
               "in": "parsePreToolStdin",
               "kind": "throw",
-              "line": 566
+              "line": 884
+            },
+            {
+              "in": "parsePreToolStdin",
+              "kind": "throw",
+              "line": 891
             },
             {
               "in": "parseBashCommand",
               "kind": "throw",
-              "line": 890
+              "line": 1215
+            },
+            {
+              "in": "readDecisionLog",
+              "kind": "catch",
+              "line": 1996
             },
             {
               "in": "safeWriteLog",
               "kind": "catch",
-              "line": 1633
+              "line": 2102
             },
             {
               "in": "runPreTool",
               "kind": "throw",
-              "line": 1649
+              "line": 2118
             },
             {
               "in": "runPreTool",
               "kind": "catch",
-              "line": 1710
+              "line": 2183
             },
             {
               "in": "runPreTool",
               "kind": "catch",
-              "line": 1796
+              "line": 2272
             }
           ],
-          "hash": "bf685aa0a5bac60f64b2975bb0cb489d95960643765bfaef66261eef323b58c3",
+          "hash": "1abf9b7131a84932c19ae4422ea038e7b9b09b60a5ad253504cac30fe33197fc",
           "importsFiles": [
             "packages/cli/src/pretool-rules.ts"
           ],
@@ -639,6 +652,8 @@
         {
           "exports": [
             "defaultDest",
+            "defaultStore",
+            "deriveClaudeProjectSlug",
             "dispatchRefresh",
             "extractIndexSourceStore",
             "lockFilePathForKey",
@@ -657,67 +672,62 @@
             {
               "in": "withFileLock",
               "kind": "catch",
-              "line": 217
+              "line": 237
             },
             {
               "in": "withFileLock",
               "kind": "throw",
-              "line": 220
+              "line": 240
             },
             {
               "in": "withFileLock",
               "kind": "catch",
-              "line": 229
+              "line": 249
             },
             {
               "in": "withFileLock",
               "kind": "throw",
-              "line": 238
+              "line": 258
             },
             {
               "in": "withFileLock",
               "kind": "catch",
-              "line": 250
+              "line": 270
             },
             {
               "in": "withFileLock",
               "kind": "catch",
-              "line": 255
+              "line": 275
             },
             {
               "in": "runGit",
               "kind": "throw",
-              "line": 279
+              "line": 299
             },
             {
               "in": "runGit",
               "kind": "throw",
-              "line": 285
+              "line": 305
             },
             {
               "in": "runSnapshotAndMirror",
               "kind": "throw",
-              "line": 324
+              "line": 344
             },
             {
               "in": "runSnapshotAndMirror",
               "kind": "catch",
-              "line": 341
+              "line": 361
             },
             {
               "in": "runSnapshotAndMirror",
               "kind": "catch",
-              "line": 353
+              "line": 373
             },
             {
               "in": "runSnapshotAndMirror",
               "kind": "throw",
-              "line": 360
-            },
-            {
-              "in": "runSnapshotAndMirror",
-              "kind": "throw",
-              "line": 391
+              "line": 380
             },
             {
               "in": "runSnapshotAndMirror",
@@ -727,85 +737,90 @@
             {
               "in": "runSnapshotAndMirror",
               "kind": "throw",
-              "line": 421
+              "line": 431
             },
             {
               "in": "runSnapshotAndMirror",
               "kind": "throw",
-              "line": 430
+              "line": 441
+            },
+            {
+              "in": "runSnapshotAndMirror",
+              "kind": "throw",
+              "line": 450
             },
             {
               "in": "extractIndexSourceStore",
               "kind": "catch",
-              "line": 502
+              "line": 522
             },
             {
               "in": "resolveStoreForProject",
               "kind": "catch",
-              "line": 533
+              "line": 553
             },
             {
               "in": "runRefresh",
               "kind": "throw",
-              "line": 556
+              "line": 576
             },
             {
               "in": "runRefresh",
               "kind": "throw",
-              "line": 582
+              "line": 602
             },
             {
               "in": "runRefresh",
               "kind": "throw",
-              "line": 589
+              "line": 609
             },
             {
               "in": "runRefresh",
               "kind": "throw",
-              "line": 600
+              "line": 620
             },
             {
               "in": "runRefresh",
               "kind": "throw",
-              "line": 638
+              "line": 658
             },
             {
               "in": "runRefresh",
               "kind": "catch",
-              "line": 715
+              "line": 735
             },
             {
               "in": "runRefresh",
               "kind": "catch",
-              "line": 718
+              "line": 738
             },
             {
               "in": "runRefresh",
               "kind": "catch",
-              "line": 724
+              "line": 744
             },
             {
               "in": "runRefresh",
               "kind": "throw",
-              "line": 728
+              "line": 748
             },
             {
               "in": "runRefresh",
               "kind": "throw",
-              "line": 729
+              "line": 749
             },
             {
               "in": "dispatchRefresh",
               "kind": "catch",
-              "line": 913
+              "line": 933
             },
             {
               "in": "dispatchRefresh",
               "kind": "throw",
-              "line": 924
+              "line": 944
             }
           ],
-          "hash": "2a4744c2e9c8199b9e8ce6cc70937a6052d5b36dfd43d033e49b11644a943ddc",
+          "hash": "522ba82c49bca4c4d89a557b303540eb3a198c836ef622615c1c0a842e7cf682",
           "importOrder": [
             "packages/memories/src/index.ts",
             "packages/kernel/src/index.ts",
@@ -862,7 +877,7 @@
           "testFramework": "node --test"
         },
         {
-          "hash": "e5f72460a9405d50c0fc5c10e43f2bb28957b0d12a9104a4c0d9bdf2896a32e8",
+          "hash": "a5bf4209021d2ee106742cdc7baa54388072cf20bcff9feba36df40a15526584",
           "importOrder": [
             "packages/cli/src/doctor.ts",
             "packages/cli/src/cli.ts",
@@ -893,7 +908,7 @@
             "makeRefreshSandbox",
             "makeSandbox"
           ],
-          "hash": "5fbc3547d55c6e0320f732681b884830915378035827c7446feacdabb0f0f603",
+          "hash": "8683dc4580c9485de994937c638e181578187ee2ebde2b7017c364b24e020212",
           "importsFiles": [
             "packages/kernel/src/index.ts"
           ],
@@ -910,7 +925,7 @@
           "testFramework": "node --test"
         },
         {
-          "hash": "45156f7ca281372878b258bff0550a3a6f042b795e8edd4cd11db699621852e7",
+          "hash": "b1148c93fe7f3ef1b2c77c9f083bdd520c551112c7e8946999528f2aa7672877",
           "importsFiles": [
             "packages/cli/src/hook.ts",
             "packages/cli/src/refresh.ts"
@@ -922,7 +937,7 @@
           "testFramework": "node --test"
         },
         {
-          "hash": "c046a2a8a4f5442b8f4b42e5f6846d23982668a69d735d070267d4bdef783086",
+          "hash": "c6f009aeaf308e5bbda3cdd4cb12f7fa16840c7d4a5884b40ef531fd56b69186",
           "importOrder": [
             "packages/cli/src/pretool.ts",
             "packages/cli/src/cli.ts",
@@ -944,7 +959,15 @@
           "testFramework": "node --test"
         },
         {
-          "hash": "0a9a72a3806fb0fc011c39efbe396c81d14dca53a2633c2784913cf5d0c36e05",
+          "exports": [
+            "scanLinesForHits"
+          ],
+          "hash": "e66a3a278a7dfdd947fd58ce99a29e6f1d98cfa511b71c4279deaddcc11c84b5",
+          "path": "packages/cli/src/tests/public-hygiene.test.ts",
+          "testFramework": "node --test"
+        },
+        {
+          "hash": "bb349a07c50f39360e08f3bcd08b41cab8f8ebb31b58d1299399f01ba8f9abc2",
           "importOrder": [
             "packages/cli/src/refresh.ts",
             "packages/cli/src/hook.ts",
@@ -1001,7 +1024,7 @@
       "origin": "authored",
       "outsidePlaces": [
         {
-          "reads": 52,
+          "reads": 56,
           "where": [
             "caller"
           ],
@@ -1029,24 +1052,7 @@
             "caller",
             "home:.ai-loadout/"
           ],
-          "writes": 5
-        },
-        {
-          "reads": 0,
-          "where": [
-            "caller",
-            "home:.ai-loadout/",
-            "home:.claude/"
-          ],
-          "writes": 2
-        },
-        {
-          "reads": 3,
-          "where": [
-            "caller",
-            "home:.claude/"
-          ],
-          "writes": 0
+          "writes": 7
         },
         {
           "reads": 4,
@@ -1092,7 +1098,7 @@
           "writes": 5
         }
       ],
-      "outsideReads": 78,
+      "outsideReads": 79,
       "outsideWrites": 16,
       "role": "code",
       "testRunners": [
@@ -1135,30 +1141,30 @@
             {
               "in": "main",
               "kind": "catch",
-              "line": 176
+              "line": 190
             },
             {
               "in": "main",
               "kind": "catch",
-              "line": 188
+              "line": 202
             },
             {
               "in": "main",
               "kind": "catch",
-              "line": 201
+              "line": 215
             },
             {
               "in": "main",
               "kind": "catch",
-              "line": 230
+              "line": 244
             },
             {
               "in": "main",
               "kind": "catch",
-              "line": 294
+              "line": 308
             }
           ],
-          "hash": "80c48b646f733d76d881969f7d5b9c7d43bd3cc0752482ab5fdd906550752171",
+          "hash": "89a7b208234b8a9b38c988787cdfc0e974f9ea9a0e61b5f6ba7b6d4bcc911ff6",
           "importsFiles": [
             "packages/kernel/src/index.ts"
           ],
@@ -3084,7 +3090,7 @@
               "line": 211
             }
           ],
-          "hash": "f33a4389dcfb3c7b4752b69dd6795ae3493bf7b470c7e0a7be54572621273b80",
+          "hash": "f356985a1518a8a78643ef6fa1da7cd3887aba52d616463803d33f6549d4f105",
           "importsFiles": [
             "packages/kernel/src/index.ts",
             "packages/memories/src/analyze.ts",
@@ -3649,7 +3655,7 @@
           "testFramework": "node --test"
         },
         {
-          "hash": "8359c64eef7606c100a72756ab3d391359143cdf4ceacfe11519912e469cb30a",
+          "hash": "d4dc4a282f726680664fe10794f7ef8c5884451c2cffb7ccb3ad9165805f8365",
           "importOrder": [
             "packages/kernel/src/index.ts",
             "packages/memories/src/analyze.ts",
@@ -3668,7 +3674,7 @@
           "testFramework": "node --test"
         },
         {
-          "hash": "db9d8e4715a423207032fc9289760caccfabe3ffed5f0ce353ea02b07c911333",
+          "hash": "92b1ed8f6e93d09baa92830bc1e223df695416efec496d6dff05e607b76443fb",
           "importOrder": [
             "packages/memories/src/parser.ts",
             "packages/memories/src/analyze.ts",
@@ -3701,7 +3707,7 @@
           "testFramework": "node --test"
         },
         {
-          "hash": "7da2d29df6448951f3d795aac4d6e331a6bcad559d9dcb6614efcce2957bc584",
+          "hash": "569f4044b5ad971366c0d80138debf090ae9ac12d4bfde519e25ce2f24b6745c",
           "importsFiles": [
             "packages/memories/src/analyze.ts",
             "packages/memories/src/index-gen.ts",
@@ -3742,7 +3748,7 @@
               "line": 269
             }
           ],
-          "hash": "60cbd585be5a64d8dc92dbfc9c1622e8b82617db98d33243ab8855c40594ab75",
+          "hash": "abb9838af6e3050e8aab0012253b90eabafd2f17c825cfb1a295a68ffdbd1322",
           "importsFiles": [
             "packages/kernel/src/index.ts",
             "packages/memories/src/index-gen.ts",
@@ -3968,7 +3974,7 @@
           "path": ".gitignore"
         },
         {
-          "hash": "2170622cb7a0ecfe45a9995d5d672fc2ced1e83860065ea111da54c8f8b306c0",
+          "hash": "b8bf8d37a2e3cade13dba886dbe9d6f43b3ce6d71d4b0fab29866e255af9ff76",
           "path": "CHANGELOG.md"
         },
         {
@@ -3988,7 +3994,7 @@
           "path": "README.hi.md"
         },
         {
-          "hash": "89068bfff7f9225d2fffbdb3030bbaad7d096029bbcead335454d71354b24289",
+          "hash": "728ab8562ea11cc6ad786ac4f702beeacd0ea545127ffa620b0c042e96aa8236",
           "path": "README.it.md"
         },
         {
@@ -3996,11 +4002,11 @@
           "path": "README.ja.md"
         },
         {
-          "hash": "f1f23d4dffa5776d59067f153bcaf3e8a11f5e0d23874f7f39be91628fbf093b",
+          "hash": "74c530e9da2ea000796d1fb9777556593b0b45ff4f7c1e3457a4e7312da89dca",
           "path": "README.md"
         },
         {
-          "hash": "aa847ff0a90189ddf85289dcc65130dd106fe0de1278f7bc0fb2198652a6eacb",
+          "hash": "31e4a9f194088031da2d578c6cbfecf94003fb0711425b5715f124d01f19ef55",
           "path": "README.pt-BR.md"
         },
         {
@@ -4008,7 +4014,7 @@
           "path": "README.zh.md"
         },
         {
-          "hash": "c5f87c41139e7cc769a97545ea47cab0c1f081d60585a34488bdb7a73852d3b9",
+          "hash": "b77e8982fa874e4e83ed54681b281faec64ff8408039e3801d71e51c6a0180e6",
           "path": "ROADMAP.md"
         },
         {
@@ -4036,7 +4042,7 @@
           "path": "package-lock.json"
         },
         {
-          "hash": "ab65b9e7fb211f115daf8751048a0a477baef0168928cafe732289fa9254b602",
+          "hash": "d1752f4453871740299880e84347f9e2a5091bcec833321bbeed8c68f6da7b42",
           "path": "package.json"
         },
         {
@@ -5825,7 +5831,7 @@
       "externals": 0,
       "files": [
         {
-          "hash": "60c3d4df9cfb20b81397290001fc987951c9ab485dc97441c6ee03529c98890c",
+          "hash": "81d8bbf5493cb388306b1a9a2479d7028644bd0134b7a0ac59941ab2cd22dd5f",
           "path": "site/astro.config.mjs"
         },
         {
@@ -5850,7 +5856,7 @@
           "path": "site/src/content/docs/handbook/architecture.md"
         },
         {
-          "hash": "89e67b79435307507cd7a1264cf9a5744d3eb58302d4d5dc39def6a0a929f1e8",
+          "hash": "c776dca6a3708f0e1575d00b77951d444e6328ee2b3bc16defbb8dddb0849091",
           "path": "site/src/content/docs/handbook/getting-started.md"
         },
         {
@@ -5862,11 +5868,11 @@
           "path": "site/src/content/docs/handbook/migration.md"
         },
         {
-          "hash": "9f1fcf2293d55e7699fb50778cbe0d4a98b54a5fbedc36e989047422bc85f90f",
+          "hash": "8757bac2fe35797307291dcfb509dbf73023984b26145daeadbd917537e49d83",
           "path": "site/src/content/docs/handbook/reference.md"
         },
         {
-          "hash": "26766df89d5d688947be11492d41da5959e0545559bc9080e6398a6ac7424e54",
+          "hash": "58c0d547b38391b4f1655bf311b674d6f20b8bd9ba596cbd4959f9bfc2983a75",
           "path": "site/src/content/docs/handbook/rituals.md"
         },
         {
@@ -5883,7 +5889,7 @@
         },
         {
           "constantOnly": true,
-          "hash": "8e05bcd5fd752f702ccef65ef161f117b225f7cefea6c1871a00e5c2cc847f6d",
+          "hash": "8ac4ace14bfb487a766ef98329296bb221eedefe6ccb0de1084bcf95af4c91b0",
           "path": "site/src/site-config.ts"
         },
         {
@@ -6095,7 +6101,7 @@
         {
           "boundary": "cli",
           "depth": 0,
-          "files": 22
+          "files": 23
         },
         {
           "boundary": "hook",
@@ -6173,6 +6179,12 @@
           "job": "build-and-test",
           "matched": true,
           "path": "packages/cli/src/tests/pretool.test.ts",
+          "runKind": "executes"
+        },
+        {
+          "job": "build-and-test",
+          "matched": true,
+          "path": "packages/cli/src/tests/public-hygiene.test.ts",
           "runKind": "executes"
         },
         {
@@ -6275,7 +6287,7 @@
           }
         }
       ],
-      "runsCount": 20,
+      "runsCount": 21,
       "secrets": [],
       "sends": {
         "deploysPages": false,
@@ -6331,7 +6343,7 @@
         {
           "coverage": true,
           "dir": "packages/cli",
-          "files": 10,
+          "files": 11,
           "job": "build-and-test",
           "junit": true,
           "runner": "node --test",
@@ -6379,7 +6391,9 @@
         }
       ],
       "untrackedLandings": [
-        ".claude/loadout/"
+        ".claude/loadout/",
+        ".claude/projects/",
+        ".claude/projects/default/memory/index.json"
       ],
       "uses": [
         "actions/checkout",
@@ -6527,7 +6541,7 @@
         {
           "boundary": "cli",
           "depth": 0,
-          "files": 23
+          "files": 24
         },
         {
           "boundary": "hook",
@@ -6610,6 +6624,12 @@
         {
           "job": "release",
           "matched": true,
+          "path": "packages/cli/src/tests/public-hygiene.test.ts",
+          "runKind": "executes"
+        },
+        {
+          "job": "release",
+          "matched": true,
           "path": "packages/cli/src/tests/refresh.test.ts",
           "runKind": "executes"
         },
@@ -6680,7 +6700,7 @@
           "runKind": "executes"
         }
       ],
-      "runsCount": 19,
+      "runsCount": 20,
       "secrets": [
         "GITHUB_TOKEN"
       ],
@@ -6740,7 +6760,7 @@
         },
         {
           "dir": "packages/cli",
-          "files": 10,
+          "files": 11,
           "job": "release",
           "runner": "node --test",
           "step": "Test",
@@ -6759,7 +6779,9 @@
         }
       ],
       "untrackedLandings": [
-        ".claude/loadout/"
+        ".claude/loadout/",
+        ".claude/projects/",
+        ".claude/projects/default/memory/index.json"
       ],
       "uses": [
         "actions/checkout",
@@ -6978,10 +7000,22 @@
   ],
   "engine": "1.26.0",
   "generatedFrom": {
-    "commit": "3fe2ae44ed0239f982cc76908ed10a2110af7144",
-    "tracked": 388
+    "commit": "e3fdae47bc8f52a438dffc49a971f0e61e477e95",
+    "tracked": 389
   },
   "landings": [
+    {
+      "readers": [
+        {
+          "by": "packages/cli/src/tests/public-hygiene.test.ts",
+          "call": "readdirSync",
+          "confidence": "ast",
+          "fromTests": true
+        }
+      ],
+      "target": ".claude",
+      "writers": []
+    },
     {
       "readers": [
         {
@@ -7034,6 +7068,69 @@
       "writers": []
     },
     {
+      "readers": [],
+      "target": ".claude/projects",
+      "tracked": false,
+      "writers": [
+        {
+          "by": "packages/cli/src/refresh.ts",
+          "confidence": "ast",
+          "untrackedInputs": true
+        }
+      ]
+    },
+    {
+      "readers": [
+        {
+          "by": "packages/cli/src/refresh.ts",
+          "call": "existsSync",
+          "confidence": "ast"
+        },
+        {
+          "by": "packages/cli/src/refresh.ts",
+          "call": "statSync",
+          "confidence": "ast"
+        }
+      ],
+      "target": ".claude/projects/default/memory",
+      "writers": []
+    },
+    {
+      "readers": [
+        {
+          "by": "packages/cli/src/refresh.ts",
+          "call": "existsSync",
+          "confidence": "ast"
+        }
+      ],
+      "target": ".claude/projects/default/memory/MEMORY.md",
+      "writers": []
+    },
+    {
+      "readers": [],
+      "target": ".claude/projects/default/memory/index.json",
+      "tracked": false,
+      "writers": [
+        {
+          "by": "packages/cli/src/refresh.ts",
+          "confidence": "ast",
+          "untrackedInputs": true
+        }
+      ]
+    },
+    {
+      "readers": [
+        {
+          "by": "packages/cli/src/tests/public-hygiene.test.ts",
+          "call": "literal",
+          "confidence": "ast",
+          "fromTests": true
+        }
+      ],
+      "target": "CHANGELOG.md",
+      "writers": []
+    },
+    {
       "readers": [
         {
           "by": "packages/cli/src/tests/help.test.ts",
@@ -7049,6 +7146,18 @@
         }
       ],
       "target": "README.md",
+      "writers": []
+    },
+    {
+      "readers": [
+        {
+          "by": "packages/cli/src/tests/public-hygiene.test.ts",
+          "call": "literal",
+          "confidence": "ast",
+          "fromTests": true
+        }
+      ],
+      "target": "ROADMAP.md",
       "writers": []
     },
     {
@@ -7159,6 +7268,12 @@
           "by": "packages/cli/src/pretool-rules.ts",
           "call": "literal",
           "confidence": "ast"
+        },
+        {
+          "by": "packages/cli/src/tests/pretool.test.ts",
+          "call": "literal",
+          "confidence": "ast",
+          "fromTests": true
         }
       ],
       "target": "packages/cli/src/pretool-rules.ts",
@@ -7182,6 +7297,12 @@
           "by": "packages/cli/src/pretool-rules.ts",
           "call": "literal",
           "confidence": "ast"
+        },
+        {
+          "by": "packages/cli/src/tests/pretool.test.ts",
+          "call": "literal",
+          "confidence": "ast",
+          "fromTests": true
         }
       ],
       "target": "packages/cli/src/tests/pretool.test.ts",
@@ -7412,6 +7533,18 @@
     {
       "readers": [
         {
+          "by": "packages/cli/src/tests/public-hygiene.test.ts",
+          "call": "readdirSync",
+          "confidence": "ast",
+          "fromTests": true
+        }
+      ],
+      "target": "site",
+      "writers": []
+    },
+    {
+      "readers": [
+        {
           "by": "site/astro.config.mjs",
           "call": "content-collection",
           "confidence": "ast"
@@ -7435,7 +7568,7 @@
   "overlaps": [],
   "submodules": [],
   "symlinks": [],
-  "testFiles": 47,
+  "testFiles": 48,
   "unassigned": [],
   "workspaces": [
     "apps/hook",

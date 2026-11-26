@@ -805,7 +805,7 @@ describe("sub-index expansion, frontmatter summary authority, and keyword extrac
     }
   });
 
-  it("explicit frontmatter id: always beats both idSource='title' and idSource='name' (Publisher ruling B)", () => {
+  it("explicit frontmatter id: always beats both idSource='title' and idSource='name' (#19)", () => {
     const tmp = mkdtempSync(join(tmpdir(), "loadout-idsource-explicit-id-"));
     try {
       writeFileSync(
@@ -838,7 +838,7 @@ describe("sub-index expansion, frontmatter summary authority, and keyword extrac
     }
   });
 
-  it("projectMode defaults to idSource='name' while non-project mode defaults to idSource='title' (Publisher ruling B)", () => {
+  it("projectMode defaults to idSource='name' while non-project mode defaults to idSource='title' (#19)", () => {
     const tmp = mkdtempSync(join(tmpdir(), "loadout-idsource-proj-default-"));
     try {
       writeFileSync(

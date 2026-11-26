@@ -783,14 +783,14 @@ describe("Part C: loadout-os hook session-start and pre-compact", () => {
 
       const boardContent = [
         "---",
-        "name: R&D Active Board",
-        "description: Current active R&D board state",
+        "name: Project Active Board",
+        "description: Current active project board state",
         "priority: core",
         "metadata:",
         "  loadout_inject: session-start",
         "  stale_after_min: 60",
         "---",
-        "# Active Board — R&D → Antigravity ⭐",
+        "# Active Board — Maintainer → Agent ⭐",
         "- Status: Healthy ≈ 100% (no ⚠ alerts)",
         "- Next: Verify UTF-8 em-dash — arrow → star ⭐ warning ⚠ approx ≈",
         "",
@@ -799,7 +799,7 @@ describe("Part C: loadout-os hook session-start and pre-compact", () => {
       writeFileSync(join(storeDir, "BOARD.md"), boardContent, "utf-8");
       writeFileSync(
         join(storeDir, "MEMORY.md"),
-        "# Memory Index\n- [Board](BOARD.md) — Current active R&D board state\n",
+        "# Memory Index\n- [Board](BOARD.md) — Current active project board state\n",
         "utf-8",
       );
 
@@ -810,7 +810,7 @@ describe("Part C: loadout-os hook session-start and pre-compact", () => {
       assert.equal(res.warnings.length, 0);
       assert.equal(res.injectedFiles.length, 1);
       assert.match(res.output, /=== \[loadout-os session-start\] BOARD\.md/);
-      assert.ok(res.output.includes("Active Board — R&D → Antigravity ⭐"));
+      assert.ok(res.output.includes("Active Board — Maintainer → Agent ⭐"));
       assert.ok(res.output.includes("Healthy ≈ 100% (no ⚠ alerts)"));
 
       // 1b. Subprocess check (proves Buffer.from(..., 'utf-8') stdout survives Windows console codepage)
@@ -821,7 +821,7 @@ describe("Part C: loadout-os hook session-start and pre-compact", () => {
           { encoding: "utf-8", input: "" },
         );
         assert.equal(proc.status, 0);
-        assert.ok(proc.stdout.includes("Active Board — R&D → Antigravity ⭐"));
+        assert.ok(proc.stdout.includes("Active Board — Maintainer → Agent ⭐"));
         assert.ok(proc.stdout.includes("em-dash — arrow → star ⭐ warning ⚠ approx ≈"));
       }
     } finally {
@@ -842,7 +842,7 @@ describe("Part C: loadout-os hook session-start and pre-compact", () => {
         boardPath,
         [
           "---",
-          "name: R&D Board",
+          "name: Project Board",
           "description: Active board",
           "priority: core",
           "metadata:",

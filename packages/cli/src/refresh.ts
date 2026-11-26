@@ -66,15 +66,35 @@ import {
 import { loadProfileConfig, normalizePreToolPath } from "./pretool.js";
 
 /**
+ * Derive Claude Code's project-store directory slug from a project directory path
+ * (e.g. `C:\work\app` -> `C--work-app`, `/home/alice/repo` -> `-home-alice-repo`).
+ */
+export function deriveClaudeProjectSlug(projectDir: string = process.cwd()): string {
+  const abs = resolve(projectDir);
+  return (abs.replace(/[:\\/]/g, "-").replace(/\s+/g, "-")) || "default";
+}
+
+/**
+ * Default memory store path derived from the current working directory.
+ * Override with `--store <dir>` or configure per-project stores in `profiles.json`.
+ */
+export function defaultStore(
+  projectDir: string = process.cwd(),
+  homeDir: string = homedir(),
+): string {
+  return join(
+    homeDir,
+    ".claude",
+    "projects",
+    deriveClaudeProjectSlug(projectDir),
+    "memory",
+  );
+}
+
+/**
  * Canonical memory store (holds MEMORY.md + topic files).
  */
-export const DEFAULT_STORE = join(
-  homedir(),
-  ".claude",
-  "projects",
-  "F--AI",
-  "memory",
-);
+export const DEFAULT_STORE = defaultStore();
 
 /** Default destination: the live global resolver index the hook reads. */
 export function defaultDest(): string {
@@ -581,7 +601,7 @@ export function runRefresh(opts: RefreshOptions): RefreshResult {
     if (!existsSync(store) || !statSync(store).isDirectory()) {
       throw new RefreshError(
         "STORE_NOT_FOUND",
-        `Store directory not found: ${store}`,
+        `Store directory not found: ${store}. Pass --store <dir> or configure per-project stores in profiles.json.`,
         2,
       );
     }

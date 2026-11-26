@@ -47,6 +47,7 @@ import {
   type ProfileConfig,
 } from "./pretool.js";
 import { PRETOOL_RULES } from "./pretool-rules.js";
+import { deriveClaudeProjectSlug } from "./refresh.js";
 
 export type CheckStatus = "pass" | "warn" | "fail";
 
@@ -216,7 +217,7 @@ export function defaultDoctorPaths(
     ? resolve(envProfilesPath)
     : resolve(home, ".ai-loadout", "profiles.json");
   return {
-    store: resolve(home, ".claude", "projects", "F--AI", "memory"),
+    store: resolve(home, ".claude", "projects", deriveClaudeProjectSlug(repoRoot), "memory"),
     index: resolve(home, ".ai-loadout", "index.json"),
     settings: resolve(home, ".claude", "settings.json"),
     usage: resolve(home, ".ai-loadout", "usage.jsonl"),
@@ -224,7 +225,7 @@ export function defaultDoctorPaths(
     hookMirror: resolve(home, ".claude", "loadout-hook", "loadout-hook.mjs"),
     skillsDir: resolve(home, ".claude", "skills"),
     extraIndexes: existsSync(projectIndex) ? [projectIndex] : [],
-    ...(existsSync(profilesPath) ? { profilesPath } : {}),
+    ...(envProfilesPath || existsSync(profilesPath) ? { profilesPath } : {}),
   };
 }
 
@@ -289,7 +290,7 @@ export function runDoctor(paths: DoctorPaths): DoctorResult {
       id: "store-validates",
       status: "fail",
       message: `Store MEMORY.md not found: ${memoryMd}`,
-      hint: "Point --store at the directory containing MEMORY.md.",
+      hint: "Point --store <dir> at the directory containing MEMORY.md, or configure project stores in profiles.json.",
     });
   } else {
     try {
@@ -678,11 +679,24 @@ export function runDoctor(paths: DoctorPaths): DoctorResult {
   };
 
   let loadedProfileConfig: ProfileConfig | undefined;
-  if (paths.profilesPath && existsSync(paths.profilesPath)) {
+  if (paths.profilesPath) {
     try {
       loadedProfileConfig = loadProfileConfig(paths.profilesPath);
-    } catch {
-      /* ignore unreadable profiles.json; falls back to single-store triad check */
+      if (loadedProfileConfig.warnings.length > 0) {
+        checks.push({
+          id: "profiles-config",
+          status: "warn",
+          message: `profiles.json has ${loadedProfileConfig.warnings.length} warning(s): ${loadedProfileConfig.warnings.join("; ")}`,
+          hint: "Fix or remove invalid keys/values in profiles.json.",
+        });
+      }
+    } catch (err) {
+      checks.push({
+        id: "profiles-config",
+        status: "fail",
+        message: `Failed to load profiles.json (${paths.profilesPath}): ${(err as Error).message}`,
+        hint: "Fix JSON syntax, top-level structure, or the explicit --profiles / AI_LOADOUT_PROFILES_PATH path.",
+      });
     }
   }
 

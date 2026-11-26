@@ -120,7 +120,7 @@ ${BOLD}Options:${RESET}
   --version    Show version
 
 ${BOLD}Examples:${RESET}
-  loadout-os memories validate ~/.claude/projects/F--AI/memory/MEMORY.md
+  loadout-os memories validate ~/.claude/projects/my-project/memory/MEMORY.md
   loadout-os rules analyze .claude/CLAUDE.md
   loadout-os validate ~/.ai-loadout/index.json
   loadout-os doctor

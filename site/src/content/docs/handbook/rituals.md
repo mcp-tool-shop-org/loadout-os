@@ -138,6 +138,7 @@ Example `profiles.json` using neutral `docs` and `release` profiles:
   },
   "quoteGate": {
     "speakers": ["He", "She", "They", "the User", "Maintainer"],
+    "namedSpeakers": ["Maintainer"],
     "allowlistSuffixes": ["docs/quote-policy.md"]
   }
 }

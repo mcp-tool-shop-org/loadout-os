@@ -32,54 +32,59 @@ interface NeedleSpec {
 }
 
 function buildRoleAndMemorySpecs(): NeedleSpec[] {
-  const dirWord = ["dir", "ector"].join("");
-  const pubWord = ["pub", "lisher"].join("");
-  const seatWord = ["se", "at"].join("");
-  const rndWord = ["rn", "d"].join("");
-  const rndAmp = ["r&", "d"].join("");
-  const studioWord = ["stu", "dio"].join("");
-  const argonWord = ["ar", "gon"].join("");
+  const w1 = ["dir", "ector"].join("");
+  const w2 = ["pub", "lisher"].join("");
+  const w3 = ["se", "at"].join("");
+  const w4 = ["rn", "d"].join("");
+  const w4Amp = ["r&", "d"].join("");
+  const w5 = ["stu", "dio"].join("");
+  const w6 = ["ar", "gon"].join("");
+  const wSlug = ["f--", "ai"].join("");
 
   const memoryIds = [
-    [pubWord, "merges"].join("-"),
+    [w2, "merges"].join("-"),
     ["rule", "coord" + "inator", "and", "merges"].join("-"),
-    ["feed", "back", "feed", "back", "never", "quote", "the", dirWord, "md"].join(""),
-    ["never", "quote", dirWord, "in", "public"].join("-"),
-    ["rule", dirWord, "communication"].join("-"),
-    ["build", "in", studioWord, "tools", "not", "side", "scripts"].join("-"),
+    ["feed", "back", "feed", "back", "never", "quote", "the", w1, "md"].join(""),
+    ["never", "quote", w1, "in", "public"].join("-"),
+    ["rule", w1, "communication"].join("-"),
+    ["build", "in", w5, "tools", "not", "side", "scripts"].join("-"),
     ["reference", "memory", "system"].join("-"),
-    [rndWord, "memory", "system"].join("-"),
-    [pubWord, "approves", "every", "publish"].join("-"),
+    [w4, "memory", "system"].join("-"),
+    [w2, "approves", "every", "publish"].join("-"),
   ];
 
   const stripDirectoryWords = (line: string): string =>
-    line.replace(new RegExp(["dir", "ector", "(?:y|ies)"].join(""), "gi"), "");
+    line.replace(new RegExp(["dir", "ector", "(?:y|ies|io|ios)"].join(""), "gi"), "");
 
   const specs: NeedleSpec[] = [
     {
-      label: "role:" + dirWord,
-      regex: new RegExp(dirWord, "i"),
+      label: "role:" + w1,
+      regex: new RegExp(w1, "i"),
       preprocessLine: stripDirectoryWords,
     },
     {
-      label: "role:" + pubWord,
-      regex: new RegExp(pubWord, "i"),
+      label: "role:" + w2,
+      regex: new RegExp(w2, "i"),
     },
     {
-      label: "role:" + seatWord,
-      regex: new RegExp(seatWord + "(?!ed\\b)", "i"),
+      label: "role:" + w3,
+      regex: new RegExp(w3 + "(?!ed\\b)", "i"),
     },
     {
-      label: "role:" + rndWord,
-      regex: new RegExp(`(?:^|[^a-z0-9])${rndWord}(?:$|[^a-z0-9])|${rndAmp}`, "i"),
+      label: "role:" + w4,
+      regex: new RegExp(`(?:^|[^a-z0-9])${w4}(?:$|[^a-z0-9])|${w4Amp}`, "i"),
     },
     {
-      label: "role:" + studioWord,
-      regex: new RegExp(studioWord, "i"),
+      label: "role:" + w5,
+      regex: new RegExp(w5, "i"),
     },
     {
-      label: "role:" + argonWord,
-      regex: new RegExp(argonWord, "i"),
+      label: "role:" + w6,
+      regex: new RegExp(w6, "i"),
+    },
+    {
+      label: "slug:" + wSlug,
+      regex: new RegExp(wSlug, "i"),
     },
   ];
 
@@ -113,7 +118,7 @@ export const NON_TEST_HYGIENE_SPECS: readonly NeedleSpec[] = [
   ...buildNameSpecs(),
 ];
 
-export const TEST_FILE_HYGIENE_SPECS: readonly NeedleSpec[] = buildNameSpecs();
+export const TEST_FILE_HYGIENE_SPECS: readonly NeedleSpec[] = NON_TEST_HYGIENE_SPECS;
 
 export function scanLinesForHits(
   relPath: string,
@@ -173,27 +178,33 @@ function collectGuardedFiles(): { nonTestFiles: string[]; testFiles: string[] } 
   }
 
   for (const entry of readdirSync(REPO_ROOT)) {
-    if (/^README(?:\.[^.]+)?\.md$/i.test(entry) || entry === "CHANGELOG.md") {
+    if (
+      /^README(?:\.[^.]+)?\.md$/i.test(entry) ||
+      entry === "CHANGELOG.md" ||
+      entry === "ROADMAP.md"
+    ) {
       nonTestFiles.push(join(REPO_ROOT, entry));
     }
   }
 
-  const siteDir = join(REPO_ROOT, "site");
-  try {
-    if (statSync(siteDir).isDirectory()) {
-      nonTestFiles.push(
-        ...collectFilesRecursive(siteDir, new Set(["node_modules", "dist", ".astro"])),
-      );
+  for (const dirName of ["site", ".claude"]) {
+    const subDir = join(REPO_ROOT, dirName);
+    try {
+      if (statSync(subDir).isDirectory()) {
+        nonTestFiles.push(
+          ...collectFilesRecursive(subDir, new Set(["node_modules", "dist", ".astro"])),
+        );
+      }
+    } catch {
+      /* ignore if absent */
     }
-  } catch {
-    /* ignore if site/ absent */
   }
 
   return { nonTestFiles, testFiles };
 }
 
-describe("public-hygiene: no studio roles, memory ids, personal names, or account names on public surfaces", () => {
-  it("must-catch: rejects every role word, studio memory id, first name, and account name", () => {
+describe("public-hygiene: no internal roles, memory ids, project slug, personal names, or account names on public surfaces", () => {
+  it("must-catch: rejects every role word, memory id, project slug, first name, and account name", () => {
     const sampleNeedles = [
       ["The ", "Dir", "ector", " ruled"].join(""),
       ["Pub", "lisher", " merges PRs"].join(""),
@@ -202,6 +213,7 @@ describe("public-hygiene: no studio roles, memory ids, personal names, or accoun
       ["team ", "r&", "d", " workflow"].join(""),
       ["built for the ", "stu", "dio"].join(""),
       ["remote-", "ar", "gon"].join(""),
+      ["~/.claude/projects/", "F--", "AI", "/memory"].join(""),
       [["pub", "lisher"].join(""), "merges"].join("-"),
       ["rule", "coord" + "inator", "and", "merges"].join("-"),
       ["feed", "back", "feed", "back", "never", "quote", "the", "dir", "ector", "md"].join(""),
@@ -223,15 +235,18 @@ describe("public-hygiene: no studio roles, memory ids, personal names, or accoun
       );
     }
 
-    // Test-file scanner must catch both personal first name and account name
-    for (const nameSample of [
+    // Test-file scanner must catch role words, memory ids, project slug, personal name, and account name
+    for (const testSample of [
       ["name: ", "Mi", "ke", " User Profile"].join(""),
       ["path: /Users/", "mi", "key", "/store"].join(""),
+      ["~/.claude/projects/", "f--", "ai", "/memory"].join(""),
+      ["The ", "Dir", "ector", " ruled"].join(""),
+      ["never", "quote", ["dir", "ector"].join(""), "in", "public"].join("-"),
     ]) {
-      const hits = scanLinesForHits("synthetic.test.ts", nameSample, TEST_FILE_HYGIENE_SPECS);
+      const hits = scanLinesForHits("synthetic.test.ts", testSample, TEST_FILE_HYGIENE_SPECS);
       assert.ok(
         hits.length >= 1,
-        `Expected test-file hygiene guard to catch name sample: ${JSON.stringify(nameSample)}`,
+        `Expected test-file hygiene guard to catch needle sample: ${JSON.stringify(testSample)}`,
       );
     }
   });
@@ -250,7 +265,7 @@ describe("public-hygiene: no studio roles, memory ids, personal names, or accoun
     assert.deepEqual(hits, []);
   });
 
-  it("repository scan: packages/*/src/** (non-test), README*.md, site/**, CHANGELOG.md, and test names are clean", () => {
+  it("repository scan: packages/*/src/** (including tests), README*.md, site/**, .claude/**, ROADMAP.md, and CHANGELOG.md are clean", () => {
     const { nonTestFiles, testFiles } = collectGuardedFiles();
     assert.ok(nonTestFiles.length > 0, "Expected non-test guarded files");
     assert.ok(testFiles.length > 0, "Expected test files");

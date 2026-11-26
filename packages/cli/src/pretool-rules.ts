@@ -341,8 +341,8 @@ export const QUOTE_GATE_ALLOWLIST_SUFFIXES: readonly string[] = [
 ];
 
 /**
- * Shipped default speaker list: pronouns and generic role nouns only, with no personal names.
- * Additional speakers (names, titles) come from `quoteGate.speakers` in `profiles.json`.
+ * Shipped default speaker list for speech-verb attributions: pronouns and generic role nouns only,
+ * with no personal names. Additional speakers come from `quoteGate.speakers` in `profiles.json`.
  */
 export const DEFAULT_QUOTE_GATE_SPEAKERS: readonly string[] = [
   "He",
@@ -350,6 +350,13 @@ export const DEFAULT_QUOTE_GATE_SPEAKERS: readonly string[] = [
   "They",
   "the User",
 ];
+
+/**
+ * Shipped default named-speaker list for name-only quote-gate branches (P1 possessive-words,
+ * P1 word-block, P2 possessive speech-noun, P2 line-start, P2 dated): empty by default.
+ * Configured names come from `quoteGate.namedSpeakers` in `profiles.json`.
+ */
+export const DEFAULT_QUOTE_GATE_NAMED_SPEAKERS: readonly string[] = [];
 
 const PUBLISHING_CMD =
   /\bgit\s+(commit|tag|notes)\b|\bgh\s+(pr|issue|release|gist)\b/i;
@@ -380,51 +387,58 @@ const QUOTE_GATE_PATTERN_CACHE = new Map<string, CompiledQuoteGatePatterns>();
 
 export function compileQuoteGatePatterns(
   speakers: readonly string[] = DEFAULT_QUOTE_GATE_SPEAKERS,
+  namedSpeakers: readonly string[] = DEFAULT_QUOTE_GATE_NAMED_SPEAKERS,
 ): CompiledQuoteGatePatterns {
-  const cleaned = speakers.map((s) => s.trim()).filter(Boolean);
-  const cacheKey = cleaned.join("\0");
+  const cleanedSpeakers = speakers.map((s) => s.trim()).filter(Boolean);
+  const cleanedNamed = namedSpeakers.map((s) => s.trim()).filter(Boolean);
+  const cacheKey = `${cleanedSpeakers.join("\0")}\x01${cleanedNamed.join("\0")}`;
   const cached = QUOTE_GATE_PATTERN_CACHE.get(cacheKey);
   if (cached) return cached;
 
-  const pronounSubjectSet = new Set<string>();
+  const subjectSet = new Set<string>();
   const pronounPossessiveSet = new Set<string>();
   const namedSpeakerSet = new Set<string>();
 
-  for (const raw of cleaned) {
+  for (const raw of cleanedSpeakers) {
     const stem = raw.replace(/^the\s+/i, "").trim();
     if (!stem) continue;
     const lower = stem.toLowerCase();
     if (lower === "he") {
-      pronounSubjectSet.add("He");
+      subjectSet.add("He");
       pronounPossessiveSet.add("His");
     } else if (lower === "his") {
       pronounPossessiveSet.add("His");
     } else if (lower === "she") {
-      pronounSubjectSet.add("She");
+      subjectSet.add("She");
       pronounPossessiveSet.add("Her");
     } else if (lower === "her") {
       pronounPossessiveSet.add("Her");
     } else if (lower === "they") {
-      pronounSubjectSet.add("They");
+      subjectSet.add("They");
       pronounPossessiveSet.add("Their");
     } else if (lower === "their") {
       pronounPossessiveSet.add("Their");
     } else {
-      namedSpeakerSet.add(escapeRegexLiteral(stem));
+      subjectSet.add(escapeRegexLiteral(stem));
     }
   }
 
-  const pronounSubjects = [...pronounSubjectSet];
+  for (const raw of cleanedNamed) {
+    const stem = raw.replace(/^the\s+/i, "").trim();
+    if (!stem) continue;
+    namedSpeakerSet.add(escapeRegexLiteral(stem));
+  }
+
+  const allSubjects = [...subjectSet];
   const pronounPossessives = [...pronounPossessiveSet];
-  const namedSpeakers = [...namedSpeakerSet];
-  const allSubjects = [...namedSpeakers, ...pronounSubjects];
+  const namedStems = [...namedSpeakerSet];
 
   const p1Parts: string[] = [];
   if (pronounPossessives.length > 0) {
     p1Parts.push(String.raw`\b(?:${pronounPossessives.join("|")})\s+words`);
   }
-  if (namedSpeakers.length > 0) {
-    const namedAlt = namedSpeakers.join("|");
+  if (namedStems.length > 0) {
+    const namedAlt = namedStems.join("|");
     p1Parts.push(String.raw`(?:the\s+)?\b(?:${namedAlt})'s\s+words`);
     p1Parts.push(String.raw`\b(?:${namedAlt})'?s?-word\s+block`);
   }
@@ -432,12 +446,8 @@ export function compileQuoteGatePatterns(
 
   const attrParts: string[] = [];
   if (allSubjects.length > 0) {
-    const subjectExpr =
-      namedSpeakers.length > 0
-        ? String.raw`(?:the\s+)?\b(?:${allSubjects.join("|")})`
-        : String.raw`\b(?:${allSubjects.join("|")})`;
     attrParts.push(
-      subjectExpr +
+      String.raw`(?:the\s+)?\b(?:${allSubjects.join("|")})` +
         String.raw`\s+(?:said|replied|answered|asked|corrected|ruled|objected` +
         String.raw`|challenged|directed|wrote|added|noted|told|put\s+it` +
         String.raw`|cut\s+it\s+off|pushed\s+back|framed\s+it|called\s+it)`,
@@ -448,8 +458,8 @@ export function compileQuoteGatePatterns(
   if (pronounPossessives.length > 0) {
     possBranches.push(String.raw`\b(?:${pronounPossessives.join("|")})`);
   }
-  if (namedSpeakers.length > 0) {
-    possBranches.push(String.raw`(?:the\s+)?\b(?:${namedSpeakers.join("|")})`);
+  if (namedStems.length > 0) {
+    possBranches.push(String.raw`(?:the\s+)?\b(?:${namedStems.join("|")})`);
   }
   if (possBranches.length > 0) {
     attrParts.push(
@@ -459,13 +469,13 @@ export function compileQuoteGatePatterns(
     );
   }
 
-  if (namedSpeakers.length > 0) {
-    const namedAlt = namedSpeakers.join("|");
+  if (namedStems.length > 0) {
+    const namedAlt = namedStems.join("|");
     attrParts.push(
-      String.raw`(?:^|\n)\s*(?:\*\*)?(?:The\s+)?(?:${namedAlt})(?:\*\*)?\s*:`,
+      String.raw`(?:^|\n)\s*(?:\*\*)?(?:The\s+)?\b(?:${namedAlt})(?:\*\*)?\s*:`,
     );
     attrParts.push(
-      String.raw`\(?\s*(?:\*\*)?(?:The\s+)?(?:${namedAlt})\s*[,(]?\s*` +
+      String.raw`\(?\s*(?:\*\*)?(?:The\s+)?\b(?:${namedAlt})\s*[,(]?\s*` +
         String.raw`(?:20\d\d-\d\d-\d\d|\d\d-\d\d)\b[^\"\u201c\n:]{0,40}?\)?(?:\*\*)?\s*[:\u2014-]?` +
         String.raw`\s*(?:\*{1,2})?\s*(?=[\"\u201c][^\s\"\u201d])`,
     );
@@ -523,9 +533,10 @@ function lineOf(text: string, pos: number): string {
 export function findQuoteViolations(
   text: string,
   speakers: readonly string[] = DEFAULT_QUOTE_GATE_SPEAKERS,
+  namedSpeakers: readonly string[] = DEFAULT_QUOTE_GATE_NAMED_SPEAKERS,
 ): QuoteViolation[] {
   if (!text) return [];
-  const { p1Re, attributionRe } = compileQuoteGatePatterns(speakers);
+  const { p1Re, attributionRe } = compileQuoteGatePatterns(speakers, namedSpeakers);
   const hits: QuoteViolation[] = [];
 
   if (p1Re && P1_QUICK_RE.test(text)) {
@@ -647,10 +658,12 @@ export function matchQuoteGate(ctx: RuleMatchInput): RuleMatchResult {
   }
 
   const speakers = ctx.profileConfig?.quoteGate?.speakers ?? DEFAULT_QUOTE_GATE_SPEAKERS;
+  const namedSpeakers =
+    ctx.profileConfig?.quoteGate?.namedSpeakers ?? DEFAULT_QUOTE_GATE_NAMED_SPEAKERS;
   const texts = quoteTextsFromTool(ctx.toolName, ctx.toolInput, extraAllowlist);
   const violations: QuoteViolation[] = [];
   for (const t of texts) {
-    violations.push(...findQuoteViolations(t, speakers));
+    violations.push(...findQuoteViolations(t, speakers, namedSpeakers));
   }
 
   if (violations.length === 0) {

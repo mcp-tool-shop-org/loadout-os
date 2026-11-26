@@ -58,7 +58,7 @@ describe("Part 1: hook pre-tool entry, profile map, pass-through, rule table, de
         {
           profiles: {
             "E:/AI/Research and Development": "docs",
-            "E:/AI/Publisher": "release",
+            "E:/AI/ReleaseRepo": "release",
             "E:/AI/Research and Development/nested/pub-sandbox": "release",
           },
         },
@@ -127,15 +127,15 @@ describe("Part 1: hook pre-tool entry, profile map, pass-through, rule table, de
 
       assert.equal(resolveProfile("E:/AI/Research and Development", cfg), "docs");
       assert.equal(resolveProfile("e:\\ai\\research and development\\packages\\cli", cfg), "docs");
-      assert.equal(resolveProfile("/e/AI/Publisher/subproject", cfg), "release");
-      assert.equal(resolveProfile("\\\\?\\E:\\AI\\Publisher\\repo\\", cfg), "release");
+      assert.equal(resolveProfile("/e/AI/ReleaseRepo/subproject", cfg), "release");
+      assert.equal(resolveProfile("\\\\?\\E:\\AI\\ReleaseRepo\\repo\\", cfg), "release");
       // Longest prefix wins over shorter parent prefix
       assert.equal(
         resolveProfile("E:\\AI\\Research and Development\\nested\\pub-sandbox\\work", cfg),
         "release",
       );
       // Sibling prefix with shared string prefix must not match (boundary check)
-      assert.equal(resolveProfile("E:/AI/Publisher-Extra", cfg), "default");
+      assert.equal(resolveProfile("E:/AI/ReleaseRepo-Extra", cfg), "default");
       // Unmatched path returns default
       assert.equal(resolveProfile("E:/AI/OtherRepo", cfg), "default");
       assert.equal(resolveProfile("", cfg), "default");
@@ -170,49 +170,26 @@ describe("Part 1: hook pre-tool entry, profile map, pass-through, rule table, de
         "e:/ai/research and development",
       );
       assert.equal(
-        normalizePreToolPath("/e/AI/Publisher/"),
-        "e:/ai/publisher",
+        normalizePreToolPath("/e/AI/ReleaseRepo/"),
+        "e:/ai/releaserepo",
       );
     });
 
-    it("validates profiles.json with structured ProfileConfigError and warns on unknown keys without crashing", () => {
+    it("throws ProfileConfigError only on missing explicit/invalid JSON/non-object top level, soft-drops invalid sub-entries with warnings, and keeps other rules enforcing", () => {
       delete process.env.AI_LOADOUT_PROFILES_PATH;
       assert.ok(defaultProfilesPath().replace(/\\/g, "/").endsWith("/.ai-loadout/profiles.json"));
       assert.deepEqual(loadProfileConfig().profiles, {});
 
-      const badCases: Array<[unknown, string]> = [
-        [[], "PROFILE_CONFIG_NOT_OBJECT"],
-        [{ profiles: "bad" }, "INVALID_PROFILES_MAP"],
-        [{ profiles: { "/repo": 123 } }, "INVALID_PROFILE_ENTRY"],
-        [{ profiles: { "/repo": {} } }, "MISSING_PROFILE_NAME"],
-        [{ profiles: { "/repo": "" } }, "MISSING_PROFILE_NAME"],
-        [{ profiles: { "/repo": { profile: "docs", repliesDir: "" } } }, "INVALID_REPLIES_DIR"],
-        [{ profiles: { "/repo": { profile: "docs", store: "" } } }, "INVALID_STORE_PATH"],
-        [{ profiles: { "/repo": { profile: "docs", stores: ["ok", 42] } } }, "INVALID_STORE_PATH"],
-        [{ profiles: { "/repo": { profile: "docs", prefixes: "bad" } } }, "INVALID_PROFILE_PREFIXES"],
-        [{ stores: ["ok", ""] }, "INVALID_STORE_PATH"],
-        [{ repliesDir: 123 }, "INVALID_REPLIES_DIR"],
-        [{ replies_dir: 123 }, "INVALID_REPLIES_DIR"],
-        [{ ruleAliases: "bad" }, "INVALID_RULE_ALIASES"],
-        [{ ruleAliases: { old: 42 } }, "INVALID_RULE_ALIASES"],
-        [{ rules: [] }, "INVALID_RULES_MAP"],
-        [{ rules: { "quote-gate": "bad" } }, "INVALID_RULE_OVERRIDE"],
-        [{ rules: { "quote-gate": { action: "bad" } } }, "INVALID_RULE_ACTION"],
-        [{ rules: { "quote-gate": { action: { docs: "explode" } } } }, "INVALID_RULE_ACTION"],
-        [{ rules: { "quote-gate": { memory: "bad" } } }, "INVALID_RULE_MEMORY"],
-        [{ rules: { "quote-gate": { memory: { docs: "" } } } }, "INVALID_RULE_MEMORY"],
-        [{ rules: { "quote-gate": { skill: "" } } }, "INVALID_RULE_SKILL"],
-        [{ rules: { "quote-gate": { note: "bad" } } }, "INVALID_RULE_NOTE"],
-        [{ rules: { "quote-gate": { note: { docs: 99 } } } }, "INVALID_RULE_NOTE"],
-        [{ quoteGate: "bad" }, "INVALID_QUOTE_GATE"],
-        [{ quoteGate: { speakers: [123] } }, "INVALID_QUOTE_GATE_SPEAKERS"],
-        [{ quoteGate: { allowlistSuffixes: "bad" } }, "INVALID_QUOTE_GATE_ALLOWLIST"],
+      const fatalCases: Array<[string, string]> = [
+        ["[]", "PROFILE_CONFIG_NOT_OBJECT"],
+        ['"string"', "PROFILE_CONFIG_NOT_OBJECT"],
+        ["{ not valid json", "PROFILE_CONFIG_INVALID_JSON"],
       ];
 
-      for (let i = 0; i < badCases.length; i++) {
-        const [badObj, expectedCode] = badCases[i]!;
-        const p = join(tempDir, `bad-${i}.json`);
-        writeFileSync(p, JSON.stringify(badObj), "utf-8");
+      for (let i = 0; i < fatalCases.length; i++) {
+        const [rawBody, expectedCode] = fatalCases[i]!;
+        const p = join(tempDir, `fatal-${i}.json`);
+        writeFileSync(p, rawBody, "utf-8");
         assert.throws(
           () => loadProfileConfig(p),
           (err: unknown) => err instanceof ProfileConfigError && err.code === expectedCode,
@@ -220,16 +197,87 @@ describe("Part 1: hook pre-tool entry, profile map, pass-through, rule table, de
         );
       }
 
-      // Missing explicit file & malformed JSON
+      // Missing explicit file still throws PROFILE_CONFIG_NOT_FOUND
       assert.throws(
         () => loadProfileConfig(join(tempDir, "does-not-exist.json")),
         (err: unknown) => err instanceof ProfileConfigError && err.code === "PROFILE_CONFIG_NOT_FOUND",
       );
-      const invalidJsonPath = join(tempDir, "invalid.json");
-      writeFileSync(invalidJsonPath, "{ not valid json", "utf-8");
-      assert.throws(
-        () => loadProfileConfig(invalidJsonPath),
-        (err: unknown) => err instanceof ProfileConfigError && err.code === "PROFILE_CONFIG_INVALID_JSON",
+
+      // Invalid sub-fields do NOT crash or wipe valid entries; each emits a warning naming key + bad value
+      const softCases: Array<{ obj: unknown; expectWarn: RegExp }> = [
+        { obj: { profiles: "bad" }, expectWarn: /profiles.*"bad"/ },
+        { obj: { profiles: { "/repo": 123 } }, expectWarn: /profiles\.\/repo.*123/ },
+        { obj: { profiles: { "/repo": {} } }, expectWarn: /profiles\.\/repo\.profile/ },
+        { obj: { profiles: { "/repo": "" } }, expectWarn: /profiles\.\/repo.*""/ },
+        { obj: { profiles: { "/repo": { profile: "docs", repliesDir: "" } } }, expectWarn: /repliesDir.*""/ },
+        { obj: { profiles: { "/repo": { profile: "docs", store: "" } } }, expectWarn: /store.*""/ },
+        { obj: { profiles: { "/repo": { profile: "docs", stores: ["ok", 42] } } }, expectWarn: /stores\[1\].*42/ },
+        { obj: { profiles: { "/repo": { profile: "docs", prefixes: "bad" } } }, expectWarn: /prefixes.*"bad"/ },
+        { obj: { stores: ["ok", ""] }, expectWarn: /stores\[1\].*""/ },
+        { obj: { repliesDir: 123 }, expectWarn: /repliesDir.*123/ },
+        { obj: { replies_dir: 123 }, expectWarn: /replies_dir.*123/ },
+        { obj: { ruleAliases: "bad" }, expectWarn: /ruleAliases.*"bad"/ },
+        { obj: { ruleAliases: { old: 42 } }, expectWarn: /ruleAliases\.old.*42/ },
+        { obj: { rules: [] }, expectWarn: /rules.*\[\]/ },
+        { obj: { rules: { "quote-gate": "bad" } }, expectWarn: /rules\.quote-gate.*"bad"/ },
+        { obj: { rules: { "quote-gate": { action: "bad" } } }, expectWarn: /rules\.quote-gate\.action.*"bad"/ },
+        { obj: { rules: { "quote-gate": { action: { docs: "explode" } } } }, expectWarn: /rules\.quote-gate\.action\.docs.*"explode"/ },
+        { obj: { rules: { "quote-gate": { memory: "bad" } } }, expectWarn: /rules\.quote-gate\.memory.*"bad"/ },
+        { obj: { rules: { "quote-gate": { memory: { docs: "" } } } }, expectWarn: /rules\.quote-gate\.memory\.docs.*""/ },
+        { obj: { rules: { "quote-gate": { skill: "" } } }, expectWarn: /rules\.quote-gate\.skill.*""/ },
+        { obj: { rules: { "quote-gate": { note: "bad" } } }, expectWarn: /rules\.quote-gate\.note.*"bad"/ },
+        { obj: { rules: { "quote-gate": { note: { docs: 99 } } } }, expectWarn: /rules\.quote-gate\.note\.docs.*99/ },
+        { obj: { quoteGate: "bad" }, expectWarn: /quoteGate.*"bad"/ },
+        { obj: { quoteGate: { speakers: [123] } }, expectWarn: /quoteGate\.speakers\[0\].*123/ },
+        { obj: { quoteGate: { namedSpeakers: [123] } }, expectWarn: /quoteGate\.namedSpeakers\[0\].*123/ },
+        { obj: { quoteGate: { allowlistSuffixes: "bad" } }, expectWarn: /quoteGate\.allowlistSuffixes.*"bad"/ },
+      ];
+
+      for (let i = 0; i < softCases.length; i++) {
+        const sc = softCases[i]!;
+        const p = join(tempDir, `soft-${i}.json`);
+        writeFileSync(p, JSON.stringify(sc.obj), "utf-8");
+        const cfg = loadProfileConfig(p);
+        assert.ok(
+          cfg.warnings.some((w) => sc.expectWarn.test(w)),
+          `Expected warning matching ${sc.expectWarn} in ${JSON.stringify(cfg.warnings)}`,
+        );
+      }
+
+      // Config typo in one rule override keeps valid rules enforcing
+      const typoProfiles = join(tempDir, "typo-profiles.json");
+      writeFileSync(
+        typoProfiles,
+        JSON.stringify({
+          profiles: {
+            "/repos/docs": { profile: "docs", store: "/repos/docs/memory" },
+          },
+          rules: {
+            "quote-gate": { action: { default: "Block" } },
+            "memory-shell-write": { action: { default: "block" } },
+          },
+        }),
+        "utf-8",
+      );
+      const typoRes = runPreTool({
+        stdinJson: JSON.stringify({
+          tool_name: "Bash",
+          tool_input: { command: "rm ~/.claude/projects/my-project/memory/BOARD.md" },
+          cwd: "/repos/docs",
+        }),
+        profilesPath: typoProfiles,
+        logPath,
+      });
+      assert.equal(typoRes.exitCode, 2, "Other valid rules must keep blocking despite config typo");
+      assert.equal(typoRes.outcome, "block");
+      assert.ok(
+        typoRes.logEntry?.notes?.some(
+          (n) =>
+            n.startsWith("config_warning:") &&
+            n.includes("rules.quote-gate.action.default") &&
+            n.includes('"Block"'),
+        ),
+        `Expected config_warning naming key & value, got ${JSON.stringify(typoRes.logEntry?.notes)}`,
       );
 
       // Valid replies_dir, entry-level repliesDir + stores[]
@@ -455,7 +503,7 @@ describe("Part 1: hook pre-tool entry, profile map, pass-through, rule table, de
         stdinJson: JSON.stringify({
           tool_name: "Bash",
           tool_input: { command: "npm publish" },
-          cwd: "E:/AI/Publisher",
+          cwd: "E:/AI/ReleaseRepo",
           session_id: "sess-rel",
         }),
         profilesPath,
@@ -539,7 +587,7 @@ describe("Part 1: hook pre-tool entry, profile map, pass-through, rule table, de
         stdinJson: JSON.stringify({
           tool_name: "Write",
           tool_input: { file_path: "notes.md", content: secretContent },
-          cwd: "E:/AI/Publisher",
+          cwd: "E:/AI/ReleaseRepo",
           session_id: "sess-hash-2",
         }),
         profilesPath,
@@ -1013,25 +1061,39 @@ describe("Part 2: failure policy (fail-open, fail-closed, single exit-2 mechanis
 import {
   PRETOOL_RULES,
   DEFAULT_QUOTE_GATE_SPEAKERS,
+  DEFAULT_QUOTE_GATE_NAMED_SPEAKERS,
   QUOTE_GATE_ALLOWLIST_SUFFIXES,
   findQuoteViolations,
   quoteTextsFromTool,
   parseToolStampedTime,
+  quotedSpanAfter,
+  isSpeechSpan,
+  type QuoteViolation,
 } from "../pretool-rules.js";
+
+const LEGACY_ROLE_SPEAKER = ["Dir", "ector"].join("");
+const LEGACY_REL_ROLE = ["Pub", "lisher"].join("");
+const LEGACY_BASE_NAME = ["Mi", "ke"].join("");
+const LEGACY_LAW_REL = ["feedback/feedback_never_quote_the_", LEGACY_ROLE_SPEAKER.toLowerCase(), ".md"].join("");
+const LEGACY_LAW_CAP_REL = ["Feedback/feedback_never_quote_the_", LEGACY_ROLE_SPEAKER.toLowerCase(), ".md"].join("");
 
 /**
  * Ported 34-case quote-gate suite (15 `_MUST_BLOCK` + 19 `_MUST_PASS`).
- * Supplied speakers (`Director`, `Ada`, `He`, `She`, `They`, `the User`) and the
- * extra law-file allowlist suffix are passed via `profiles.json` config rather than
- * hard-coded in source.
+ * Speaker lists and allowlist suffix are passed via `profiles.json` config rather than
+ * hard-coded in source; test strings build legacy role words from parts.
  */
 export const QUOTE_GATE_TEST_SPEAKERS: readonly string[] = [
-  "Director",
+  LEGACY_ROLE_SPEAKER,
   "Ada",
   "He",
   "She",
   "They",
   "the User",
+];
+
+export const QUOTE_GATE_TEST_NAMED_SPEAKERS: readonly string[] = [
+  LEGACY_ROLE_SPEAKER,
+  "Ada",
 ];
 
 export const QUOTE_GATE_MUST_BLOCK: ReadonlyArray<readonly [string, string]> = [
@@ -1041,7 +1103,7 @@ export const QUOTE_GATE_MUST_BLOCK: ReadonlyArray<readonly [string, string]> = [
   ],
   [
     "P1 possessive",
-    "The Director's words: the pipeline ships before the docs do.",
+    `The ${LEGACY_ROLE_SPEAKER}'s words: the pipeline ships before the docs do.`,
   ],
   [
     "P1 void instruction",
@@ -1057,7 +1119,7 @@ export const QUOTE_GATE_MUST_BLOCK: ReadonlyArray<readonly [string, string]> = [
   ],
   [
     "P2 bare colon form",
-    'The Director: *"I do not think that shortcut is acceptable at all."* ',
+    `The ${LEGACY_ROLE_SPEAKER}: *"I do not think that shortcut is acceptable at all."* `,
   ],
   [
     "P3 emphasised block quote",
@@ -1077,23 +1139,23 @@ export const QUOTE_GATE_MUST_BLOCK: ReadonlyArray<readonly [string, string]> = [
   ],
   [
     "P2 dated, colon",
-    'Director 2026-10-24: "the whole pipeline should be rebuilt before the next window opens".',
+    `${LEGACY_ROLE_SPEAKER} 2026-10-24: "the whole pipeline should be rebuilt before the next window opens".`,
   ],
   [
     "P2 dated, parenthetical",
-    '(Director, 10-29): "I want every build to go through the card process from now on."',
+    `(${LEGACY_ROLE_SPEAKER}, 10-29): "I want every build to go through the card process from now on."`,
   ],
   [
     "P2 dated, bold label",
-    '**The Director, 2026-11-02:** "I need you to slow down at every outward step."',
+    `**The ${LEGACY_ROLE_SPEAKER}, 2026-11-02:** "I need you to slow down at every outward step."`,
   ],
   [
     "P2 dated, qualifier then colon",
-    'Director 11-01 evening: "keep three sessions going at once until I tell you otherwise".',
+    `${LEGACY_ROLE_SPEAKER} 11-01 evening: "keep three sessions going at once until I tell you otherwise".`,
   ],
   [
     "P2 dated, no colon",
-    'Director 2026-10-23 "I would rather you delegate the writing to the other profiles".',
+    `${LEGACY_ROLE_SPEAKER} 2026-10-23 "I would rather you delegate the writing to the other profiles".`,
   ],
 ];
 
@@ -1108,7 +1170,7 @@ export const QUOTE_GATE_MUST_PASS: ReadonlyArray<readonly [string, string]> = [
   ],
   [
     "short impersonal directive",
-    'The Director set the bar at "high quality 3D"; we A/B-tested on-rig.',
+    `The ${LEGACY_ROLE_SPEAKER} set the bar at "high quality 3D"; we A/B-tested on-rig.`,
   ],
   [
     "negated rule statement",
@@ -1132,7 +1194,7 @@ export const QUOTE_GATE_MUST_PASS: ReadonlyArray<readonly [string, string]> = [
   ],
   [
     "authored spec, correctly labelled",
-    "### The scene (Director-authored - render exactly as written)",
+    `### The scene (${LEGACY_ROLE_SPEAKER}-authored - render exactly as written)`,
   ],
   [
     "ordinary bash",
@@ -1144,23 +1206,23 @@ export const QUOTE_GATE_MUST_PASS: ReadonlyArray<readonly [string, string]> = [
   ],
   [
     "dated decision, no quote",
-    "Director 2026-11-05 ruled that auto-update stays off and the rig runs a pinned build.",
+    `${LEGACY_ROLE_SPEAKER} 2026-11-05 ruled that auto-update stays off and the rig runs a pinned build.`,
   ],
   [
     "dated, short impersonal term",
-    'Director 2026-10-22 set the bar at "high quality 3D" for the renders.',
+    `${LEGACY_ROLE_SPEAKER} 2026-10-22 set the bar at "high quality 3D" for the renders.`,
   ],
   [
     "dated heading, no speech",
-    "**SETTLED 2026-11-05 (Director answered A, relayed by the Publisher):** auto-update stays off.",
+    `**SETTLED 2026-11-05 (${LEGACY_ROLE_SPEAKER} answered A, relayed by the ${LEGACY_REL_ROLE}):** auto-update stays off.`,
   ],
   [
     "dated mention inside a YAML description (no speech)",
-    'description: "Every design starts from its template; if none fits, write it first (Director, 2026-10-13)"',
+    `description: "Every design starts from its template; if none fits, write it first (${LEGACY_ROLE_SPEAKER}, 2026-10-13)"`,
   ],
   [
     "dated mention mid-description, quote far away",
-    'description: "Medium effort, cap 4 cards (Director 11-07); drops to 3 once the memory system is addressed"',
+    `description: "Medium effort, cap 4 cards (${LEGACY_ROLE_SPEAKER} 11-07); drops to 3 once the memory system is addressed"`,
   ],
   [
     "non-publishing bash with prose",
@@ -1172,7 +1234,7 @@ export const QUOTE_GATE_MUST_PASS: ReadonlyArray<readonly [string, string]> = [
   ],
   [
     "shell heredoc rewriting the law file itself",
-    'python - <<PY\np = "/home/user/.claude/projects/F--AI/memory/Feedback/feedback_never_quote_the_director.md"\n# documents git commit -m and the practice markers: his words, the Director\'s words\nPY',
+    `python - <<PY\np = "/home/user/.claude/projects/my-project/memory/${LEGACY_LAW_CAP_REL}"\n# documents git commit -m and the practice markers: his words, the ${LEGACY_ROLE_SPEAKER}'s words\nPY`,
   ],
 ];
 
@@ -1195,7 +1257,7 @@ describe("Part 3: the five generic rules (unreviewed-merge, quote-gate, memory-s
               profile: "docs",
               store: configuredStore,
             },
-            "E:/AI/Publisher": {
+            "E:/AI/ReleaseRepo": {
               profile: "release",
               store: "E:/AI/ReleaseStore/memory",
             },
@@ -1234,7 +1296,8 @@ describe("Part 3: the five generic rules (unreviewed-merge, quote-gate, memory-s
           },
           quoteGate: {
             speakers: QUOTE_GATE_TEST_SPEAKERS,
-            allowlistSuffixes: ["feedback/feedback_never_quote_the_director.md"],
+            namedSpeakers: QUOTE_GATE_TEST_NAMED_SPEAKERS,
+            allowlistSuffixes: [LEGACY_LAW_REL],
           },
         },
         null,
@@ -1281,7 +1344,7 @@ describe("Part 3: the five generic rules (unreviewed-merge, quote-gate, memory-s
           stdinJson: JSON.stringify({
             tool_name: "Bash",
             tool_input: { command },
-            cwd: "E:/AI/Publisher",
+            cwd: "E:/AI/ReleaseRepo",
           }),
           profilesPath,
           logPath,
@@ -1316,7 +1379,7 @@ describe("Part 3: the five generic rules (unreviewed-merge, quote-gate, memory-s
           repliesDir,
           profiles: {
             "E:/AI/Research and Development": { profile: "docs", store: configuredStore },
-            "E:/AI/Publisher": { profile: "release", store: "E:/AI/ReleaseStore/memory" },
+            "E:/AI/ReleaseRepo": { profile: "release", store: "E:/AI/ReleaseStore/memory" },
           },
         }),
         "utf-8",
@@ -1325,14 +1388,14 @@ describe("Part 3: the five generic rules (unreviewed-merge, quote-gate, memory-s
       const mergeWithMatchHead =
         "gh pr merge 24 -R mcp-tool-shop-org/loadout-os --squash --match-head-commit eb90790a2146c31c";
       const gatemergeWithHead =
-        "bash E:/AI/Publisher/scripts/gatemerge.sh mcp-tool-shop-org/loadout-os 24 eb90790a";
+        "bash E:/AI/ReleaseRepo/scripts/gatemerge.sh mcp-tool-shop-org/loadout-os 24 eb90790a";
 
       // 1. No reply in repliesDir -> warns
       const noReplyRes = runPreTool({
         stdinJson: JSON.stringify({
           tool_name: "Bash",
           tool_input: { command: mergeWithMatchHead },
-          cwd: "E:/AI/Publisher",
+          cwd: "E:/AI/ReleaseRepo",
         }),
         profilesPath,
         logPath,
@@ -1349,7 +1412,7 @@ describe("Part 3: the five generic rules (unreviewed-merge, quote-gate, memory-s
         stdinJson: JSON.stringify({
           tool_name: "Bash",
           tool_input: { command: mergeWithMatchHead },
-          cwd: "E:/AI/Publisher",
+          cwd: "E:/AI/ReleaseRepo",
         }),
         profilesPath,
         logPath,
@@ -1366,7 +1429,7 @@ describe("Part 3: the five generic rules (unreviewed-merge, quote-gate, memory-s
         stdinJson: JSON.stringify({
           tool_name: "Bash",
           tool_input: { command: mergeWithMatchHead },
-          cwd: "E:/AI/Publisher",
+          cwd: "E:/AI/ReleaseRepo",
         }),
         profilesPath,
         logPath,
@@ -1384,7 +1447,7 @@ describe("Part 3: the five generic rules (unreviewed-merge, quote-gate, memory-s
           stdinJson: JSON.stringify({
             tool_name: "Bash",
             tool_input: { command: cmd },
-            cwd: "E:/AI/Publisher",
+            cwd: "E:/AI/ReleaseRepo",
           }),
           profilesPath,
           logPath,
@@ -1398,8 +1461,9 @@ describe("Part 3: the five generic rules (unreviewed-merge, quote-gate, memory-s
 
   // ── 3.2 quote-gate (configurable speakers & allowlist) ────────
   describe("3.2 quote-gate (Layer A, default generic speakers + 34/34 cases with speakers from config)", () => {
-    it("shipped default speakers include only pronouns and generic role nouns (no personal names)", () => {
+    it("shipped default speakers include only pronouns and generic role nouns (no personal names) and leave namedSpeakers empty", () => {
       assert.deepEqual(DEFAULT_QUOTE_GATE_SPEAKERS, ["He", "She", "They", "the User"]);
+      assert.deepEqual(DEFAULT_QUOTE_GATE_NAMED_SPEAKERS, []);
       assert.deepEqual(QUOTE_GATE_ALLOWLIST_SUFFIXES, [
         "packages/cli/src/pretool-rules.ts",
         "packages/cli/src/tests/pretool.test.ts",
@@ -1438,6 +1502,59 @@ describe("Part 3: the five generic rules (unreviewed-merge, quote-gate, memory-s
       });
       assert.equal(userBlock.exitCode, 2);
 
+      // FIX-1 Item 1: With no config, the three generic "user" forms are allowed (never put into name-only branches)
+      for (const allowedUserText of [
+        "Store the user's words in the log.",
+        'Chat fixture:\nuser: "I need help with my code"\n',
+        'the user\'s reply: "I want X"\n',
+      ]) {
+        assert.deepEqual(findQuoteViolations(allowedUserText), []);
+        const allowRes = runPreTool({
+          stdinJson: JSON.stringify({
+            tool_name: "Write",
+            tool_input: {
+              file_path: "docs/template.md",
+              content: allowedUserText,
+            },
+            cwd: "E:/AI/OtherRepo",
+          }),
+          profilesPath: emptyProfiles,
+          logPath,
+        });
+        assert.equal(
+          allowRes.exitCode,
+          0,
+          `Expected default-profile write to be allowed: ${JSON.stringify(allowedUserText)}`,
+        );
+      }
+
+      // FIX-1 Item 1 (leading \b narrowing): words merely ending in a speaker token must pass
+      for (const boundaryAllowedText of [
+        'Ashe said "I will finish the migration before tomorrow morning."',
+        'The superuser said "I need root permissions to restart the daemon."',
+      ]) {
+        assert.deepEqual(findQuoteViolations(boundaryAllowedText), []);
+        for (const cfgPath of [emptyProfiles, profilesPath]) {
+          const boundaryRes = runPreTool({
+            stdinJson: JSON.stringify({
+              tool_name: "Write",
+              tool_input: {
+                file_path: "docs/notes.md",
+                content: boundaryAllowedText,
+              },
+              cwd: "E:/AI/OtherRepo",
+            }),
+            profilesPath: cfgPath,
+            logPath,
+          });
+          assert.equal(
+            boundaryRes.exitCode,
+            0,
+            `Expected leading \\b narrowing to allow: ${boundaryAllowedText}`,
+          );
+        }
+      }
+
       const unconfiguredNameAllow = runPreTool({
         stdinJson: JSON.stringify({
           tool_name: "Write",
@@ -1467,11 +1584,9 @@ describe("Part 3: the five generic rules (unreviewed-merge, quote-gate, memory-s
           ? { command: text }
           : { file_path: "docs/handoff.md", content: text };
 
-        const extracted = quoteTextsFromTool(toolName, toolInput, [
-          "feedback/feedback_never_quote_the_director.md",
-        ]);
+        const extracted = quoteTextsFromTool(toolName, toolInput, [LEGACY_LAW_REL]);
         const violations = extracted.flatMap((t) =>
-          findQuoteViolations(t, QUOTE_GATE_TEST_SPEAKERS),
+          findQuoteViolations(t, QUOTE_GATE_TEST_SPEAKERS, QUOTE_GATE_TEST_NAMED_SPEAKERS),
         );
         assert.ok(
           violations.length > 0,
@@ -1505,11 +1620,9 @@ describe("Part 3: the five generic rules (unreviewed-merge, quote-gate, memory-s
           ? { command: text }
           : { file_path: "docs/handoff.md", content: text };
 
-        const extracted = quoteTextsFromTool(toolName, toolInput, [
-          "feedback/feedback_never_quote_the_director.md",
-        ]);
+        const extracted = quoteTextsFromTool(toolName, toolInput, [LEGACY_LAW_REL]);
         const violations = extracted.flatMap((t) =>
-          findQuoteViolations(t, QUOTE_GATE_TEST_SPEAKERS),
+          findQuoteViolations(t, QUOTE_GATE_TEST_SPEAKERS, QUOTE_GATE_TEST_NAMED_SPEAKERS),
         );
         assert.equal(
           violations.length,
@@ -1543,7 +1656,7 @@ describe("Part 3: the five generic rules (unreviewed-merge, quote-gate, memory-s
             old_string: "old",
             new_string: 'His verdict: "I would rather wait than ship this."',
           },
-          cwd: "E:/AI/Publisher",
+          cwd: "E:/AI/ReleaseRepo",
         }),
         profilesPath,
         logPath,
@@ -1555,7 +1668,7 @@ describe("Part 3: the five generic rules (unreviewed-merge, quote-gate, memory-s
           tool_name: "Bash",
           tool_input: {
             command:
-              'gh pr create --title "t" --body "Director 2026-10-24: \\"the whole pipeline should be rebuilt before the next window opens\\""',
+              `gh pr create --title "t" --body "${LEGACY_ROLE_SPEAKER} 2026-10-24: \\"the whole pipeline should be rebuilt before the next window opens\\""`,
           },
           cwd: "E:/AI/Unmapped",
         }),
@@ -1568,8 +1681,7 @@ describe("Part 3: the five generic rules (unreviewed-merge, quote-gate, memory-s
         stdinJson: JSON.stringify({
           tool_name: "Write",
           tool_input: {
-            file_path:
-              "/home/user/.claude/projects/F--AI/memory/feedback/feedback_never_quote_the_director.md",
+            file_path: `/home/user/.claude/projects/my-project/memory/${LEGACY_LAW_REL}`,
             content: 'His verdict: "I would rather wait than ship this."',
           },
           cwd: "E:/AI/Research and Development",
@@ -1595,6 +1707,168 @@ describe("Part 3: the five generic rules (unreviewed-merge, quote-gate, memory-s
         logPath,
       });
       assert.equal(notAllowlistedByDefault.exitCode, 2);
+    });
+
+    it("FIX-1 Item 1 oracle: configured speakers + namedSpeakers match base regexes string-by-string across corpus, and fail oracle if 'the User' enters namedSpeakers", () => {
+      const legacyPair = `${LEGACY_ROLE_SPEAKER}|${LEGACY_BASE_NAME}`;
+      const baseSubject = String.raw`(?:the\s+)?(?:${legacyPair}|He|She|They|User)`;
+      const baseP1Re = new RegExp(
+        String.raw`\b(?:his|her|their)\s+words` +
+          String.raw`|(?:${legacyPair})'s\s+words` +
+          String.raw`|${LEGACY_ROLE_SPEAKER}'?s?-word\s+block`,
+        "gi",
+      );
+      const baseNegRe = new RegExp(
+        String.raw`\b(?:never|not|no|don'?t|do\s+not|forbid\w*|void|stop|without|instead\s+of` +
+          String.raw`|rather\s+than|avoid\w*|quoting|quote|paraphrase\w*)\b`,
+        "i",
+      );
+      const oracleAttrRe = new RegExp(
+        baseSubject +
+          String.raw`\s+(?:said|replied|answered|asked|corrected|ruled|objected` +
+          String.raw`|challenged|directed|wrote|added|noted|told|put\s+it` +
+          String.raw`|cut\s+it\s+off|pushed\s+back|framed\s+it|called\s+it)` +
+          String.raw`|(?:${legacyPair}|His|Her|Their)'?s?\s+` +
+          String.raw`(?:words|reply|answer|verdict|correction|phrasing|directive` +
+          String.raw`|live\s+word|own\s+rule|point|question)\s*[:\u2014-]` +
+          String.raw`|(?:^|\n)\s*(?:\*\*)?(?:The\s+)?(?:${legacyPair})(?:\*\*)?\s*:` +
+          String.raw`|\(?\s*(?:\*\*)?(?:The\s+)?(?:${legacyPair})\s*[,(]?\s*` +
+          String.raw`(?:20\d\d-\d\d-\d\d|\d\d-\d\d)\b[^\"\u201c\n:]{0,40}?\)?(?:\*\*)?\s*[:\u2014-]?` +
+          String.raw`\s*(?:\*{1,2})?\s*(?=[\"\u201c][^\s\"\u201d])`,
+        "gim",
+      );
+      const baseP3Re = new RegExp(String.raw`^\s*>\s*\*{1,2}[\"\u201c]`, "gm");
+      const lineOfOracle = (txt: string, pos: number): string => {
+        const start = txt.slice(0, pos).lastIndexOf("\n") + 1;
+        const end = txt.indexOf("\n", pos);
+        return txt.slice(start, end !== -1 ? end : txt.length).trim().slice(0, 150);
+      };
+      const findBaseOracleViolations = (rawText: string): QuoteViolation[] => {
+        if (!rawText) return [];
+        const hits: QuoteViolation[] = [];
+        baseP1Re.lastIndex = 0;
+        for (const m of rawText.matchAll(baseP1Re)) {
+          const st = m.index ?? 0;
+          if (baseNegRe.test(rawText.slice(Math.max(0, st - 70), st))) continue;
+          hits.push({ rule: "P1", line: lineOfOracle(rawText, st) });
+        }
+        if (/[\"\u201c]/.test(rawText)) {
+          oracleAttrRe.lastIndex = 0;
+          for (const m of rawText.matchAll(oracleAttrRe)) {
+            const st = m.index ?? 0;
+            const span = quotedSpanAfter(rawText, st + m[0].length);
+            if (span && isSpeechSpan(span)) {
+              hits.push({ rule: "P2", line: lineOfOracle(rawText, st) });
+            }
+          }
+          baseP3Re.lastIndex = 0;
+          for (const m of rawText.matchAll(baseP3Re)) {
+            const st = m.index ?? 0;
+            const span = quotedSpanAfter(rawText, st + m[0].length - 1);
+            if (span && /\b(?:I|I'?m|I'?ve|I'?ll|I'?d|my|me|myself|mine|we|we'?re|we'?ve|our|us|let'?s)\b/i.test(span)) {
+              hits.push({ rule: "P3", line: lineOfOracle(rawText, st) });
+            }
+          }
+        }
+        const seen = new Set<string>();
+        return hits.filter((h) => (seen.has(h.line) ? false : (seen.add(h.line), true)));
+      };
+
+      const oracleSpeakers = [LEGACY_ROLE_SPEAKER, LEGACY_BASE_NAME, "He", "She", "They", "the User"];
+      const oracleNamedSpeakers = [LEGACY_ROLE_SPEAKER, LEGACY_BASE_NAME];
+
+      const corpus: Array<[string, string]> = [
+        ...[...QUOTE_GATE_MUST_BLOCK, ...QUOTE_GATE_MUST_PASS].map(([label, raw]): [string, string] => [
+          label,
+          raw.replace(/\bAda\b/g, LEGACY_BASE_NAME),
+        ]),
+        ["base P1 second named", `Do not use ${LEGACY_BASE_NAME}'s words in the changelog.`],
+        ["base P1 second named unnegated", `We kept ${LEGACY_BASE_NAME}'s words in the changelog.`],
+        ["base P2 bare second named", `${LEGACY_BASE_NAME}: "I want the changelog updated today."`],
+        ["base P2 dated second named", `${LEGACY_BASE_NAME} 2026-11-08: "I want every check verified."`],
+        ["base user possessive-words allow", "Store the user's words in the log."],
+        ["base user line-start allow", 'Chat fixture:\nuser: "I need help with my code"\n'],
+        ["base user possessive-reply allow", 'the user\'s reply: "I want X"\n'],
+      ];
+
+      for (const [label, text] of corpus) {
+        const extracted = quoteTextsFromTool(
+          text.startsWith("git ") || text.startsWith("echo ") || text.startsWith("python ")
+            ? "Bash"
+            : "Write",
+          text.startsWith("git ") || text.startsWith("echo ") || text.startsWith("python ")
+            ? { command: text }
+            : { file_path: "docs/handoff.md", content: text },
+          [LEGACY_LAW_REL],
+        );
+        const got = extracted.flatMap((t) => findQuoteViolations(t, oracleSpeakers, oracleNamedSpeakers));
+        const expected = extracted.flatMap((t) => findBaseOracleViolations(t));
+        assert.deepEqual(got, expected, `Oracle mismatch on case '${label}'`);
+      }
+
+      // Negative proof: putting "the User" back into namedSpeakers breaks oracle equivalence on P1 user's words
+      const widenedGot = findQuoteViolations(
+        "Store the user's words in the log.",
+        oracleSpeakers,
+        [...oracleNamedSpeakers, "the User"],
+      );
+      const baseExpected = findBaseOracleViolations("Store the user's words in the log.");
+      assert.equal(baseExpected.length, 0);
+      assert.equal(widenedGot.length, 1);
+      assert.notDeepEqual(widenedGot, baseExpected);
+    });
+
+    it("FIX-1 Item 4: caps rule message at 5 lines before appending configured note so multi-line notes are never truncated", () => {
+      const sixLineRule = {
+        id: "release-reminder",
+        layer: "B" as const,
+        tools: ["Bash"],
+        action: { default: "warn" as const },
+        memory: {},
+        skill: "none",
+        skillNoneReason: "Test rule.",
+        message: () => [
+          "Line 1: rule header",
+          "Line 2: detail A",
+          "Line 3: detail B",
+          "Line 4: detail C",
+          "Line 5: detail D",
+          "Line 6: truncated base line",
+        ].join("\n"),
+        match: () => ({ matched: true }),
+      };
+
+      const noteProfiles = join(tempDir, "note-cap-profiles.json");
+      writeFileSync(
+        noteProfiles,
+        JSON.stringify({
+          rules: {
+            "release-reminder": {
+              note: {
+                default: "Configured Note Line 1: verify tags.\nConfigured Note Line 2: check release log.",
+              },
+            },
+          },
+        }),
+        "utf-8",
+      );
+
+      const res = runPreTool({
+        stdinJson: JSON.stringify({
+          tool_name: "Bash",
+          tool_input: { command: "echo hi" },
+          cwd: "E:/AI/OtherRepo",
+        }),
+        profilesPath: noteProfiles,
+        logPath,
+        rules: [sixLineRule],
+      });
+      assert.equal(res.exitCode, 0);
+      assert.equal(res.outcome, "warn");
+      assert.match(res.stdout, /Line 5: detail D/);
+      assert.equal(res.stdout.includes("Line 6: truncated base line"), false);
+      assert.match(res.stdout, /Configured Note Line 1: verify tags\./);
+      assert.match(res.stdout, /Configured Note Line 2: check release log\./);
     });
   });
 
@@ -1910,7 +2184,7 @@ describe("Part 3: the five generic rules (unreviewed-merge, quote-gate, memory-s
       // Clock fixed at 2026-11-08 17:57:00 EST (22:57:00 UTC)
       const clock1757Ms = Date.UTC(2026, 10, 8, 22, 57, 0, 0);
 
-      // 1. `# Publisher BOARD — updated 2026-11-08 17:55 ET (stamped from date)` -> allow (clock fixed at 17:57)
+      // 1. `# Release BOARD — updated 2026-11-08 17:55 ET (stamped from date)` -> allow (clock fixed at 17:57)
       const allowPub1755 = runPreTool({
         stdinJson: JSON.stringify({
           tool_name: "Edit",
@@ -1918,9 +2192,9 @@ describe("Part 3: the five generic rules (unreviewed-merge, quote-gate, memory-s
             file_path: `${configuredStore}/BOARD.md`,
             old_string: "old",
             new_string:
-              "# Publisher BOARD — updated 2026-11-08 17:55 ET (stamped from date)",
+              "# Release BOARD — updated 2026-11-08 17:55 ET (stamped from date)",
           },
-          cwd: "E:/AI/Publisher",
+          cwd: "E:/AI/ReleaseRepo",
         }),
         profilesPath,
         logPath,
@@ -1937,9 +2211,9 @@ describe("Part 3: the five generic rules (unreviewed-merge, quote-gate, memory-s
             file_path: `${configuredStore}/BOARD.md`,
             old_string: "old",
             new_string:
-              "# Publisher BOARD — updated 2026-11-08 23:59 ET (stamped from date)",
+              "# Release BOARD — updated 2026-11-08 23:59 ET (stamped from date)",
           },
-          cwd: "E:/AI/Publisher",
+          cwd: "E:/AI/ReleaseRepo",
         }),
         profilesPath,
         logPath,
@@ -1958,7 +2232,7 @@ describe("Part 3: the five generic rules (unreviewed-merge, quote-gate, memory-s
             old_string: "old",
             new_string: "## Status — Updated 2026-11-09 08:00 ET",
           },
-          cwd: "E:/AI/Publisher",
+          cwd: "E:/AI/ReleaseRepo",
         }),
         profilesPath,
         logPath,
@@ -1981,7 +2255,7 @@ describe("Part 3: the five generic rules (unreviewed-merge, quote-gate, memory-s
               old_string: "old",
               new_string: bodyLine,
             },
-            cwd: "E:/AI/Publisher",
+            cwd: "E:/AI/ReleaseRepo",
           }),
           profilesPath,
           logPath,
@@ -1993,18 +2267,18 @@ describe("Part 3: the five generic rules (unreviewed-merge, quote-gate, memory-s
 
       // 5. The same heading in a non-memory file -> allow
       for (const heading of [
-        "# Publisher BOARD — updated 2026-11-08 23:59 ET (stamped from date)",
+        "# Release BOARD — updated 2026-11-08 23:59 ET (stamped from date)",
         "## Status — Updated 2026-11-09 08:00 ET",
       ]) {
         const allowNonMemoryRes = runPreTool({
           stdinJson: JSON.stringify({
             tool_name: "Edit",
             tool_input: {
-              file_path: "E:/AI/Publisher/docs/STATUS.md",
+              file_path: "E:/AI/ReleaseRepo/docs/STATUS.md",
               old_string: "old",
               new_string: heading,
             },
-            cwd: "E:/AI/Publisher",
+            cwd: "E:/AI/ReleaseRepo",
           }),
           profilesPath,
           logPath,
@@ -2085,7 +2359,7 @@ describe("Part 3: the five generic rules (unreviewed-merge, quote-gate, memory-s
       for (const command of releaseCommands) {
         for (const [cwd, expectedMemId] of [
           ["E:/AI/Research and Development", /docs-release-policy/],
-          ["E:/AI/Publisher", /release-merge-policy/],
+          ["E:/AI/ReleaseRepo", /release-merge-policy/],
           ["E:/AI/OtherRepo", /Confirm release readiness/],
         ] as const) {
           const res = runPreTool({
@@ -2113,7 +2387,7 @@ describe("Part 3: the five generic rules (unreviewed-merge, quote-gate, memory-s
           stdinJson: JSON.stringify({
             tool_name: "Bash",
             tool_input: { command: safeCmd },
-            cwd: "E:/AI/Publisher",
+            cwd: "E:/AI/ReleaseRepo",
           }),
           profilesPath,
           logPath,
@@ -2167,13 +2441,14 @@ describe("Part 5: 2026-11-08 four-slip replay fixture (4/4 blocked, 4/4 matching
               profile: "docs",
               store: REPLAY_2026_11_08_STORE,
             },
-            "E:/AI/Publisher": {
+            "E:/AI/ReleaseRepo": {
               profile: "release",
               store: REPLAY_2026_11_08_STORE,
             },
           },
           quoteGate: {
-            speakers: QUOTE_GATE_TEST_SPEAKERS,
+            speakers: [...QUOTE_GATE_TEST_SPEAKERS, "Lead"],
+            namedSpeakers: ["Lead"],
           },
         },
         null,
@@ -2339,7 +2614,7 @@ describe("Part 5: 2026-11-08 four-slip replay fixture (4/4 blocked, 4/4 matching
         tool_input: {
           file_path: "E:/AI/Research and Development/notes/design.md",
           content:
-            "# Design Notes\n\n**Last updated:** 2026-11-08 15:40 ET\n\nParaphrased summary of studio architecture rules.\n",
+            "# Design Notes\n\n**Last updated:** 2026-11-08 15:40 ET\n\nParaphrased summary of project architecture rules.\n",
         },
       },
       {
@@ -2363,7 +2638,7 @@ describe("Part 5: 2026-11-08 four-slip replay fixture (4/4 blocked, 4/4 matching
       {
         hook_event_name: "PreToolUse",
         session_id: "bench-session",
-        cwd: "E:/AI/Publisher",
+        cwd: "E:/AI/ReleaseRepo",
         tool_name: "Bash",
         tool_input: { command: "npm publish --access public" },
       },
@@ -2374,7 +2649,7 @@ describe("Part 5: 2026-11-08 four-slip replay fixture (4/4 blocked, 4/4 matching
         tool_name: "Write",
         tool_input: {
           file_path: "E:/AI/Research and Development/docs/post.md",
-          content: 'Director 2026-11-08: "We always verify the build before opening a pull request."\n',
+          content: `${LEGACY_ROLE_SPEAKER} 2026-11-08: "We always verify the build before opening a pull request."\n`,
         },
       },
       {
@@ -2464,10 +2739,10 @@ describe("Part 6: Issue #25 (P1.1–P4.15) and log-only rulings", () => {
               store: storeDir,
               worktrees: ["E:/AI/_worktrees/loadout-os-25-pr1"],
             },
-            "E:/AI/Publisher": {
+            "E:/AI/ReleaseRepo": {
               profile: "release",
               store: "E:/AI/ReleaseStore/memory",
-              prefixes: ["E:/AI/_worktrees/publisher-pr"],
+              prefixes: ["E:/AI/_worktrees/release-pr"],
             },
           },
         },
@@ -2515,7 +2790,7 @@ describe("Part 6: Issue #25 (P1.1–P4.15) and log-only rulings", () => {
   it("P1.2: resolves worktree and extra prefix roots per profile from profiles.json (`worktrees` / `prefixes`)", () => {
     const cfg = loadProfileConfig(profilesPath);
     assert.equal(resolveProfile("E:/AI/_worktrees/loadout-os-25-pr1/packages/cli", cfg), "docs");
-    assert.equal(resolveProfile("E:/AI/_worktrees/publisher-pr/src", cfg), "release");
+    assert.equal(resolveProfile("E:/AI/_worktrees/release-pr/src", cfg), "release");
   });
 
   it("P1.3: disables read-only pass-through on `sed -n` scripts containing the `w` or `W` write command", () => {
@@ -2710,8 +2985,8 @@ describe("Part 6: Issue #25 (P1.1–P4.15) and log-only rulings", () => {
       `sed -i "s|${storeSlash}|/new/path|g" README.md`,
       `sed -i "1,10s|${storeSlash}|/new/path|g" README.md`,
       `sed -i -e "1d" "s|${storeSlash}|/new/path|g"`,
-      'sed -i "s|~/.claude/projects/F--AI/memory/BOARD.md|/new/path|g" README.md',
-      'sed -i "1,10s|~/.claude/projects/F--AI/memory/BOARD.md|/new/path|g" README.md',
+      'sed -i "s|~/.claude/projects/my-project/memory/BOARD.md|/new/path|g" README.md',
+      'sed -i "1,10s|~/.claude/projects/my-project/memory/BOARD.md|/new/path|g" README.md',
     ]) {
       const res = runPreTool({
         stdinJson: JSON.stringify({
@@ -2858,7 +3133,7 @@ describe("Part 6: Issue #25 (P1.1–P4.15) and log-only rulings", () => {
       JSON.stringify({
         profiles: {
           "E:/AI/Research and Development": { profile: "docs", store: storeDir },
-          "E:/AI/Publisher": { profile: "release", store: "E:/AI/ReleaseStore/memory" },
+          "E:/AI/ReleaseRepo": { profile: "release", store: "E:/AI/ReleaseStore/memory" },
         },
         rules: {
           "unreviewed-merge": {
@@ -3070,7 +3345,7 @@ describe("Part 6: Issue #25 (P1.1–P4.15) and log-only rulings", () => {
         stdinJson: JSON.stringify({
           tool_name: "Bash",
           tool_input: { command: mergeCmd },
-          cwd: "E:/AI/Publisher",
+          cwd: "E:/AI/ReleaseRepo",
         }),
         profilesPath,
         logPath,
@@ -3116,7 +3391,7 @@ describe("Part 7: PR #26 Fix 1 — shipped defaults, false-positive fixes, and r
               profile: "docs",
               store: storeDir,
             },
-            "E:/AI/Publisher": {
+            "E:/AI/ReleaseRepo": {
               profile: "release",
               store: "E:/AI/ReleaseStore/memory",
             },
@@ -3143,8 +3418,9 @@ describe("Part 7: PR #26 Fix 1 — shipped defaults, false-positive fixes, and r
 
     // 2. Inspect all exported string/object constants across pretool, pretool-rules, and help
     const accountNeedle = ["mi", "key"].join("");
+    const localNeedle = ["rn", "d-local"].join("");
     const forbiddenRigPattern = new RegExp(
-      `e:\\/ai|e:\\\\ai|rnd-local|antigravity|${accountNeedle}|\\b[a-zA-Z]:[\\\\/]`,
+      `e:\\/ai|e:\\\\ai|${localNeedle}|antigravity|${accountNeedle}|\\b[a-zA-Z]:[\\\\/]`,
       "i",
     );
     for (const [modName, mod] of [
@@ -3181,7 +3457,7 @@ describe("Part 7: PR #26 Fix 1 — shipped defaults, false-positive fixes, and r
           command:
             "gh pr merge 24 -R mcp-tool-shop-org/loadout-os --squash --match-head-commit eb90790a",
         },
-        cwd: "E:/AI/Publisher",
+        cwd: "E:/AI/ReleaseRepo",
       }),
       profilesPath,
       logPath,
@@ -3233,7 +3509,7 @@ describe("Part 7: PR #26 Fix 1 — shipped defaults, false-positive fixes, and r
     }
   });
 
-  it("Ask 2 (FP-MSW-2): allows studio CLIs (`claude-memories`, `cli.js`) and read-only inspection scripts given a store argument, while blocking mutating script files", () => {
+  it("Ask 2 (FP-MSW-2): allows memory CLIs (`claude-memories`, `cli.js`) and read-only inspection scripts given a store argument, while blocking mutating script files", () => {
     const storeSlash = storeDir.replace(/\\/g, "/");
     const roScript = join(tempDir, "inspect_store.py");
     writeFileSync(

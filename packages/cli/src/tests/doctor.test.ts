@@ -202,9 +202,9 @@ test("Part 4.1: provenance & triad frontmatter fields read at top-level or under
       "description: Tests top-level provenance fields",
       "keywords: [provenance, top]",
       "priority: domain",
-      "loadout_skill: remote-argon",
+      "loadout_skill: review-flow",
       "loadout_triggers: [unreviewed-merge, release-reminder]",
-      "author_agent: rnd",
+      "author_agent: docs",
       "created_at: 2026-11-08T15:00:00Z",
       "verification_status: tool_verified",
       "evidence_ref: PR#21",
@@ -216,12 +216,12 @@ test("Part 4.1: provenance & triad frontmatter fields read at top-level or under
 
     const parsedTop = parseFrontmatter(topMd);
     assert.ok(parsedTop.frontmatter);
-    assert.equal(parsedTop.frontmatter.loadout_skill, "remote-argon");
+    assert.equal(parsedTop.frontmatter.loadout_skill, "review-flow");
     assert.deepEqual(parsedTop.frontmatter.loadout_triggers, [
       "unreviewed-merge",
       "release-reminder",
     ]);
-    assert.equal(parsedTop.frontmatter.author_agent, "rnd");
+    assert.equal(parsedTop.frontmatter.author_agent, "docs");
     assert.equal(parsedTop.frontmatter.created_at, "2026-11-08T15:00:00Z");
     assert.equal(parsedTop.frontmatter.verification_status, "tool_verified");
     assert.equal(parsedTop.frontmatter.evidence_ref, "PR#21");
@@ -230,7 +230,7 @@ test("Part 4.1: provenance & triad frontmatter fields read at top-level or under
     // Round-trip via serializeFrontmatter
     const reserialized = serializeFrontmatter(parsedTop.frontmatter);
     const reparsed = parseFrontmatter(reserialized);
-    assert.equal(reparsed.frontmatter?.loadout_skill, "remote-argon");
+    assert.equal(reparsed.frontmatter?.loadout_skill, "review-flow");
     assert.deepEqual(reparsed.frontmatter?.loadout_triggers, [
       "unreviewed-merge",
       "release-reminder",
@@ -247,7 +247,7 @@ test("Part 4.1: provenance & triad frontmatter fields read at top-level or under
       "  priority: domain",
       "  loadout_skill: loadout-os",
       "  loadout_triggers: [memory-shell-write, future-stamp]",
-      "  author_agent: publisher",
+      "  author_agent: release",
       "  created_at: 2026-11-08 15:03 ET",
       "  verification_status: human_ruling",
       "  evidence_ref: ruling-2026-11-08",
@@ -265,7 +265,7 @@ test("Part 4.1: provenance & triad frontmatter fields read at top-level or under
       "memory-shell-write",
       "future-stamp",
     ]);
-    assert.equal(parsedMeta.frontmatter.author_agent, "publisher");
+    assert.equal(parsedMeta.frontmatter.author_agent, "release");
     assert.equal(parsedMeta.frontmatter.created_at, "2026-11-08 15:03 ET");
     assert.equal(parsedMeta.frontmatter.verification_status, "human_ruling");
     assert.equal(parsedMeta.frontmatter.evidence_ref, "ruling-2026-11-08");
@@ -292,9 +292,9 @@ test("Part 4.1: provenance & triad frontmatter fields read at top-level or under
     const eTop = idx.entries.find((e) => e.id === "prov-top");
     const eMeta = idx.entries.find((e) => e.id === "prov-meta");
     assert.ok(eTop);
-    assert.equal(eTop.loadout_skill, "remote-argon");
+    assert.equal(eTop.loadout_skill, "review-flow");
     assert.deepEqual(eTop.loadout_triggers, ["unreviewed-merge", "release-reminder"]);
-    assert.equal(eTop.author_agent, "rnd");
+    assert.equal(eTop.author_agent, "docs");
     assert.equal(eTop.created_at, "2026-11-08T15:00:00Z");
     assert.equal(eTop.verification_status, "tool_verified");
     assert.equal(eTop.evidence_ref, "PR#21");
@@ -303,7 +303,7 @@ test("Part 4.1: provenance & triad frontmatter fields read at top-level or under
     assert.ok(eMeta);
     assert.equal(eMeta.loadout_skill, "loadout-os");
     assert.deepEqual(eMeta.loadout_triggers, ["memory-shell-write", "future-stamp"]);
-    assert.equal(eMeta.author_agent, "publisher");
+    assert.equal(eMeta.author_agent, "release");
     assert.equal(eMeta.verification_status, "human_ruling");
   } finally {
     sb.cleanup();
@@ -1109,6 +1109,64 @@ test("PR2 Item 8: `loadout-os memories split --by <rules.json>` splits 85-entry 
     assert.equal(find(postSplitDoctor.checks, "memory-read-limit").status, "pass");
     assert.equal(find(postSplitDoctor.checks, "subindex-entries").status, "pass");
   } finally {
+    sb.cleanup();
+  }
+});
+
+test("FIX-1 Item 2: doctor reports profiles.json config warnings without failing, and exits non-zero on malformed profiles.json", () => {
+  const sb = makeSandbox();
+  const prevExitCode = process.exitCode;
+  try {
+    // 1. Typo in profiles.json reports status: "warn" naming key & bad value, keeping ok: true
+    const warnProfiles = join(sb.dir, "warn-profiles.json");
+    writeFileSync(
+      warnProfiles,
+      JSON.stringify({
+        rules: {
+          "quote-gate": {
+            action: { default: "Block" },
+          },
+        },
+      }),
+      "utf-8",
+    );
+    const warnDoctor = runDoctor({ ...pathsFor(sb), profilesPath: warnProfiles });
+    const warnCheck = find(warnDoctor.checks, "profiles-config");
+    assert.equal(warnCheck.status, "warn");
+    assert.match(warnCheck.message, /rules\.quote-gate\.action\.default/);
+    assert.match(warnCheck.message, /"Block"/);
+
+    // 2. Malformed JSON in profiles.json reports status: "fail", ok: false, and CLI exits non-zero
+    const badJsonProfiles = join(sb.dir, "bad-profiles.json");
+    writeFileSync(badJsonProfiles, "{ malformed json", "utf-8");
+    const paths = pathsFor(sb);
+    const failDoctor = runDoctor({ ...paths, profilesPath: badJsonProfiles });
+    const failCheck = find(failDoctor.checks, "profiles-config");
+    assert.equal(failCheck.status, "fail");
+    assert.equal(failDoctor.ok, false);
+
+    process.exitCode = undefined;
+    dispatch([
+      "doctor",
+      "--store",
+      paths.store,
+      "--index",
+      paths.index,
+      "--settings",
+      paths.settings,
+      "--usage",
+      paths.usage,
+      "--skills",
+      paths.skillsDir ?? "",
+      "--profiles",
+      badJsonProfiles,
+      "--repo-root",
+      sb.dir,
+      "--json",
+    ]);
+    assert.equal(process.exitCode, 1);
+  } finally {
+    process.exitCode = prevExitCode;
     sb.cleanup();
   }
 });

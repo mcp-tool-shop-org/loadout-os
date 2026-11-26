@@ -202,6 +202,7 @@ The only built-in profile is `default`. Longest matching `cwd` prefix selects th
   },
   "quoteGate": {
     "speakers": ["He", "She", "They", "the User", "Maintainer"],
+    "namedSpeakers": ["Maintainer"],
     "allowlistSuffixes": ["docs/quote-policy.md"]
   }
 }
