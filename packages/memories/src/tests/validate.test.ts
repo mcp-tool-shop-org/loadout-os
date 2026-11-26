@@ -159,7 +159,7 @@ describe("validateMemory", () => {
     }
   });
 
-  it("ID_TOO_LONG respects idSource ('title' vs 'name') when frontmatter has no explicit id: (Publisher ruling B)", () => {
+  it("ID_TOO_LONG respects idSource ('title' vs 'name') when frontmatter has no explicit id: (#19)", () => {
     const tmp = mkdtempSync(join(tmpdir(), "loadout-val-idsource-"));
     try {
       const longName = "This Is A Very Long Frontmatter Name That Exceeds Sixty Characters In Length";

@@ -70,7 +70,7 @@ loadout-os refresh [--store <d>] [--dest <p>] [--project <r>] [--id-source title
 
 ## Collegamento della memoria a livello di progetto e del codice Claude
 
-Ogni "seat" di progetto può mantenere il proprio archivio `.claude/loadout/index.json`, creato a partire dal suo archivio di memoria (`loadout-os refresh --store <store> --project <root>`).
+Ogni profilo di progetto può mantenere il proprio archivio `.claude/loadout/index.json`, creato a partire dal suo archivio di memoria (`loadout-os refresh --store <store> --project <root>`).
 
 ### 1. Frontmatter per argomento e board
 

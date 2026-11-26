@@ -10,7 +10,7 @@ import { readdirSync, existsSync, readFileSync, writeFileSync, mkdirSync } from 
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { runDoctor, defaultDoctorPaths, type DoctorPaths } from "../doctor.js";
+import { runDoctor, defaultDoctorPaths, type DoctorCheck, type DoctorPaths } from "../doctor.js";
 import { dispatch } from "../cli.js";
 import { makeSandbox } from "./fixtures.js";
 
@@ -28,7 +28,7 @@ function pathsFor(sb: ReturnType<typeof makeSandbox>): DoctorPaths {
   };
 }
 
-function find(checks: { id: string; status: string; message: string; hint?: string }[], id: string) {
+function find(checks: DoctorCheck[], id: string): DoctorCheck {
   const c = checks.find((x) => x.id === id);
   assert.ok(c, `expected a check with id "${id}"`);
   return c!;
@@ -189,11 +189,6 @@ test("doctor: defaultDoctorPaths points hookSource at bundled apps/hook/dist/loa
 
 import { parseFrontmatter, serializeFrontmatter } from "@mcptoolshop/ai-loadout";
 import { analyzeMemoryMd, generateIndex } from "@mcptoolshop/claude-memories";
-import {
-  RND_TRIAD_ENTRIES,
-  PUBLISHER_TRIAD_ENTRIES,
-  STUDIO_TRIAD_ENTRIES,
-} from "./fixtures.js";
 import { PRETOOL_RULES } from "../pretool-rules.js";
 
 test("Part 4.1: provenance & triad frontmatter fields read at top-level or under metadata, and carried into index entries", () => {
@@ -207,9 +202,9 @@ test("Part 4.1: provenance & triad frontmatter fields read at top-level or under
       "description: Tests top-level provenance fields",
       "keywords: [provenance, top]",
       "priority: domain",
-      "loadout_skill: remote-argon",
+      "loadout_skill: review-flow",
       "loadout_triggers: [unreviewed-merge, release-reminder]",
-      "author_agent: rnd",
+      "author_agent: docs",
       "created_at: 2026-11-08T15:00:00Z",
       "verification_status: tool_verified",
       "evidence_ref: PR#21",
@@ -221,12 +216,12 @@ test("Part 4.1: provenance & triad frontmatter fields read at top-level or under
 
     const parsedTop = parseFrontmatter(topMd);
     assert.ok(parsedTop.frontmatter);
-    assert.equal(parsedTop.frontmatter.loadout_skill, "remote-argon");
+    assert.equal(parsedTop.frontmatter.loadout_skill, "review-flow");
     assert.deepEqual(parsedTop.frontmatter.loadout_triggers, [
       "unreviewed-merge",
       "release-reminder",
     ]);
-    assert.equal(parsedTop.frontmatter.author_agent, "rnd");
+    assert.equal(parsedTop.frontmatter.author_agent, "docs");
     assert.equal(parsedTop.frontmatter.created_at, "2026-11-08T15:00:00Z");
     assert.equal(parsedTop.frontmatter.verification_status, "tool_verified");
     assert.equal(parsedTop.frontmatter.evidence_ref, "PR#21");
@@ -235,7 +230,7 @@ test("Part 4.1: provenance & triad frontmatter fields read at top-level or under
     // Round-trip via serializeFrontmatter
     const reserialized = serializeFrontmatter(parsedTop.frontmatter);
     const reparsed = parseFrontmatter(reserialized);
-    assert.equal(reparsed.frontmatter?.loadout_skill, "remote-argon");
+    assert.equal(reparsed.frontmatter?.loadout_skill, "review-flow");
     assert.deepEqual(reparsed.frontmatter?.loadout_triggers, [
       "unreviewed-merge",
       "release-reminder",
@@ -252,7 +247,7 @@ test("Part 4.1: provenance & triad frontmatter fields read at top-level or under
       "  priority: domain",
       "  loadout_skill: loadout-os",
       "  loadout_triggers: [memory-shell-write, future-stamp]",
-      "  author_agent: publisher",
+      "  author_agent: release",
       "  created_at: 2026-11-08 15:03 ET",
       "  verification_status: human_ruling",
       "  evidence_ref: ruling-2026-11-08",
@@ -270,7 +265,7 @@ test("Part 4.1: provenance & triad frontmatter fields read at top-level or under
       "memory-shell-write",
       "future-stamp",
     ]);
-    assert.equal(parsedMeta.frontmatter.author_agent, "publisher");
+    assert.equal(parsedMeta.frontmatter.author_agent, "release");
     assert.equal(parsedMeta.frontmatter.created_at, "2026-11-08 15:03 ET");
     assert.equal(parsedMeta.frontmatter.verification_status, "human_ruling");
     assert.equal(parsedMeta.frontmatter.evidence_ref, "ruling-2026-11-08");
@@ -297,9 +292,9 @@ test("Part 4.1: provenance & triad frontmatter fields read at top-level or under
     const eTop = idx.entries.find((e) => e.id === "prov-top");
     const eMeta = idx.entries.find((e) => e.id === "prov-meta");
     assert.ok(eTop);
-    assert.equal(eTop.loadout_skill, "remote-argon");
+    assert.equal(eTop.loadout_skill, "review-flow");
     assert.deepEqual(eTop.loadout_triggers, ["unreviewed-merge", "release-reminder"]);
-    assert.equal(eTop.author_agent, "rnd");
+    assert.equal(eTop.author_agent, "docs");
     assert.equal(eTop.created_at, "2026-11-08T15:00:00Z");
     assert.equal(eTop.verification_status, "tool_verified");
     assert.equal(eTop.evidence_ref, "PR#21");
@@ -308,14 +303,14 @@ test("Part 4.1: provenance & triad frontmatter fields read at top-level or under
     assert.ok(eMeta);
     assert.equal(eMeta.loadout_skill, "loadout-os");
     assert.deepEqual(eMeta.loadout_triggers, ["memory-shell-write", "future-stamp"]);
-    assert.equal(eMeta.author_agent, "publisher");
+    assert.equal(eMeta.author_agent, "release");
     assert.equal(eMeta.verification_status, "human_ruling");
   } finally {
     sb.cleanup();
   }
 });
 
-test("Part 4.2 & 4.3: doctor triad check in temp HOME verifies all 5 rules' memories, skills (WARN on skill: none with reason), and PreToolUse hook command+mode", () => {
+test("Part 4.2 & 4.3: doctor triad check in temp HOME verifies configured rule memories, skills (WARN on skill: none with reason), and PreToolUse hook command+mode", () => {
   const sb = makeSandbox({
     withUsage: true,
     withSettingsHook: true,
@@ -323,21 +318,36 @@ test("Part 4.2 & 4.3: doctor triad check in temp HOME verifies all 5 rules' memo
     observedAvg: 130,
   });
   try {
-    // Populate temp HOME's project index with the 5 R&D triad entries from the Part 4.3 fixture, plus the
-    // studio entry the `default` seat cites for director-quote (the single-index fallback validates the
-    // `default` column against the global and project indexes together)
+    // Populate temp HOME's project index with neutral default rule memory ids configured via profiles.json
     const projectIndexPath = join(sb.dir, "project-index.json");
+    const defaultTriadIds = [
+      "merge-review-policy",
+      "quote-gate-policy",
+      "memory-store-policy",
+      "timestamp-policy",
+      "release-checklist-policy",
+    ];
     writeFileSync(
       projectIndexPath,
       JSON.stringify(
         {
           version: "1.0.0",
           generated: "2026-11-08T20:00:00.000Z",
-          entries: [...RND_TRIAD_ENTRIES, ...STUDIO_TRIAD_ENTRIES],
+          entries: defaultTriadIds.map((id) => ({
+            id,
+            path: `memory/${id}.md`,
+            keywords: [id],
+            patterns: [],
+            priority: "domain",
+            summary: `Policy entry for ${id}`,
+            triggers: { task: true, plan: true, edit: false },
+            tokens_est: 100,
+            lines: 10,
+          })),
           budget: {
             always_loaded_est: 0,
-            on_demand_total_est: 2293,
-            avg_task_load_est: 458,
+            on_demand_total_est: 500,
+            avg_task_load_est: 100,
             avg_task_load_observed: null,
           },
         },
@@ -347,9 +357,28 @@ test("Part 4.2 & 4.3: doctor triad check in temp HOME verifies all 5 rules' memo
       "utf-8",
     );
 
-    // Populate temp HOME's ~/.claude/skills/<name>/SKILL.md for the 3 skills in the table
+    const profilesPath = join(sb.dir, "profiles.json");
+    writeFileSync(
+      profilesPath,
+      JSON.stringify(
+        {
+          rules: {
+            "unreviewed-merge": { memory: { default: "merge-review-policy" }, skill: "review-gate" },
+            "quote-gate": { memory: { default: "quote-gate-policy" } },
+            "memory-shell-write": { memory: { default: "memory-store-policy" }, skill: "loadout-os" },
+            "future-stamp": { memory: { default: "timestamp-policy" }, skill: "loadout-os" },
+            "release-reminder": { memory: { default: "release-checklist-policy" }, skill: "release-flow" },
+          },
+        },
+        null,
+        2,
+      ),
+      "utf-8",
+    );
+
+    // Populate temp HOME's ~/.claude/skills/<name>/SKILL.md for the configured skills
     const skillsDir = join(sb.dir, ".claude", "skills");
-    for (const skillName of ["remote-argon", "loadout-os", "full-treatment"]) {
+    for (const skillName of ["review-gate", "loadout-os", "release-flow"]) {
       const sDir = join(skillsDir, skillName);
       mkdirSync(sDir, { recursive: true });
       writeFileSync(
@@ -398,6 +427,7 @@ test("Part 4.2 & 4.3: doctor triad check in temp HOME verifies all 5 rules' memo
       ...pathsFor(sb),
       skillsDir,
       extraIndexes: [projectIndexPath],
+      profilesPath,
     };
 
     const res = runDoctor(basePaths);
@@ -407,19 +437,26 @@ test("Part 4.2 & 4.3: doctor triad check in temp HOME verifies all 5 rules' memo
     assert.equal(memCheck.status, "pass");
 
     const skillCheck = find(res.checks, "triad-skills");
-    // WARN because director-quote is marked `skill: "none"` with a reason
+    // WARN because quote-gate is marked `skill: "none"` with a reason
     assert.equal(skillCheck.status, "warn");
-    assert.match(skillCheck.message, /director-quote/);
+    assert.match(skillCheck.message, /quote-gate/);
 
     const hookCheck = find(res.checks, "triad-pretool-hook");
     assert.equal(hookCheck.status, "pass");
     assert.match(hookCheck.message, /loadout-os hook pre-tool --mode log-only/);
     assert.match(hookCheck.message, /mode: log-only/);
 
+    // 0. With no profiles.json (no memory refs configured), triad-memories passes cleanly
+    const unconfiguredRes = runDoctor({
+      ...pathsFor(sb),
+      skillsDir,
+    });
+    assert.equal(find(unconfiguredRes.checks, "triad-memories").status, "pass");
+
     // 1. Broken memory link -> FAIL
     const brokenMemRes = runDoctor({
       ...basePaths,
-      extraIndexes: [], // removes the R&D project index so the 5 rule memories are missing
+      extraIndexes: [], // removes the project index so configured rule memories are missing
     });
     assert.equal(find(brokenMemRes.checks, "triad-memories").status, "fail");
     assert.equal(brokenMemRes.ok, false);
@@ -478,7 +515,7 @@ test("Part 4.2 & 4.3: doctor triad check in temp HOME verifies all 5 rules' memo
   }
 });
 
-test("Issue #25 / Ruling 1: doctor triad-memories check runs per seat across two temp seat stores, passing when each seat's ids resolve only in its own store, and failing naming the seat when one id is missing", () => {
+test("Issue #25 / Ruling 1: doctor triad-memories check runs per profile across two temp profile stores, passing when each profile's ids resolve only in its own store, and failing naming the profile when one id is missing", () => {
   const sb = makeSandbox({
     withUsage: true,
     withSettingsHook: true,
@@ -486,23 +523,48 @@ test("Issue #25 / Ruling 1: doctor triad-memories check runs per seat across two
     observedAvg: 130,
   });
   try {
-    const rndStoreDir = join(sb.dir, "rnd-store", "memory");
-    const pubStoreDir = join(sb.dir, "pub-store", "memory");
-    mkdirSync(rndStoreDir, { recursive: true });
-    mkdirSync(pubStoreDir, { recursive: true });
+    const docsStoreDir = join(sb.dir, "docs-store", "memory");
+    const relStoreDir = join(sb.dir, "release-store", "memory");
+    mkdirSync(docsStoreDir, { recursive: true });
+    mkdirSync(relStoreDir, { recursive: true });
 
-    // Write R&D index.json with ONLY R&D's 5 memory IDs
+    const makeEntries = (ids: string[]) =>
+      ids.map((id) => ({
+        id,
+        path: `memory/${id}.md`,
+        keywords: [id],
+        patterns: [id.replace(/-/g, "_")],
+        priority: "domain" as const,
+        summary: `Entry for ${id}`,
+        triggers: { task: true, plan: true, edit: false },
+        tokens_est: 100,
+        lines: 10,
+      }));
+
+    const docsEntries = makeEntries([
+      "docs-merge-rule",
+      "docs-quote-rule",
+      "docs-shell-rule",
+      "docs-stamp-rule",
+      "docs-release-rule",
+    ]);
+    const relEntries = makeEntries([
+      "rel-merge-rule",
+      "rel-quote-rule",
+      "rel-memory-system",
+    ]);
+
     writeFileSync(
-      join(rndStoreDir, "index.json"),
+      join(docsStoreDir, "index.json"),
       JSON.stringify(
         {
           version: "1.0.0",
           generated: "2026-11-09T00:00:00.000Z",
-          entries: RND_TRIAD_ENTRIES,
+          entries: docsEntries,
           budget: {
             always_loaded_est: 0,
-            on_demand_total_est: 2293,
-            avg_task_load_est: 458,
+            on_demand_total_est: 500,
+            avg_task_load_est: 100,
             avg_task_load_observed: null,
           },
         },
@@ -512,18 +574,17 @@ test("Issue #25 / Ruling 1: doctor triad-memories check runs per seat across two
       "utf-8",
     );
 
-    // Write Publisher index.json with ONLY Publisher's 5 memory IDs
     writeFileSync(
-      join(pubStoreDir, "index.json"),
+      join(relStoreDir, "index.json"),
       JSON.stringify(
         {
           version: "1.0.0",
           generated: "2026-11-09T00:00:00.000Z",
-          entries: PUBLISHER_TRIAD_ENTRIES,
+          entries: relEntries,
           budget: {
             always_loaded_est: 0,
-            on_demand_total_est: 1220,
-            avg_task_load_est: 244,
+            on_demand_total_est: 300,
+            avg_task_load_est: 100,
             avg_task_load_observed: null,
           },
         },
@@ -533,14 +594,35 @@ test("Issue #25 / Ruling 1: doctor triad-memories check runs per seat across two
       "utf-8",
     );
 
-    const seatsPath = join(sb.dir, "seats.json");
+    const profilesPath = join(sb.dir, "profiles.json");
     writeFileSync(
-      seatsPath,
+      profilesPath,
       JSON.stringify(
         {
-          seats: {
-            "E:/AI/Research and Development": { seat: "rnd", store: rndStoreDir },
-            "E:/AI/Publisher": { seat: "publisher", store: pubStoreDir },
+          profiles: {
+            "/repos/docs": { profile: "docs", store: docsStoreDir },
+            "/repos/release": { profile: "release", store: relStoreDir },
+          },
+          rules: {
+            "unreviewed-merge": {
+              memory: { docs: "docs-merge-rule", release: "rel-merge-rule" },
+              skill: "review-gate",
+            },
+            "quote-gate": {
+              memory: { docs: "docs-quote-rule", release: "rel-quote-rule" },
+            },
+            "memory-shell-write": {
+              memory: { docs: "docs-shell-rule", release: "rel-memory-system" },
+              skill: "loadout-os",
+            },
+            "future-stamp": {
+              memory: { docs: "docs-stamp-rule", release: "rel-memory-system" },
+              skill: "loadout-os",
+            },
+            "release-reminder": {
+              memory: { docs: "docs-release-rule", release: "rel-merge-rule" },
+              skill: "release-flow",
+            },
           },
         },
         null,
@@ -550,7 +632,7 @@ test("Issue #25 / Ruling 1: doctor triad-memories check runs per seat across two
     );
 
     const skillsDir = join(sb.dir, ".claude", "skills");
-    for (const skillName of ["remote-argon", "loadout-os", "full-treatment"]) {
+    for (const skillName of ["review-gate", "loadout-os", "release-flow"]) {
       const sDir = join(skillsDir, skillName);
       mkdirSync(sDir, { recursive: true });
       writeFileSync(
@@ -590,18 +672,18 @@ test("Issue #25 / Ruling 1: doctor triad-memories check runs per seat across two
       "utf-8",
     );
 
-    // 1. Positive: both seats have their own 5 memory IDs in their own stores (and neither store has the other's IDs) -> PASS
+    // 1. Positive: both profiles have their own configured memory IDs in their own stores -> PASS
     const passRes = runDoctor({
       ...pathsFor(sb),
       skillsDir,
-      seatsPath,
+      profilesPath,
     });
     const passTriad = find(passRes.checks, "triad-memories");
     assert.equal(passTriad.status, "pass");
-    assert.match(passTriad.message, /rnd, publisher/);
+    assert.match(passTriad.message, /docs, release/);
     assert.equal(passRes.ok, true);
 
-    // Exercise dispatchDoctor `--seats` CLI wiring
+    // Exercise dispatchDoctor `--profiles` CLI wiring
     dispatch([
       "doctor",
       "--store",
@@ -614,24 +696,24 @@ test("Issue #25 / Ruling 1: doctor triad-memories check runs per seat across two
       sb.usagePath,
       "--skills",
       skillsDir,
-      "--seats",
-      seatsPath,
+      "--profiles",
+      profilesPath,
       "--json",
     ]);
     process.exitCode = 0;
 
-    // 2. Negative: remove the one memory ID only `director-quote` cites (`rule-director-communication`) from Publisher's store -> FAIL naming `publisher`
+    // 2. Negative: remove `rel-quote-rule` from release store -> FAIL naming `release`
     writeFileSync(
-      join(pubStoreDir, "index.json"),
+      join(relStoreDir, "index.json"),
       JSON.stringify(
         {
           version: "1.0.0",
           generated: "2026-11-09T00:00:00.000Z",
-          entries: PUBLISHER_TRIAD_ENTRIES.filter((e) => e.id !== "rule-director-communication"),
+          entries: relEntries.filter((e) => e.id !== "rel-quote-rule"),
           budget: {
             always_loaded_est: 0,
-            on_demand_total_est: 1020,
-            avg_task_load_est: 204,
+            on_demand_total_est: 200,
+            avg_task_load_est: 100,
             avg_task_load_observed: null,
           },
         },
@@ -644,51 +726,34 @@ test("Issue #25 / Ruling 1: doctor triad-memories check runs per seat across two
     const failRes = runDoctor({
       ...pathsFor(sb),
       skillsDir,
-      seatsPath,
+      profilesPath,
     });
     const failTriad = find(failRes.checks, "triad-memories");
     assert.equal(failTriad.status, "fail");
     assert.match(
       failTriad.message,
-      /publisher: director-quote -> rule-director-communication/,
-      "Failure message must name the seat (`publisher`), rule (`director-quote`), and missing memory ID (`rule-director-communication`)",
+      /release: quote-gate -> rel-quote-rule/,
+      "Failure message must name the profile (`release`), rule (`quote-gate`), and missing memory ID (`rel-quote-rule`)",
     );
     assert.doesNotMatch(
       failTriad.message,
-      /rnd: /,
-      "A Publisher-store gap must not be reported against the R&D seat",
+      /docs: /,
+      "A release-store gap must not be reported against the docs profile",
     );
     assert.equal(failRes.ok, false);
 
-    // 2b. Stale ids after a store rebuild: a Publisher store that still carries only the entry ids it
-    // used before its 2026-11-21 rebuild fails for every rule, each pair naming the id the table now cites
-    const preRebuildIds = [
-      "publisher-merges-as-coordinator",
-      "feedback-never-quote-director",
-      "project-memory-system",
-      "feedback-eastern-time",
-      "publishing-tags-need-publisher-ok",
-    ];
+    // 2b. Stale ids after a store rebuild: a store carrying old ids fails for every rule
+    const preRebuildIds = ["legacy-a", "legacy-b"];
     writeFileSync(
-      join(pubStoreDir, "index.json"),
+      join(relStoreDir, "index.json"),
       JSON.stringify(
         {
           version: "1.0.0",
           generated: "2026-11-09T00:00:00.000Z",
-          entries: preRebuildIds.map((id) => ({
-            id,
-            path: `memory/${id}.md`,
-            keywords: [id],
-            patterns: [id.replace(/-/g, "_")],
-            priority: "domain",
-            summary: "Entry id from before the store rebuild",
-            triggers: { task: true, plan: true, edit: false },
-            tokens_est: 100,
-            lines: 10,
-          })),
+          entries: makeEntries(preRebuildIds),
           budget: {
             always_loaded_est: 0,
-            on_demand_total_est: 500,
+            on_demand_total_est: 200,
             avg_task_load_est: 100,
             avg_task_load_observed: null,
           },
@@ -701,32 +766,32 @@ test("Issue #25 / Ruling 1: doctor triad-memories check runs per seat across two
     const staleRes = runDoctor({
       ...pathsFor(sb),
       skillsDir,
-      seatsPath,
+      profilesPath,
     });
     const staleTriad = find(staleRes.checks, "triad-memories");
     assert.equal(staleTriad.status, "fail");
     for (const pair of [
-      "unreviewed-merge -> rule-coordinator-and-merges",
-      "director-quote -> rule-director-communication",
-      "memory-shell-write -> reference-memory-system",
-      "future-stamp -> reference-memory-system",
-      "release-reminder -> rule-coordinator-and-merges",
+      "unreviewed-merge -> rel-merge-rule",
+      "quote-gate -> rel-quote-rule",
+      "memory-shell-write -> rel-memory-system",
+      "future-stamp -> rel-memory-system",
+      "release-reminder -> rel-merge-rule",
     ]) {
       assert.ok(
-        staleTriad.message.includes(`publisher: ${pair}`),
-        `Stale Publisher store must report \`publisher: ${pair}\`; got: ${staleTriad.message}`,
+        staleTriad.message.includes(`release: ${pair}`),
+        `Stale release store must report \`release: ${pair}\`; got: ${staleTriad.message}`,
       );
     }
-    assert.doesNotMatch(staleTriad.message, /rnd: /);
+    assert.doesNotMatch(staleTriad.message, /docs: /);
     assert.equal(staleRes.ok, false);
 
-    // 3. Direct `seatStores` option in DoctorPaths also validates per seat
+    // 3. Direct `profileStores` option in DoctorPaths also validates per profile
     const directRes = runDoctor({
       ...pathsFor(sb),
       skillsDir,
-      seatStores: { rnd: rndStoreDir, publisher: pubStoreDir },
+      profileStores: { docs: docsStoreDir, release: relStoreDir },
     });
-    assert.equal(find(directRes.checks, "triad-memories").status, "fail");
+    assert.equal(find(directRes.checks, "triad-memories").status, "pass");
   } finally {
     sb.cleanup();
   }
@@ -1045,5 +1110,126 @@ test("PR2 Item 8: `loadout-os memories split --by <rules.json>` splits 85-entry 
     assert.equal(find(postSplitDoctor.checks, "subindex-entries").status, "pass");
   } finally {
     sb.cleanup();
+  }
+});
+
+test("FIX-1 Item 2: doctor reports profiles.json config warnings without failing, and exits non-zero on malformed profiles.json", () => {
+  const sb = makeSandbox();
+  const prevExitCode = process.exitCode;
+  try {
+    // 1. Typo in profiles.json reports status: "warn" naming key & bad value, keeping ok: true
+    const warnProfiles = join(sb.dir, "warn-profiles.json");
+    writeFileSync(
+      warnProfiles,
+      JSON.stringify({
+        rules: {
+          "quote-gate": {
+            action: { default: "Block" },
+          },
+        },
+      }),
+      "utf-8",
+    );
+    const warnDoctor = runDoctor({ ...pathsFor(sb), profilesPath: warnProfiles });
+    const warnCheck = find(warnDoctor.checks, "profiles-config");
+    assert.equal(warnCheck.status, "warn");
+    assert.match(warnCheck.message, /rules\.quote-gate\.action\.default/);
+    assert.match(warnCheck.message, /"Block"/);
+
+    // 2. Malformed JSON in profiles.json reports status: "fail", ok: false, and CLI exits non-zero
+    const badJsonProfiles = join(sb.dir, "bad-profiles.json");
+    writeFileSync(badJsonProfiles, "{ malformed json", "utf-8");
+    const paths = pathsFor(sb);
+    const failDoctor = runDoctor({ ...paths, profilesPath: badJsonProfiles });
+    const failCheck = find(failDoctor.checks, "profiles-config");
+    assert.equal(failCheck.status, "fail");
+    assert.equal(failDoctor.ok, false);
+
+    process.exitCode = undefined;
+    dispatch([
+      "doctor",
+      "--store",
+      paths.store,
+      "--index",
+      paths.index,
+      "--settings",
+      paths.settings,
+      "--usage",
+      paths.usage,
+      "--skills",
+      paths.skillsDir ?? "",
+      "--profiles",
+      badJsonProfiles,
+      "--repo-root",
+      sb.dir,
+      "--json",
+    ]);
+    assert.equal(process.exitCode, 1);
+  } finally {
+    process.exitCode = prevExitCode;
+    sb.cleanup();
+  }
+});
+
+test("FIX-2 Item 1: doctor reports DEFAULT_STORE_REQUIRED fail when no default store is configured, and resolves profiles.json defaultStore / AI_LOADOUT_STORE regardless of cwd", () => {
+  const sb = makeSandbox({ withSettingsHook: true });
+  const sbDecoy = makeSandbox();
+  const prevCwd = process.cwd();
+  const prevEnvStore = process.env.AI_LOADOUT_STORE;
+  const prevEnvProfiles = process.env.AI_LOADOUT_PROFILES_PATH;
+
+  try {
+    delete process.env.AI_LOADOUT_STORE;
+    delete process.env.AI_LOADOUT_PROFILES_PATH;
+
+    // 1. No --store, no AI_LOADOUT_STORE, no defaultStore -> store-validates fails with DEFAULT_STORE_REQUIRED
+    const emptyProfiles = join(sb.dir, "empty-profiles.json");
+    writeFileSync(emptyProfiles, JSON.stringify({}), "utf-8");
+
+    process.chdir(sbDecoy.storeDir);
+    const defaultPathsNoCfg = defaultDoctorPaths(sbDecoy.dir, sb.dir);
+    assert.equal(defaultPathsNoCfg.store, "", "defaultDoctorPaths must never derive store from repoRoot/cwd");
+
+    const missingStoreDoc = runDoctor({
+      ...pathsFor(sb),
+      store: "",
+      profilesPath: emptyProfiles,
+    });
+    const missingCheck = find(missingStoreDoc.checks, "store-validates");
+    assert.equal(missingCheck.status, "fail");
+    assert.equal(missingCheck.code, "DEFAULT_STORE_REQUIRED");
+    assert.equal(missingStoreDoc.ok, false);
+    assert.match(missingCheck.hint ?? "", /--store/);
+    assert.match(missingCheck.hint ?? "", /AI_LOADOUT_STORE/);
+    assert.match(missingCheck.hint ?? "", /defaultStore/);
+
+    // 2. defaultStore in profiles.json resolves regardless of cwd
+    const cfgProfiles = join(sb.dir, "cfg-profiles.json");
+    writeFileSync(cfgProfiles, JSON.stringify({ defaultStore: sb.storeDir }), "utf-8");
+    const cfgDoc = runDoctor({
+      ...pathsFor(sb),
+      store: "",
+      profilesPath: cfgProfiles,
+    });
+    assert.equal(find(cfgDoc.checks, "store-validates").status, "pass");
+
+    // 3. AI_LOADOUT_STORE overrides defaultStore in profiles.json
+    const sbEnv = makeSandbox({ withSettingsHook: true });
+    try {
+      process.env.AI_LOADOUT_STORE = sbEnv.storeDir;
+      process.env.AI_LOADOUT_PROFILES_PATH = cfgProfiles;
+      const envPaths = defaultDoctorPaths(sbDecoy.dir, sb.dir);
+      assert.equal(envPaths.store, resolve(sbEnv.storeDir));
+    } finally {
+      sbEnv.cleanup();
+    }
+  } finally {
+    process.chdir(prevCwd);
+    if (prevEnvStore === undefined) delete process.env.AI_LOADOUT_STORE;
+    else process.env.AI_LOADOUT_STORE = prevEnvStore;
+    if (prevEnvProfiles === undefined) delete process.env.AI_LOADOUT_PROFILES_PATH;
+    else process.env.AI_LOADOUT_PROFILES_PATH = prevEnvProfiles;
+    sb.cleanup();
+    sbDecoy.cleanup();
   }
 });

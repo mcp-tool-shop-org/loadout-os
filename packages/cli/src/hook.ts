@@ -48,7 +48,7 @@ export interface HookTestResult {
 }
 
 const DEFAULT_PROMPT =
-  "How do I run the dogfood swarm and full-treatment on a repo before npm publish?";
+  "How do I validate memory entries and refresh the index before npm publish?";
 
 export function defaultHookPath(repoRoot: string = process.cwd()): string {
   return resolve(repoRoot, "apps", "hook", "loadout-hook.mjs");

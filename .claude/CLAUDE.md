@@ -2,7 +2,7 @@
 
 ## What this is
 
-**loadout-os is the Knowledge OS for the studio**, consolidated into one repo so it can evolve as a single surface. It folds together three previously-separate npm packages plus the live runtime hook:
+**loadout-os is the Knowledge OS for AI coding agents**, consolidated into one repo so it can evolve as a single surface. It folds together three previously-separate npm packages plus the live runtime hook:
 
 | Was | Now lives at | Role |
 |---|---|---|
@@ -16,7 +16,7 @@
 The production data flow, running on this rig right now:
 
 ```
-canonical store  ~/.claude/projects/F--AI/memory/   (~330 .md files + MEMORY.md)
+canonical store  ~/.claude/projects/<project-slug>/memory/   (~330 .md files + MEMORY.md)
       │  claude-memories index + validate           ← "Index Freshness Ritual" in global CLAUDE.md
       ▼
 store dispatch table  <store>/index.json
@@ -50,9 +50,9 @@ Until Phase 6 retirement, **upstream source-of-truth stays at**:
 
 **Do not edit the three upstream repos from inside loadout-os sessions.** Edits here stay here until the explicit Phase 6 cutover. The one exception is the hook's both-copies rule above.
 
-## Repo-first waiver (deliberate — do not "fix")
+## Repo-first waiver (historical bootstrap, 2026-06-10)
 
-This repo intentionally has **no GitHub remote yet**, which violates the workspace Repo-First Hard Rule. The waiver is director-approved (2026-06-10): it's a local prototype consolidating already-pushed upstream sources; nothing here is unrecoverable. The remote lands at Phase 5. Do not create the remote early or halt over the rule.
+During local bootstrap (2026-06-10), this repo temporarily had no GitHub remote under a maintainer-approved waiver while consolidating already-pushed upstream sources. The GitHub remote (`mcp-tool-shop-org/loadout-os`) is now live as of Phase 5.
 
 ## Why this consolidation
 
@@ -62,7 +62,7 @@ Decompose-by-secrets (Parnas 1972) is right for N humans, operationally broken f
 
 - **Read `ROADMAP.md` first** — it's the dispatch table for this repo, and each phase has a gate that halts on failure.
 - Global rules (`~/.claude/CLAUDE.md`) and workspace rules (`E:/AI/.claude/CLAUDE.md`) apply here.
-- **Cost discipline:** no agent fleets, no Workflow orchestration without explicit pricing + director approval. This layer's work is deterministic-first: scripts, validators, hand edits.
+- **Cost discipline:** no agent fleets, no Workflow orchestration without explicit pricing + maintainer approval. This layer's work is deterministic-first: scripts, validators, hand edits.
 - The loadout-hook injects pointer lines on prompts — open the pointed file before acting; don't paraphrase from the summary line.
 - Any new pipeline/script/SKILL.md authored here needs the six-standards compliance block (`workflow_standards.md`). Phase 6 (publish/deprecate/cutover) additionally requires a compensators table — no skip allowed.
 - If the session touches the canonical memory store, end with the Index Freshness Ritual (global CLAUDE.md, Non-Negotiable).

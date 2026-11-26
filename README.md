@@ -25,9 +25,9 @@ loadout-os unifies four surfaces under one `loadout-os` binary:
 | **Kernel** (knowledge router) | Deterministic keyword/pattern matcher, hierarchical layered resolver (global → org → project → session), and the agent runtime contract. Core entries always load; domain entries load on match; manual entries load on explicit lookup. |
 | **Memories adapter** | Turns a `MEMORY.md` store (plus linked `index-*.md` or `metadata.loadout_role: subindex` sub-indexes) into a machine-readable dispatch table and lints it (loader truncation limits at 180 lines / 24 KB — warning by default, error when opted in via `--max-lines`/`--max-bytes`, frontmatter `metadata.enforce_limits: true`, or `.loadout.json` — plus missing files, orphans across sub-indexes, stale bullet summaries, duplicates, over-long entries). |
 | **Rules adapter** | Splits a bloated `CLAUDE.md` into a lean always-loaded index plus on-demand rule files, and validates frontmatter against the index. |
-| **Runtime hooks** | `UserPromptSubmit` pointer router (`loadout-hook.mjs`, merging global + project layers with fair-share cap and sub-index preference), `hook session-start` (UTF-8 board injection + staleness & shell-edit refresh), `hook pre-compact` (staleness warning before compaction), and `hook post-write` (`PostToolUse` validator + project refresh). |
+| **Runtime hooks** | `UserPromptSubmit` pointer router (`loadout-hook.mjs`, merging global + project layers with fair-share cap and sub-index preference), `hook session-start` (UTF-8 board injection + staleness & shell-edit refresh), `hook pre-compact` (staleness warning before compaction), `hook post-write` (`PostToolUse` validator + project refresh), and `hook pre-tool` (`PreToolUse` Layer A/B guard + decision logger). |
 
-Plus three rituals that keep the system honest: **`refresh`** (regenerate → validate → publish the dispatch index to global or `--project <root>`, with a `.bak` compensator, OS file lock, and optional `--snapshot-repo` / `--mirror-repo`), **`doctor`** (a read-only 8-check health screen), and **`report`** (usage / dead-entry / token-budget observability).
+Plus three rituals that keep the system honest: **`refresh`** (regenerate → validate → publish the dispatch index to global or `--project <root>`, with a `.bak` compensator, OS file lock, and optional `--snapshot-repo` / `--mirror-repo`), **`doctor`** (a read-only health screen including triad checks), and **`report`** (usage / dead-entry / token-budget observability).
 
 ## Command surface
 
@@ -40,6 +40,7 @@ loadout-os memories health         [path] [--json]
 loadout-os memories sync-summaries <MEMORY.md> [--fix] [--json]
 loadout-os memories place          <topic.md> <index> [--store <dir>] [--into <index>] [--json]
 loadout-os memories move           <topic.md> <index> [--store <dir>] [--into <index>] [--json]
+loadout-os memories split          [<MEMORY.md>] --by <rules.json> [--store <dir>] [--id-source title|name] [--dry-run] [--json]
 
 # Instruction-file adapter
 loadout-os rules analyze  <CLAUDE.md> [--rules-dir <dir>] [--json]
@@ -57,20 +58,21 @@ loadout-os budget <index> [jsonl]   # token budget breakdown
 loadout-os validate <index>         # validate index STRUCTURE (kernel)
 
 # Rituals + hooks
-loadout-os doctor [--json]                    # read-only health screen
-loadout-os report [--index <p>] [--jsonl <p>] # observability over usage.jsonl
-loadout-os hook test [--prompt "<text>"]      # drive the runtime hook on a sample prompt
+loadout-os doctor [--profiles <p>] [--json]                    # read-only health screen
+loadout-os report [--index <p>] [--jsonl <p>]                  # observability over usage.jsonl
+loadout-os hook test [--prompt "<text>"]                       # drive the runtime hook on a sample prompt
 loadout-os hook session-start [--project <r>] [--user-prompt-submit]
 loadout-os hook pre-compact   [--project <r>]
 loadout-os hook post-write    [--project <r>] [--snapshot-repo <d>] [--mirror-repo <b>] [--fix]
-loadout-os refresh [--store <d>] [--dest <p>] [--project <r>] [--id-source title|name] [--snapshot-repo <d>] [--mirror-repo <b>] [--fix] [--dry-run]
+loadout-os hook pre-tool      [--mode enforce|log-only] [--profiles <p>] [--log <p>] [--timeout-ms <ms>]
+loadout-os refresh [--store <d>] [--dest <p>] [--project <r>] [--profiles <p>] [--id-source title|name] [--snapshot-repo <d>] [--mirror-repo <b>] [--fix] [--dry-run]
 ```
 
 > **Name collision, resolved by namespacing.** The flat `validate <index>` is the kernel's index-structure validator. The store and rules linters are namespaced — `memories validate <MEMORY.md>` and `rules validate` — so all three coexist. Run `loadout-os <command> --help` for per-command synopsis, arguments, and exit codes.
 
 ## Project-Layer Memory & Claude Code Hook Wiring
 
-Each project seat can keep its own `.claude/loadout/index.json` built from its memory store (`loadout-os refresh --store <store> --project <root>`).
+Each project profile can keep its own `.claude/loadout/index.json` built from its memory store (`loadout-os refresh --store <store> --project <root>`).
 
 ### 1. Topic & Board Frontmatter
 
@@ -131,6 +133,17 @@ metadata:
         ]
       }
     ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "loadout-os hook pre-tool --mode enforce"
+          }
+        ]
+      }
+    ],
     "PostToolUse": [
       {
         "matcher": "Write|Edit|MultiEdit",
@@ -147,6 +160,54 @@ metadata:
 ```
 
 > **Note on shell edits:** Edits made to memory files through a shell (`Bash` / `PowerShell`) skip `PostToolUse` (`Write|Edit`). As a built-in fallback, `loadout-os hook session-start` checks whether any `<store>/*.md` file is newer than the project `index.json` and automatically refreshes the project index (or warns if validation fails).
+
+### 3. PreToolUse Hook & `profiles.json`
+
+`loadout-os hook pre-tool` guards tool calls in-process before execution, passing read-only tools and read-only Bash pipelines silently (`exit 0`), evaluating the Layer A/B rule table per active profile, logging hashed decisions (`input_hash`, never raw command text) to `~/.ai-loadout/hook-decisions.jsonl`, failing open before a block match, and failing closed (`exit 2` + stderr only) once a block rule matches.
+
+**Built-in rules:**
+
+| Rule ID | Layer | Tools | Default Action | Purpose |
+|---|---|---|---|---|
+| `unreviewed-merge` | A | `Bash` | `warn` | Reminds to verify a recorded review pass (`PASS at <head8>`) before merging |
+| `quote-gate` | A | `Write`, `Edit`, `MultiEdit`, `Bash` | `block` | Blocks verbatim quoting of configured speakers in artifacts or commit/PR text |
+| `memory-shell-write` | A | `Bash` | `block` | Blocks direct shell writes into memory stores |
+| `future-stamp` | A | `Write`, `Edit`, `MultiEdit` | `block` | Blocks tool-stamped timestamps more than 5 minutes ahead of the OS clock |
+| `release-reminder` | B | `Bash` | `warn` | Reminds before `npm publish`, `gh release create`, or `git push --tags` |
+
+**Profiles & config (`~/.ai-loadout/profiles.json`, env `AI_LOADOUT_PROFILES_PATH`, `AI_LOADOUT_STORE`):**
+
+The only built-in profile is `default`. Global `refresh` and `doctor` resolve the default memory store with precedence `--store <dir>` > `AI_LOADOUT_STORE` > `defaultStore` in `profiles.json` (and refuse with `DEFAULT_STORE_REQUIRED` if none is configured; they never derive from `cwd`). Longest matching `cwd` prefix selects the active profile and optional store/replies/rule overrides:
+
+```json
+{
+  "defaultStore": "/stores/global/memory",
+  "profiles": {
+    "/repos/docs-site": { "profile": "docs", "store": "/stores/docs/memory" },
+    "/repos/release-bot": { "profile": "release", "store": "/stores/release/memory" }
+  },
+  "repliesDir": "/var/log/review-replies",
+  "rules": {
+    "unreviewed-merge": {
+      "action": { "docs": "off", "release": "warn" },
+      "memory": { "release": "release-merge-policy" },
+      "skill": "release-checklist",
+      "note": { "release": "Verify changelog and release tag alignment before merging." }
+    },
+    "quote-gate": {
+      "action": { "docs": "warn", "release": "block" }
+    }
+  },
+  "ruleAliases": {
+    "legacy-quote-rule": "quote-gate"
+  },
+  "quoteGate": {
+    "speakers": ["He", "She", "They", "the User", "Maintainer"],
+    "namedSpeakers": ["Maintainer"],
+    "allowlistSuffixes": ["docs/quote-policy.md"]
+  }
+}
+```
 
 ## Install
 

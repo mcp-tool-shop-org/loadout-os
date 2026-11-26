@@ -60,74 +60,29 @@
   ],
   "changes": {
     "fileCounts": {
-      "added": 5,
-      "changed": 35,
+      "added": 0,
+      "changed": 13,
       "moved": 0,
-      "parts": 5,
+      "parts": 3,
       "removed": 0
     },
     "items": [
       {
-        "kind": "door",
-        "sentence": "CI now also runs packages/cli/src/tests/pretool.test.ts.",
-        "subjects": [
-          ".github/workflows/ci.yml",
-          "packages/cli/src/tests/pretool.test.ts"
-        ]
-      },
-      {
-        "kind": "door",
-        "sentence": "Release now also runs packages/cli/src/tests/pretool.test.ts.",
-        "subjects": [
-          ".github/workflows/release.yml",
-          "packages/cli/src/tests/pretool.test.ts"
-        ]
-      },
-      {
-        "kind": "landing",
-        "sentence": ".claude/MEMORY.md is now read by packages/cli/src/commands.ts.",
-        "subjects": [
-          ".claude/MEMORY.md",
-          "packages/cli/src/commands.ts"
-        ]
-      },
-      {
-        "kind": "landing",
-        "sentence": "README.md is now also read by packages/cli/src/tests/pretool.test.ts.",
-        "subjects": [
-          "README.md",
-          "packages/cli/src/tests/pretool.test.ts"
-        ]
-      },
-      {
-        "kind": "landing",
-        "sentence": "packages/cli/src/pretool-rules.ts is now read by packages/cli/src/pretool-rules.ts.",
-        "subjects": [
-          "packages/cli/src/pretool-rules.ts",
-          "packages/cli/src/pretool-rules.ts"
-        ]
-      },
-      {
-        "kind": "landing",
-        "sentence": "And 1 more new writer or reader of a place.",
-        "subjects": []
-      },
-      {
         "kind": "counts",
-        "sentence": "5 files added and 35 changed content, across 5 parts.",
+        "sentence": "Nothing structural changed since 2026-11-26; 13 files changed content.",
         "subjects": []
       }
     ],
     "since": {
-      "commit": "c838284447d36e0435d2840d3bc7d11c2b186a21",
-      "generatedAt": "2026-11-08T17:43:07.867Z"
+      "commit": "e3fdae47bc8f52a438dffc49a971f0e61e477e95",
+      "generatedAt": "2026-11-26T05:23:28.616Z"
     },
-    "unchanged": false
+    "unchanged": true
   },
   "changesTogether": [
     {
-      "a": "packages/cli/src/cli.ts",
-      "b": "packages/cli/src/doctor.ts",
+      "a": "packages/cli/src/pretool-rules.ts",
+      "b": "packages/cli/src/tests/pretool.test.ts",
       "either": 7,
       "partLabels": [
         "cli",
@@ -138,12 +93,27 @@
         "cli"
       ],
       "relation": "inside",
-      "shared": 5
+      "shared": 6
+    },
+    {
+      "a": "packages/cli/src/cli.ts",
+      "b": "packages/cli/src/doctor.ts",
+      "either": 9,
+      "partLabels": [
+        "cli",
+        "cli"
+      ],
+      "parts": [
+        "cli",
+        "cli"
+      ],
+      "relation": "inside",
+      "shared": 7
     },
     {
       "a": "packages/cli/src/cli.ts",
       "b": "packages/cli/src/help.ts",
-      "either": 7,
+      "either": 9,
       "partLabels": [
         "cli",
         "cli"
@@ -153,27 +123,12 @@
         "cli"
       ],
       "relation": "inside",
-      "shared": 5
-    },
-    {
-      "a": "packages/cli/src/cli.ts",
-      "b": "packages/cli/src/tests/doctor.test.ts",
-      "either": 7,
-      "partLabels": [
-        "cli",
-        "cli"
-      ],
-      "parts": [
-        "cli",
-        "cli"
-      ],
-      "relation": "inside",
-      "shared": 5
+      "shared": 7
     },
     {
       "a": "packages/cli/src/doctor.ts",
       "b": "packages/cli/src/help.ts",
-      "either": 6,
+      "either": 8,
       "partLabels": [
         "cli",
         "cli"
@@ -183,12 +138,12 @@
         "cli"
       ],
       "relation": "inside",
-      "shared": 4
+      "shared": 6
     },
     {
-      "a": "packages/cli/src/help.ts",
-      "b": "packages/cli/src/tests/doctor.test.ts",
-      "either": 6,
+      "a": "packages/cli/src/index.ts",
+      "b": "packages/cli/src/tests/fixtures.ts",
+      "either": 7,
       "partLabels": [
         "cli",
         "cli"
@@ -198,18 +153,18 @@
         "cli"
       ],
       "relation": "inside",
-      "shared": 4
+      "shared": 5
     }
   ],
   "changesTogetherNote": [
-    "2 files changed together with their own tests, as expected.",
+    "3 files changed together with their own tests, as expected.",
     "Confidence is low: fewer than 25 source files reach 10 revisions in the window.",
     "Window: 180 days; a pair counts from 3 shared commits, since 0 source files reach 10 revisions; the floor rises to 10 when 25 do."
   ],
-  "changesTogetherWithTests": 2,
-  "commit": "3fe2ae44ed0239f982cc76908ed10a2110af7144",
+  "changesTogetherWithTests": 3,
+  "commit": "a36f1ed763fef108b054c9c4a86e51371718d9e4",
   "defaultBranch": "main",
-  "derived": "9 parts, mostly Markdown (236 files); code in TypeScript (90), CSS (8), JavaScript (7), Astro (4) and PowerShell (1). Work enters through 6 doors; the busiest is CI, which reaches 6 parts. It publishes @mcptoolshop/loadout-os to npm. It deploys a site to GitHub Pages. People run ai-loadout, claude-memories, claude-rules and loadout-os.",
+  "derived": "9 parts, mostly Markdown (236 files); code in TypeScript (91), CSS (8), JavaScript (7), Astro (4) and PowerShell (1). Work enters through 6 doors; the busiest is CI, which reaches 6 parts. It publishes @mcptoolshop/loadout-os to npm. It deploys a site to GitHub Pages. People run ai-loadout, claude-memories, claude-rules and loadout-os.",
   "doors": [
     {
       "builds": [
@@ -243,7 +198,7 @@
         {
           "boundary": "cli",
           "depth": 0,
-          "files": 22
+          "files": 23
         },
         {
           "boundary": "hook",
@@ -279,6 +234,7 @@
         "packages/cli/src/tests/help.test.ts",
         "packages/cli/src/tests/hook.test.ts",
         "packages/cli/src/tests/pretool.test.ts",
+        "packages/cli/src/tests/public-hygiene.test.ts",
         "packages/cli/src/tests/refresh.test.ts",
         "packages/cli/src/tests/report.test.ts",
         "packages/cli/src/tests/split.test.ts",
@@ -287,8 +243,8 @@
         "packages/memories/src/tests/",
         "packages/rules/src/tests/"
       ],
-      "runsCount": 14,
-      "runsMore": 34,
+      "runsCount": 15,
+      "runsMore": 35,
       "sends": [
         "uploads coverage to Codecov",
         "deploys the site on a push to main"
@@ -320,7 +276,7 @@
         {
           "boundary": "cli",
           "depth": 0,
-          "files": 23
+          "files": 24
         },
         {
           "boundary": "hook",
@@ -352,6 +308,7 @@
         "packages/cli/src/tests/help.test.ts",
         "packages/cli/src/tests/hook.test.ts",
         "packages/cli/src/tests/pretool.test.ts",
+        "packages/cli/src/tests/public-hygiene.test.ts",
         "packages/cli/src/tests/refresh.test.ts",
         "packages/cli/src/tests/report.test.ts",
         "packages/cli/src/tests/split.test.ts",
@@ -360,8 +317,8 @@
         "packages/memories/src/tests/",
         "packages/rules/src/tests/"
       ],
-      "runsCount": 15,
-      "runsMore": 35,
+      "runsCount": 16,
+      "runsMore": 36,
       "sends": [
         "publishes @mcptoolshop/loadout-os to npm",
         "creates a GitHub release"
@@ -595,13 +552,13 @@
   ],
   "engine": "1.26.0",
   "generated": [],
-  "generatedAt": "2026-11-11T22:20:34.061Z",
+  "generatedAt": "2026-11-26T05:39:32.795Z",
   "limits": [
     "6 writes and 29 reads use paths built at run time and are not named here.",
     "1 write goes to places this repository does not track, so it is not listed as generated.",
-    "7 writes and 70 reads go to a path their caller passes, not to this repository.",
+    "7 writes and 74 reads go to a path their caller passes, not to this repository.",
     "2 writes and 32 reads go to the directory the command is run in, not to this repository.",
-    "7 writes and 18 reads go to the home directory (.ai-loadout/ and .claude/) or a path their caller passes, not to this repository.",
+    "7 writes and 15 reads go to the home directory (.ai-loadout/) or a path their caller passes, not to this repository.",
     "8 writes and 1 read go to a temporary directory, not to this repository.",
     "2 writes and 5 reads go to the directory the command is run in (.claude/ and MEMORY.md/) or the home directory (.claude/), not to this repository.",
     "4 reads go to the directory the command is run in (.claude/ and MEMORY.md/), the home directory (.claude/) or a temporary directory, not to this repository.",
@@ -637,7 +594,7 @@
   ],
   "summary": null,
   "summaryFrom": null,
-  "testFiles": 47,
+  "testFiles": 48,
   "testedBy": {
     "cli": 13,
     "hook": 0,

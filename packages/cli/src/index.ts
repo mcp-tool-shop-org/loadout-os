@@ -45,27 +45,37 @@ export type { HookTestOptions, HookTestResult } from "./hook.js";
 export {
   runPreTool,
   parsePreToolStdin,
-  loadSeatConfig,
-  resolveSeat,
+  loadProfileConfig,
+  resolveProfile,
   normalizePreToolPath,
   parseBashCommand,
   isSegmentReadOnly,
   isBashCommandReadOnly,
   isReadOnlyPassThrough,
   extractWritePayload,
+  resolveCanonicalRuleId,
   resolveRuleAction,
+  resolveRuleMemory,
+  resolveRuleSkill,
+  resolveRuleNote,
+  formatMemorySuffix,
   capRuleMessage,
   hashToolInput,
   appendDecisionLog,
-  defaultSeatsPath,
+  readDecisionLog,
+  defaultProfilesPath,
   defaultDecisionLogPath,
+  defaultRepliesDir,
   DEFAULT_PRETOOL_TIMEOUT_MS,
   READ_ONLY_TOOLS,
+  ProfileConfigError,
 } from "./pretool.js";
 export type {
   PreToolStdinPayload,
-  SeatConfig,
-  SeatName,
+  ProfileConfig,
+  ProfileName,
+  RuleConfigOverride,
+  QuoteGateConfig,
   CommandRedirection,
   CommandSegment,
   ParsedBashCommand,
@@ -75,6 +85,7 @@ export type {
   RuleAction,
   RuleMatchInput,
   RuleMatchResult,
+  RuleMemoryMap,
   PreToolRule,
   MatchedRuleRecord,
   DecisionLogEntry,
@@ -83,7 +94,16 @@ export type {
   PreToolOptions,
   PreToolResult,
 } from "./pretool.js";
-export { PRETOOL_RULES } from "./pretool-rules.js";
+export {
+  PRETOOL_RULES,
+  QUOTE_GATE_RULE,
+  DEFAULT_QUOTE_GATE_SPEAKERS,
+  DEFAULT_QUOTE_GATE_NAMED_SPEAKERS,
+  QUOTE_GATE_ALLOWLIST_SUFFIXES,
+  matchQuoteGate,
+  findQuoteViolations,
+  hasReviewPassAtHead,
+} from "./pretool-rules.js";
 
 // ── Ritual: refresh (Index Freshness Ritual) ───────────────────
 export {
@@ -93,7 +113,7 @@ export {
   dispatchRefresh,
   rewritePathsAbsolute,
   defaultDest,
-  DEFAULT_STORE,
+  resolveDefaultStore,
   RefreshError,
 } from "./refresh.js";
 export type { RefreshOptions, RefreshResult } from "./refresh.js";

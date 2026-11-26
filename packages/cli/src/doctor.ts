@@ -39,13 +39,21 @@ import {
 } from "@mcptoolshop/ai-loadout";
 
 import { BOLD, DIM, RESET, GREEN, YELLOW, RED, log } from "./console.js";
-import { loadSeatConfig, resolveRuleMemory, type PreToolRule } from "./pretool.js";
+import {
+  loadProfileConfig,
+  resolveRuleMemory,
+  resolveRuleSkill,
+  type PreToolRule,
+  type ProfileConfig,
+} from "./pretool.js";
 import { PRETOOL_RULES } from "./pretool-rules.js";
+import { resolveDefaultStore } from "./refresh.js";
 
 export type CheckStatus = "pass" | "warn" | "fail";
 
 export interface DoctorCheck {
   id: string;
+  code?: string;
   status: CheckStatus;
   message: string;
   hint?: string;
@@ -73,10 +81,10 @@ export interface DoctorPaths {
   skillsDir?: string;
   /** Additional index paths (e.g. project `.claude/loadout/index.json`) searched by the triad memory check. */
   extraIndexes?: string[];
-  /** Optional path to `seats.json` for per-seat triad memory checks. */
-  seatsPath?: string;
-  /** Optional per-seat memory store directory map (`{ rnd: "<store>", publisher: "<store>" }`) for per-seat triad memory checks. */
-  seatStores?: Record<string, string>;
+  /** Optional path to `profiles.json` for per-profile triad memory and skill checks. */
+  profilesPath?: string;
+  /** Optional per-profile memory store directory map (`{ docs: "<store>", release: "<store>" }`) for per-profile triad memory checks. */
+  profileStores?: Record<string, string>;
   /** Override pre-tool rule table for the triad check (defaults to `PRETOOL_RULES`). */
   rules?: readonly PreToolRule[];
   /** Warn threshold in bytes for MEMORY.md size (defaults to 60% of 24.4 KB = 14,640 B). */
@@ -115,12 +123,13 @@ function toPositiveNumber(val: unknown): number | undefined {
 export function resolveScaleThresholds(
   paths: DoctorPaths,
   memoryMdContent?: string,
+  storePath: string = paths.store,
 ): { memoryWarnBytes: number; subindexWarnEntries: number } {
   let cfgBytes: number | undefined;
   let cfgEntries: number | undefined;
 
-  const storeConfigPath = join(paths.store, ".loadout.json");
-  if (existsSync(storeConfigPath)) {
+  const storeConfigPath = storePath ? join(storePath, ".loadout.json") : "";
+  if (storeConfigPath && existsSync(storeConfigPath)) {
     try {
       const cfg = JSON.parse(readFileSync(storeConfigPath, "utf-8")) as Record<
         string,
@@ -205,9 +214,14 @@ export function defaultDoctorPaths(
 ): DoctorPaths {
   const home = homeDir;
   const projectIndex = resolve(repoRoot, ".claude", "loadout", "index.json");
-  const seatsPath = resolve(home, ".ai-loadout", "seats.json");
+  const envProfilesPath = process.env.AI_LOADOUT_PROFILES_PATH?.trim();
+  const profilesPath = envProfilesPath
+    ? resolve(envProfilesPath)
+    : resolve(home, ".ai-loadout", "profiles.json");
+  const resolvedProfilesPath =
+    envProfilesPath || existsSync(profilesPath) ? profilesPath : undefined;
   return {
-    store: resolve(home, ".claude", "projects", "F--AI", "memory"),
+    store: resolveDefaultStore(resolvedProfilesPath) ?? "",
     index: resolve(home, ".ai-loadout", "index.json"),
     settings: resolve(home, ".claude", "settings.json"),
     usage: resolve(home, ".ai-loadout", "usage.jsonl"),
@@ -215,7 +229,7 @@ export function defaultDoctorPaths(
     hookMirror: resolve(home, ".claude", "loadout-hook", "loadout-hook.mjs"),
     skillsDir: resolve(home, ".claude", "skills"),
     extraIndexes: existsSync(projectIndex) ? [projectIndex] : [],
-    ...(existsSync(seatsPath) ? { seatsPath } : {}),
+    ...(resolvedProfilesPath ? { profilesPath: resolvedProfilesPath } : {}),
   };
 }
 
@@ -273,98 +287,141 @@ function loadIndex(
 export function runDoctor(paths: DoctorPaths): DoctorResult {
   const checks: DoctorCheck[] = [];
 
+  let loadedProfileConfig: ProfileConfig | undefined;
+  let profilesConfigCheck: DoctorCheck | undefined;
+  if (paths.profilesPath) {
+    try {
+      loadedProfileConfig = loadProfileConfig(paths.profilesPath);
+      if (loadedProfileConfig.warnings.length > 0) {
+        profilesConfigCheck = {
+          id: "profiles-config",
+          status: "warn",
+          message: `profiles.json has ${loadedProfileConfig.warnings.length} warning(s): ${loadedProfileConfig.warnings.join("; ")}`,
+          hint: "Fix or remove invalid keys/values in profiles.json.",
+        };
+      }
+    } catch (err) {
+      profilesConfigCheck = {
+        id: "profiles-config",
+        status: "fail",
+        message: `Failed to load profiles.json (${paths.profilesPath}): ${(err as Error).message}`,
+        hint: "Fix JSON syntax, top-level structure, or the explicit --profiles / AI_LOADOUT_PROFILES_PATH path.",
+      };
+    }
+  }
+
+  const envStore = process.env.AI_LOADOUT_STORE?.trim();
+  const effectiveStore = paths.store?.trim()
+    ? resolve(paths.store)
+    : envStore
+      ? resolve(envStore)
+      : loadedProfileConfig?.defaultStore?.trim()
+        ? resolve(loadedProfileConfig.defaultStore.trim())
+        : "";
+
   // (a) store MEMORY.md validates (0 errors)
-  const memoryMd = join(paths.store, "MEMORY.md");
-  if (!existsSync(memoryMd)) {
+  if (!effectiveStore) {
     checks.push({
       id: "store-validates",
+      code: "DEFAULT_STORE_REQUIRED",
       status: "fail",
-      message: `Store MEMORY.md not found: ${memoryMd}`,
-      hint: "Point --store at the directory containing MEMORY.md.",
+      message:
+        "DEFAULT_STORE_REQUIRED: No default memory store configured (neither --store, AI_LOADOUT_STORE, nor defaultStore in profiles.json is set).",
+      hint: 'Pass --store <dir>, set AI_LOADOUT_STORE=<dir>, or set "defaultStore" in ~/.ai-loadout/profiles.json.',
     });
   } else {
-    try {
-      const analysis = analyzeMemoryMd(memoryMd);
-      const issues = validateMemory(analysis);
-      const errors = issues.filter((i) => i.severity === "error").length;
-      const warnings = issues.filter((i) => i.severity === "warning").length;
-      if (errors > 0) {
-        checks.push({
-          id: "store-validates",
-          status: "fail",
-          message: `Store MEMORY.md has ${errors} error(s), ${warnings} warning(s)`,
-          hint: "Run `loadout-os memories validate <MEMORY.md>` for detail.",
-        });
-      } else if (warnings > 0) {
-        checks.push({
-          id: "store-validates",
-          status: "warn",
-          message: `Store MEMORY.md valid (0 errors) with ${warnings} warning(s)`,
-          hint: "Run `loadout-os memories validate <MEMORY.md>` for detail.",
-        });
-      } else {
-        checks.push({
-          id: "store-validates",
-          status: "pass",
-          message: `Store MEMORY.md validates (0 errors, ${analysis.refs.length} refs)`,
-        });
-      }
-
-      // (a2) MEMORY.md size vs 60% of Claude Code's 24.4 KB read limit & sub-index entry counts
-      const memoryMdRaw = readFileSync(memoryMd, "utf-8");
-      const memoryMdBytes = Buffer.byteLength(memoryMdRaw, "utf-8");
-      const { memoryWarnBytes, subindexWarnEntries } = resolveScaleThresholds(
-        paths,
-        memoryMdRaw,
-      );
-      const pctOfReadLimit = Math.round(
-        (memoryMdBytes / CLAUDE_CODE_MEMORY_READ_LIMIT_BYTES) * 100,
-      );
-
-      if (memoryMdBytes > memoryWarnBytes) {
-        checks.push({
-          id: "memory-read-limit",
-          status: "warn",
-          message: `MEMORY.md is ${memoryMdBytes} B (${pctOfReadLimit}% of Claude Code's 24.4 KB read limit; warn threshold ${memoryWarnBytes} B)`,
-          hint: "Split root entries into sub-indexes with `loadout-os memories split --by <rules.json>`.",
-        });
-      } else {
-        checks.push({
-          id: "memory-read-limit",
-          status: "pass",
-          message: `MEMORY.md size ${memoryMdBytes} B (${pctOfReadLimit}% of 24.4 KB read limit <= ${memoryWarnBytes} B warn threshold)`,
-        });
-      }
-
-      // Gather sub-index entry counts from analysis and any sub-index files in the store directory
-      const subindexCounts = new Map<string, number>();
-      if (analysis.subindexEntryCounts) {
-        for (const [subFile, count] of Object.entries(
-          analysis.subindexEntryCounts,
-        )) {
-          subindexCounts.set(subFile, count);
+    const memoryMd = join(effectiveStore, "MEMORY.md");
+    if (!existsSync(memoryMd)) {
+      checks.push({
+        id: "store-validates",
+        status: "fail",
+        message: `Store MEMORY.md not found: ${memoryMd}`,
+        hint: 'Point --store <dir> at the directory containing MEMORY.md, or set "defaultStore" / project stores in profiles.json.',
+      });
+    } else {
+      try {
+        const analysis = analyzeMemoryMd(memoryMd);
+        const issues = validateMemory(analysis);
+        const errors = issues.filter((i) => i.severity === "error").length;
+        const warnings = issues.filter((i) => i.severity === "warning").length;
+        if (errors > 0) {
+          checks.push({
+            id: "store-validates",
+            status: "fail",
+            message: `Store MEMORY.md has ${errors} error(s), ${warnings} warning(s)`,
+            hint: "Run `loadout-os memories validate <MEMORY.md>` for detail.",
+          });
+        } else if (warnings > 0) {
+          checks.push({
+            id: "store-validates",
+            status: "warn",
+            message: `Store MEMORY.md valid (0 errors) with ${warnings} warning(s)`,
+            hint: "Run `loadout-os memories validate <MEMORY.md>` for detail.",
+          });
+        } else {
+          checks.push({
+            id: "store-validates",
+            status: "pass",
+            message: `Store MEMORY.md validates (0 errors, ${analysis.refs.length} refs)`,
+          });
         }
-      }
-      if (existsSync(paths.store)) {
-        try {
-          for (const entry of readdirSync(paths.store)) {
-            if (extname(entry) !== ".md" || entry === "MEMORY.md") continue;
-            if (subindexCounts.has(entry)) continue;
-            const fullPath = join(paths.store, entry);
-            try {
-              if (!statSync(fullPath).isFile()) continue;
-              const subRaw = readFileSync(fullPath, "utf-8");
-              if (detectSubindex(entry, subRaw).isSubindex) {
-                subindexCounts.set(entry, parseMemoryMd(subRaw).refs.length);
-              }
-            } catch {
-              // ignore unreadable file
-            }
+
+        // (a2) MEMORY.md size vs 60% of Claude Code's 24.4 KB read limit & sub-index entry counts
+        const memoryMdRaw = readFileSync(memoryMd, "utf-8");
+        const memoryMdBytes = Buffer.byteLength(memoryMdRaw, "utf-8");
+        const { memoryWarnBytes, subindexWarnEntries } = resolveScaleThresholds(
+          paths,
+          memoryMdRaw,
+          effectiveStore,
+        );
+        const pctOfReadLimit = Math.round(
+          (memoryMdBytes / CLAUDE_CODE_MEMORY_READ_LIMIT_BYTES) * 100,
+        );
+
+        if (memoryMdBytes > memoryWarnBytes) {
+          checks.push({
+            id: "memory-read-limit",
+            status: "warn",
+            message: `MEMORY.md is ${memoryMdBytes} B (${pctOfReadLimit}% of Claude Code's 24.4 KB read limit; warn threshold ${memoryWarnBytes} B)`,
+            hint: "Split root entries into sub-indexes with `loadout-os memories split --by <rules.json>`.",
+          });
+        } else {
+          checks.push({
+            id: "memory-read-limit",
+            status: "pass",
+            message: `MEMORY.md size ${memoryMdBytes} B (${pctOfReadLimit}% of 24.4 KB read limit <= ${memoryWarnBytes} B warn threshold)`,
+          });
+        }
+
+        // Gather sub-index entry counts from analysis and any sub-index files in the store directory
+        const subindexCounts = new Map<string, number>();
+        if (analysis.subindexEntryCounts) {
+          for (const [subFile, count] of Object.entries(
+            analysis.subindexEntryCounts,
+          )) {
+            subindexCounts.set(subFile, count);
           }
-        } catch {
-          // ignore unreadable dir
         }
-      }
+        if (existsSync(effectiveStore)) {
+          try {
+            for (const entry of readdirSync(effectiveStore)) {
+              if (extname(entry) !== ".md" || entry === "MEMORY.md") continue;
+              if (subindexCounts.has(entry)) continue;
+              const fullPath = join(effectiveStore, entry);
+              try {
+                if (!statSync(fullPath).isFile()) continue;
+                const subRaw = readFileSync(fullPath, "utf-8");
+                if (detectSubindex(entry, subRaw).isSubindex) {
+                  subindexCounts.set(entry, parseMemoryMd(subRaw).refs.length);
+                }
+              } catch {
+                // ignore unreadable file
+              }
+            }
+          } catch {
+            // ignore unreadable dir
+          }
+        }
 
       const overSubindexes: { file: string; count: number }[] = [];
       let maxSubindexEntries = 0;
@@ -401,6 +458,7 @@ export function runDoctor(paths: DoctorPaths): DoctorResult {
         status: "fail",
         message: `Could not analyze store MEMORY.md: ${(e as Error).message}`,
       });
+    }
     }
   }
 
@@ -640,7 +698,7 @@ export function runDoctor(paths: DoctorPaths): DoctorResult {
   // ── Part 4.2: Triad checks (memory, skill, pre-tool hook) ─────
   const rules = paths.rules ?? PRETOOL_RULES;
 
-  // (i) triad-memories: every rule in the table names a memory id that exists in the seat's store/index
+  // (i) triad-memories: every rule with a configured memory id names an id that exists in the profile's store/index
   const loadStoreMemoryIds = (storeDir: string): Set<string> => {
     const ids = new Set<string>();
     const storeIndexFile = join(storeDir, "index.json");
@@ -668,45 +726,59 @@ export function runDoctor(paths: DoctorPaths): DoctorResult {
     return ids;
   };
 
-  let configuredSeatStores: Record<string, string> = {};
-  if (paths.seatStores && Object.keys(paths.seatStores).length > 0) {
-    configuredSeatStores = { ...paths.seatStores };
-  } else if (paths.seatsPath && existsSync(paths.seatsPath)) {
-    try {
-      const sc = loadSeatConfig(paths.seatsPath);
-      if (sc.seatStores && Object.keys(sc.seatStores).length > 0) {
-        configuredSeatStores = { ...sc.seatStores };
-      }
-    } catch {
-      /* ignore unreadable seats.json; falls back to single-store triad check */
-    }
+  if (profilesConfigCheck) {
+    checks.push(profilesConfigCheck);
   }
 
-  const seatNames = Object.keys(configuredSeatStores);
-  if (seatNames.length > 0) {
-    const missingSeatMemoryRules: string[] = [];
-    for (const seat of seatNames) {
-      const storeDir = configuredSeatStores[seat];
-      const seatKnownIds = loadStoreMemoryIds(storeDir);
+  let configuredProfileStores: Record<string, string> = {};
+  if (paths.profileStores && Object.keys(paths.profileStores).length > 0) {
+    configuredProfileStores = { ...paths.profileStores };
+  } else if (
+    loadedProfileConfig?.profileStores &&
+    Object.keys(loadedProfileConfig.profileStores).length > 0
+  ) {
+    configuredProfileStores = { ...loadedProfileConfig.profileStores };
+  }
+
+  const profileNames = Object.keys(configuredProfileStores);
+  if (profileNames.length > 0) {
+    const missingProfileMemoryRules: string[] = [];
+    let checkedRuleRefs = 0;
+    for (const profile of profileNames) {
+      const storeDir = configuredProfileStores[profile];
+      const profileKnownIds = loadStoreMemoryIds(storeDir);
       for (const r of rules) {
-        const memId = resolveRuleMemory(r, seat);
-        if (!memId || !seatKnownIds.has(memId)) {
-          missingSeatMemoryRules.push(`${seat}: ${r.id} -> ${memId || "(empty)"}`);
+        const memId = resolveRuleMemory(r, profile, loadedProfileConfig);
+        if (!memId) {
+          if (typeof r.memory === "string") {
+            missingProfileMemoryRules.push(`${profile}: ${r.id} -> (empty)`);
+          }
+          continue;
+        }
+        checkedRuleRefs++;
+        if (!profileKnownIds.has(memId)) {
+          missingProfileMemoryRules.push(`${profile}: ${r.id} -> ${memId}`);
         }
       }
     }
-    if (missingSeatMemoryRules.length > 0) {
+    if (missingProfileMemoryRules.length > 0) {
       checks.push({
         id: "triad-memories",
         status: "fail",
-        message: `Triad memory id missing from seat store(s): ${missingSeatMemoryRules.join(", ")}`,
-        hint: "Ensure every rule in PRETOOL_RULES references a memory id present in each configured seat's own store/index.",
+        message: `Triad memory id missing from profile store(s): ${missingProfileMemoryRules.join(", ")}`,
+        hint: "Ensure every configured rule memory id exists in each profile's own store/index.",
+      });
+    } else if (checkedRuleRefs === 0) {
+      checks.push({
+        id: "triad-memories",
+        status: "pass",
+        message: `No per-profile rule memory ids configured across ${profileNames.length} profile store(s) (${profileNames.join(", ")})`,
       });
     } else {
       checks.push({
         id: "triad-memories",
         status: "pass",
-        message: `All ${rules.length} pre-tool rule memory id(s) exist per seat across ${seatNames.length} seat store(s) (${seatNames.join(", ")})`,
+        message: `All ${checkedRuleRefs} configured pre-tool rule memory ref(s) exist per profile across ${profileNames.length} profile store(s) (${profileNames.join(", ")})`,
       });
     }
   } else {
@@ -726,10 +798,18 @@ export function runDoctor(paths: DoctorPaths): DoctorResult {
     }
 
     const missingMemoryRules: string[] = [];
+    let checkedDefaultRefs = 0;
     for (const r of rules) {
-      const memId = resolveRuleMemory(r, "default");
-      if (!memId || !knownMemoryIds.has(memId)) {
-        missingMemoryRules.push(`${r.id} -> ${memId || "(empty)"}`);
+      const memId = resolveRuleMemory(r, "default", loadedProfileConfig);
+      if (!memId) {
+        if (typeof r.memory === "string") {
+          missingMemoryRules.push(`${r.id} -> (empty)`);
+        }
+        continue;
+      }
+      checkedDefaultRefs++;
+      if (!knownMemoryIds.has(memId)) {
+        missingMemoryRules.push(`${r.id} -> ${memId}`);
       }
     }
     if (missingMemoryRules.length > 0) {
@@ -737,13 +817,19 @@ export function runDoctor(paths: DoctorPaths): DoctorResult {
         id: "triad-memories",
         status: "fail",
         message: `Triad memory id missing from index(es): ${missingMemoryRules.join(", ")}`,
-        hint: "Ensure every rule in PRETOOL_RULES references a memory id present in the global or project index.json.",
+        hint: "Ensure every configured rule memory id exists in the global or project index.json.",
+      });
+    } else if (checkedDefaultRefs === 0) {
+      checks.push({
+        id: "triad-memories",
+        status: "pass",
+        message: "No default pre-tool rule memory ids configured (configure via profiles.json)",
       });
     } else {
       checks.push({
         id: "triad-memories",
         status: "pass",
-        message: `All ${rules.length} pre-tool rule memory id(s) exist in loaded index(es)`,
+        message: `All ${checkedDefaultRefs} configured pre-tool rule memory id(s) exist in loaded index(es)`,
       });
     }
   }
@@ -755,18 +841,19 @@ export function runDoctor(paths: DoctorPaths): DoctorResult {
   const noneWithReasonRules: string[] = [];
 
   for (const r of rules) {
-    if (r.skill === "none") {
+    const skillName = resolveRuleSkill(r, loadedProfileConfig);
+    if (skillName === "none") {
       if (r.skillNoneReason && r.skillNoneReason.trim().length > 0) {
         noneWithReasonRules.push(`${r.id} (${r.skillNoneReason.trim()})`);
       } else {
         brokenSkillRules.push(`${r.id} (skill: none without reason)`);
       }
-    } else if (!r.skill || !r.skill.trim()) {
+    } else if (!skillName || !skillName.trim()) {
       brokenSkillRules.push(`${r.id} (empty skill)`);
     } else {
-      const skillFile = join(skillsDir, r.skill, "SKILL.md");
+      const skillFile = join(skillsDir, skillName, "SKILL.md");
       if (!existsSync(skillFile)) {
-        brokenSkillRules.push(`${r.id} -> ${r.skill}/SKILL.md`);
+        brokenSkillRules.push(`${r.id} -> ${skillName}/SKILL.md`);
       }
     }
   }
@@ -876,7 +963,7 @@ export function printDoctor(result: DoctorResult, paths: DoctorPaths): void {
   log();
   log(`${BOLD}loadout-os doctor${RESET} ${DIM}— read-only health screen${RESET}`);
   log();
-  log(`  ${DIM}store:    ${paths.store}${RESET}`);
+  log(`  ${DIM}store:    ${paths.store || "(unconfigured)"}${RESET}`);
   log(`  ${DIM}index:    ${paths.index}${RESET}`);
   log(`  ${DIM}settings: ${paths.settings}${RESET}`);
   log(`  ${DIM}usage:    ${paths.usage}${RESET}`);

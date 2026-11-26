@@ -3,24 +3,24 @@
  *
  * Implements:
  *   1. PreToolUse stdin schema reader (`tool_name`, `tool_input`, `cwd`, `session_id`)
- *   2. Seat resolution from `~/.ai-loadout/seats.json` (longest matching prefix of `cwd`,
+ *   2. Profile resolution from `~/.ai-loadout/profiles.json` (longest matching prefix of `cwd`,
  *      case- and slash-normalised on Windows; `default` when unmatched; env override
- *      `AI_LOADOUT_SEATS_PATH`)
+ *      `AI_LOADOUT_PROFILES_PATH`)
  *   3. Cheap read-only pass-through for read-only tools (`Read`, `Glob`, `Grep`, etc.)
  *      and read-only Bash commands (`git status|diff|log|show`, `gh … view|list`, `ls`,
  *      `cat`, `head`, `tail`, `grep`, `rg`, `sed -n`, `sha256sum`, `wc`,
  *      `find` without `-delete`/`-exec`, `loadout-os … --dry-run`), checking every
  *      segment across pipes, `&&`, `||`, `;`, `&`, newlines, subshells, and command
  *      substitutions
- *   4. Typed rule table (`PreToolRule`) with per-seat actions (`block`, `warn`, `off`),
- *      triad metadata (`memory`, `skill`), and <= 5-line messages
+ *   4. Typed rule table (`PreToolRule`) with per-profile actions (`block`, `warn`, `off`),
+ *      triad metadata (`memory`, `skill`), optional per-profile `note`, and <= 5-line messages
  *   5. Append-only JSONL decision log at `~/.ai-loadout/hook-decisions.jsonl`
  *      (env override `AI_LOADOUT_DECISIONS_LOG`), recording `input_hash` (SHA-256)
  *      and never logging raw command or payload text
  *   6. Modes: `--mode enforce` (default) and `--mode log-only`
  *   7. Failure policy:
  *      - Fail open (`error_open`, exit 0) on any error before a block rule matches
- *        (unreadable stdin, bad seat map, parser crash) and on the warn layer
+ *        (unreadable stdin, bad profile map, parser crash) and on the warn layer
  *      - Fail closed (`error_closed`, exit 2) once a block rule has matched, even if a
  *        later step errors
  *      - Never emit JSON `permissionDecision: "deny"` together with exit 2 (exit 2 +
@@ -40,7 +40,7 @@ import { PRETOOL_RULES } from "./pretool-rules.js";
 
 export type RuleLayer = "A" | "B";
 export type RuleAction = "block" | "warn" | "off";
-export type SeatName = "rnd" | "publisher" | "default" | string;
+export type ProfileName = "default" | string;
 export type HookMode = "enforce" | "log-only";
 export type DecisionOutcome =
   | "allow"
@@ -59,17 +59,49 @@ export interface PreToolStdinPayload {
   tool_use_id?: string;
 }
 
-export interface SeatConfig {
-  /** Raw prefix -> seat name mapping from seats.json. */
-  seats: Record<string, string>;
-  /** Additional memory store paths configured in seats.json or env. */
+export interface RuleConfigOverride {
+  action?: Record<string, RuleAction>;
+  memory?: Record<string, string>;
+  skill?: string;
+  note?: Record<string, string>;
+}
+
+export interface QuoteGateConfig {
+  speakers?: string[];
+  namedSpeakers?: string[];
+  allowlistSuffixes?: string[];
+}
+
+export class ProfileConfigError extends Error {
+  readonly code: string;
+  constructor(code: string, message: string) {
+    super(message);
+    this.name = "ProfileConfigError";
+    this.code = code;
+  }
+}
+
+export interface ProfileConfig {
+  /** Raw prefix -> profile name mapping from profiles.json. */
+  profiles: Record<string, string>;
+  /** Configured default memory store path from profiles.json (for global refresh and doctor). */
+  defaultStore?: string;
+  /** Additional memory store paths configured in profiles.json or env. */
   storePaths: string[];
-  /** Seat name -> primary store path mapping from seats.json. */
-  seatStores?: Record<string, string>;
-  /** Raw project prefix -> store path mapping from seats.json. */
-  projectStores?: Record<string, string>;
-  /** Configured Argon review replies directory from seats.json. */
+  /** Profile name -> primary store path mapping from profiles.json. */
+  profileStores: Record<string, string>;
+  /** Raw project prefix -> store path mapping from profiles.json. */
+  projectStores: Record<string, string>;
+  /** Configured review replies directory from profiles.json. */
   repliesDir?: string;
+  /** Per-rule overrides (`action`, `memory`, `skill`, `note`) keyed by canonical rule id. */
+  rules: Record<string, RuleConfigOverride>;
+  /** Rule id aliases (`oldId -> newId`) for rule lookups and decision-log reading. */
+  ruleAliases: Record<string, string>;
+  /** Optional quote-gate configuration (`speakers`, `allowlistSuffixes`). */
+  quoteGate?: QuoteGateConfig;
+  /** Non-fatal warnings (e.g. unknown keys) recorded while loading profiles.json. */
+  warnings: string[];
 }
 
 export interface CommandRedirection {
@@ -133,12 +165,13 @@ export interface RuleMatchInput {
   toolName: string;
   toolInput: Record<string, unknown>;
   cwd: string;
-  seat: SeatName;
+  profile: ProfileName;
   parsedCommand?: ParsedBashCommand;
   writePayload?: WritePayload;
   storePaths: string[];
   normalizedStorePaths?: string[];
   repliesDir?: string;
+  profileConfig?: ProfileConfig;
   nowMs: number;
   recordNote: (note: string) => void;
 }
@@ -149,10 +182,8 @@ export interface RuleMatchResult {
 }
 
 export interface RuleMemoryMap {
-  default: string;
-  rnd?: string;
-  publisher?: string;
-  [seat: string]: string | undefined;
+  default?: string;
+  [profile: string]: string | undefined;
 }
 
 export interface PreToolRule {
@@ -161,9 +192,7 @@ export interface PreToolRule {
   tools: readonly string[];
   action: {
     default: RuleAction;
-    rnd?: RuleAction;
-    publisher?: RuleAction;
-    [seat: string]: RuleAction | undefined;
+    [profile: string]: RuleAction | undefined;
   };
   memory: RuleMemoryMap | string;
   skill: string;
@@ -182,7 +211,7 @@ export interface MatchedRuleRecord {
 
 export interface DecisionLogEntry {
   ts: string;
-  seat: string;
+  profile: string;
   session: string;
   tool: string;
   mode: HookMode;
@@ -199,13 +228,13 @@ export interface PreToolOptions {
   stdinJson?: string;
   /** Mode: `"enforce"` (default) or `"log-only"`. */
   mode?: string;
-  /** Override path to `seats.json` (defaults to `AI_LOADOUT_SEATS_PATH` or `~/.ai-loadout/seats.json`). */
-  seatsPath?: string;
+  /** Override path to `profiles.json` (defaults to `AI_LOADOUT_PROFILES_PATH` or `~/.ai-loadout/profiles.json`). */
+  profilesPath?: string;
   /** Override path to `hook-decisions.jsonl` (defaults to `AI_LOADOUT_DECISIONS_LOG` or `~/.ai-loadout/hook-decisions.jsonl`). */
   logPath?: string;
-  /** Additional store paths (merged with default `~/.claude/projects/<project>/memory` and seat map stores). */
+  /** Additional store paths (merged with default `~/.claude/projects/<project>/memory` and profile map stores). */
   storePaths?: string[];
-  /** Override Argon review replies directory (defaults to `seats.json` `repliesDir` or `AI_LOADOUT_REPLIES_DIR`; unset when neither is configured). */
+  /** Override review replies directory (defaults to `profiles.json` `repliesDir` or `AI_LOADOUT_REPLIES_DIR`; unset when neither is configured). */
   repliesDir?: string;
   /** Custom rule table override for tests (defaults to `PRETOOL_RULES`). */
   rules?: readonly PreToolRule[];
@@ -226,7 +255,7 @@ export interface PreToolResult {
   stdout: string;
   stderr: string;
   passThrough: boolean;
-  seat: string;
+  profile: string;
   outcome: DecisionOutcome | "pass_through";
   logEntry?: DecisionLogEntry;
 }
@@ -295,10 +324,10 @@ const OUTPUT_REDIRECT_OPS = new Set([
 
 const HOMEDIR_SLASH = homedir().replace(/\\/g, "/");
 
-export function defaultSeatsPath(): string {
-  const envPath = process.env.AI_LOADOUT_SEATS_PATH?.trim();
+export function defaultProfilesPath(): string {
+  const envPath = process.env.AI_LOADOUT_PROFILES_PATH?.trim();
   if (envPath) return resolve(envPath);
-  return join(homedir(), ".ai-loadout", "seats.json");
+  return join(homedir(), ".ai-loadout", "profiles.json");
 }
 
 export function defaultDecisionLogPath(): string {
@@ -313,7 +342,7 @@ export function defaultRepliesDir(): string | undefined {
   return undefined;
 }
 
-// ── Path Normalization & Seat Resolution ──────────────────────
+// ── Path Normalization & Profile Resolution ───────────────────
 
 /**
  * Normalize a path for prefix comparison:
@@ -382,143 +411,454 @@ export function normalizePreToolPath(rawPath: string): string {
   return p;
 }
 
+function isPlainObject(val: unknown): val is Record<string, unknown> {
+  return Boolean(val) && typeof val === "object" && !Array.isArray(val);
+}
+
+const VALID_RULE_ACTIONS = new Set<RuleAction>(["block", "warn", "off"]);
+
+const TOP_LEVEL_CONFIG_KEYS = new Set([
+  "defaultStore",
+  "profiles",
+  "rules",
+  "ruleAliases",
+  "quoteGate",
+  "stores",
+  "repliesDir",
+  "replies_dir",
+]);
+
+const PROFILE_ENTRY_KEYS = new Set([
+  "profile",
+  "store",
+  "stores",
+  "worktrees",
+  "prefixes",
+  "repliesDir",
+  "replies_dir",
+]);
+
+const RULE_OVERRIDE_KEYS = new Set(["action", "memory", "skill", "note"]);
+const QUOTE_GATE_KEYS = new Set(["speakers", "namedSpeakers", "allowlistSuffixes"]);
+
+function formatWarnValue(val: unknown): string {
+  try {
+    const raw = JSON.stringify(val);
+    return raw === undefined ? String(val) : raw;
+  } catch {
+    return String(val);
+  }
+}
+
+function readSoftStringArray(
+  val: unknown,
+  context: string,
+  warn: (msg: string) => void,
+): { valid: boolean; items: string[] } {
+  if (!Array.isArray(val)) {
+    warn(`Invalid profiles.json '${context}' value (${formatWarnValue(val)}): expected an array of strings; ignoring`);
+    return { valid: false, items: [] };
+  }
+  const out: string[] = [];
+  for (let i = 0; i < val.length; i++) {
+    const item = val[i];
+    if (typeof item !== "string" || !item.trim()) {
+      warn(`Invalid profiles.json '${context}[${i}]' value (${formatWarnValue(item)}): expected a non-empty string; skipping`);
+      continue;
+    }
+    out.push(item.trim());
+  }
+  return { valid: true, items: out };
+}
+
+function readSoftStringRecord(
+  val: unknown,
+  context: string,
+  warn: (msg: string) => void,
+  allowEmptyValue: boolean = false,
+): Record<string, string> | undefined {
+  if (!isPlainObject(val)) {
+    warn(`Invalid profiles.json '${context}' value (${formatWarnValue(val)}): expected a JSON object; ignoring`);
+    return undefined;
+  }
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(val)) {
+    if (!k.trim() || typeof v !== "string" || (!allowEmptyValue && !v.trim())) {
+      warn(
+        `Invalid profiles.json '${context}.${k}' value (${formatWarnValue(v)}): expected a ${allowEmptyValue ? "string" : "non-empty string"}; dropping entry`,
+      );
+      continue;
+    }
+    out[k.trim()] = allowEmptyValue ? v.trimEnd() : v.trim();
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
+function mergeRuleOverride(
+  existing: RuleConfigOverride | undefined,
+  incoming: RuleConfigOverride,
+  incomingWins: boolean,
+): RuleConfigOverride {
+  if (!existing) return incoming;
+  const mergeMap = <T>(
+    a: Record<string, T> | undefined,
+    b: Record<string, T> | undefined,
+  ): Record<string, T> | undefined => {
+    if (!a && !b) return undefined;
+    return incomingWins ? { ...(a ?? {}), ...(b ?? {}) } : { ...(b ?? {}), ...(a ?? {}) };
+  };
+  return {
+    ...(existing.action || incoming.action
+      ? { action: mergeMap(existing.action, incoming.action) }
+      : {}),
+    ...(existing.memory || incoming.memory
+      ? { memory: mergeMap(existing.memory, incoming.memory) }
+      : {}),
+    ...(incoming.skill || existing.skill
+      ? { skill: incomingWins ? (incoming.skill ?? existing.skill) : (existing.skill ?? incoming.skill) }
+      : {}),
+    ...(existing.note || incoming.note
+      ? { note: mergeMap(existing.note, incoming.note) }
+      : {}),
+  };
+}
+
 /**
- * Load and validate `~/.ai-loadout/seats.json`.
- * - If the default file does not exist and no explicit override was set, returns an empty map.
- * - If an explicit override path is missing, or the file is unreadable or malformed JSON,
- *   throws an Error so the caller fails open and logs `error_open`.
+ * Load and validate `~/.ai-loadout/profiles.json`.
+ * - If the default file does not exist and no explicit override was set, returns an empty config.
+ * - If an explicit override path is missing, unreadable, malformed JSON, or not a top-level JSON
+ *   object, throws a `ProfileConfigError` so callers fail safely (`error_open` in hook; `fail` in doctor).
+ * - Unknown keys and invalidly typed sub-fields or rule/profile overrides are soft-dropped and
+ *   recorded in `warnings` (and `opts.onWarning`) without disabling the rest of the config.
  */
-export function loadSeatConfig(seatsPath?: string): SeatConfig {
+export function loadProfileConfig(
+  profilesPath?: string,
+  opts?: { onWarning?: (msg: string) => void },
+): ProfileConfig {
   const explicitOverride = Boolean(
-    seatsPath || process.env.AI_LOADOUT_SEATS_PATH?.trim(),
+    profilesPath || process.env.AI_LOADOUT_PROFILES_PATH?.trim(),
   );
-  const resolvedPath = seatsPath ? resolve(seatsPath) : defaultSeatsPath();
+  const resolvedPath = profilesPath ? resolve(profilesPath) : defaultProfilesPath();
 
   let raw: string;
   try {
     raw = readFileSync(resolvedPath, "utf-8");
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === "ENOENT" && !explicitOverride) {
-      return { seats: {}, storePaths: [], seatStores: {}, projectStores: {} };
+      return {
+        profiles: {},
+        storePaths: [],
+        profileStores: {},
+        projectStores: {},
+        rules: {},
+        ruleAliases: {},
+        warnings: [],
+      };
     }
-    throw new Error(`Seat map not found at explicit path: ${resolvedPath}`);
+    throw new ProfileConfigError(
+      "PROFILE_CONFIG_NOT_FOUND",
+      `Profile config not found at explicit path: ${resolvedPath}`,
+    );
   }
 
-  const parsed: unknown = JSON.parse(raw);
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    throw new Error(`Seat map at ${resolvedPath} must be a JSON object`);
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (err) {
+    throw new ProfileConfigError(
+      "PROFILE_CONFIG_INVALID_JSON",
+      `Profile config at ${resolvedPath} is invalid JSON: ${(err as Error).message}`,
+    );
   }
 
-  const obj = parsed as Record<string, unknown>;
-  const seats: Record<string, string> = {};
-  const storePaths: string[] = [];
-  const seatStores: Record<string, string> = {};
-  const projectStores: Record<string, string> = {};
-  let repliesDir: string | undefined;
-
-  if (typeof obj.repliesDir === "string" && obj.repliesDir.trim()) {
-    repliesDir = obj.repliesDir.trim();
-  } else if (typeof obj.replies_dir === "string" && obj.replies_dir.trim()) {
-    repliesDir = obj.replies_dir.trim();
+  if (!isPlainObject(parsed)) {
+    throw new ProfileConfigError(
+      "PROFILE_CONFIG_NOT_OBJECT",
+      `Profile config at ${resolvedPath} must be a JSON object`,
+    );
   }
 
-  const parseSeatEntries = (mapObj: Record<string, unknown>) => {
-    for (const [key, val] of Object.entries(mapObj)) {
-      if (key === "repliesDir" || key === "replies_dir") {
-        if (typeof val === "string" && val.trim()) {
-          repliesDir = val.trim();
-        }
-        continue;
-      }
-      if (key === "stores" && Array.isArray(val)) {
-        for (const item of val) {
-          if (typeof item === "string" && item.trim()) {
-            storePaths.push(item.trim());
-          } else {
-            throw new Error(`Invalid store path in seats.json stores array`);
-          }
-        }
-        continue;
-      }
-      if (typeof val === "string" && val.trim()) {
-        seats[key] = val.trim();
-      } else if (val && typeof val === "object" && !Array.isArray(val)) {
-        const rec = val as Record<string, unknown>;
-        if (typeof rec.seat !== "string" || !rec.seat.trim()) {
-          throw new Error(`Seat entry for '${key}' is missing a non-empty 'seat' string`);
-        }
-        const seatName = rec.seat.trim();
-        seats[key] = seatName;
-
-        // Support additional worktree / prefix roots per seat (P1.2)
-        for (const extraList of [rec.worktrees, rec.prefixes]) {
-          if (Array.isArray(extraList)) {
-            for (const pfx of extraList) {
-              if (typeof pfx === "string" && pfx.trim()) {
-                seats[pfx.trim()] = seatName;
-              }
-            }
-          }
-        }
-
-        if (typeof rec.repliesDir === "string" && rec.repliesDir.trim() && !repliesDir) {
-          repliesDir = rec.repliesDir.trim();
-        }
-
-        if (typeof rec.store === "string" && rec.store.trim()) {
-          const st = rec.store.trim();
-          storePaths.push(st);
-          if (!seatStores[seatName]) seatStores[seatName] = st;
-          projectStores[key] = st;
-        }
-        if (Array.isArray(rec.stores)) {
-          for (const s of rec.stores) {
-            if (typeof s === "string" && s.trim()) {
-              const st = s.trim();
-              storePaths.push(st);
-              if (!seatStores[seatName]) seatStores[seatName] = st;
-              if (!projectStores[key]) projectStores[key] = st;
-            }
-          }
-        }
-      } else {
-        throw new Error(`Invalid seat map value for prefix '${key}'`);
-      }
-    }
+  const warnings: string[] = [];
+  const warn = (msg: string) => {
+    warnings.push(msg);
+    opts?.onWarning?.(msg);
   };
 
-  if (obj.seats && typeof obj.seats === "object" && !Array.isArray(obj.seats)) {
-    if (Array.isArray(obj.stores)) {
-      for (const s of obj.stores) {
-        if (typeof s === "string" && s.trim()) storePaths.push(s.trim());
+  for (const key of Object.keys(parsed)) {
+    if (!TOP_LEVEL_CONFIG_KEYS.has(key)) {
+      warn(`Unknown top-level key '${key}' in ${resolvedPath}`);
+    }
+  }
+
+  const profiles: Record<string, string> = {};
+  const storePaths: string[] = [];
+  const profileStores: Record<string, string> = {};
+  const projectStores: Record<string, string> = {};
+  let defaultStore: string | undefined;
+  let repliesDir: string | undefined;
+
+  if (parsed.defaultStore !== undefined) {
+    if (typeof parsed.defaultStore !== "string" || !parsed.defaultStore.trim()) {
+      warn(`Invalid profiles.json 'defaultStore' value (${formatWarnValue(parsed.defaultStore)}): expected a non-empty string; ignoring`);
+    } else {
+      defaultStore = parsed.defaultStore.trim();
+      storePaths.push(defaultStore);
+    }
+  }
+
+  if (parsed.repliesDir !== undefined) {
+    if (typeof parsed.repliesDir !== "string" || !parsed.repliesDir.trim()) {
+      warn(`Invalid profiles.json 'repliesDir' value (${formatWarnValue(parsed.repliesDir)}): expected a non-empty string; ignoring`);
+    } else {
+      repliesDir = parsed.repliesDir.trim();
+    }
+  } else if (parsed.replies_dir !== undefined) {
+    if (typeof parsed.replies_dir !== "string" || !parsed.replies_dir.trim()) {
+      warn(`Invalid profiles.json 'replies_dir' value (${formatWarnValue(parsed.replies_dir)}): expected a non-empty string; ignoring`);
+    } else {
+      repliesDir = parsed.replies_dir.trim();
+    }
+  }
+
+  if (parsed.stores !== undefined) {
+    storePaths.push(...readSoftStringArray(parsed.stores, "stores", warn).items);
+  }
+
+  if (parsed.profiles !== undefined) {
+    if (!isPlainObject(parsed.profiles)) {
+      warn(`Invalid profiles.json 'profiles' value (${formatWarnValue(parsed.profiles)}): expected a JSON object; ignoring`);
+    } else {
+      for (const [prefix, val] of Object.entries(parsed.profiles)) {
+        if (typeof val === "string") {
+          if (!val.trim()) {
+            warn(`Invalid profiles.json 'profiles.${prefix}' value (${formatWarnValue(val)}): expected a non-empty string; dropping entry`);
+            continue;
+          }
+          profiles[prefix] = val.trim();
+          continue;
+        }
+        if (!isPlainObject(val)) {
+          warn(`Invalid profiles.json 'profiles.${prefix}' value (${formatWarnValue(val)}): expected a string or object; dropping entry`);
+          continue;
+        }
+        for (const k of Object.keys(val)) {
+          if (!PROFILE_ENTRY_KEYS.has(k)) {
+            warn(`Unknown key '${k}' in profile entry '${prefix}'`);
+          }
+        }
+        if (typeof val.profile !== "string" || !val.profile.trim()) {
+          warn(`Invalid profiles.json 'profiles.${prefix}.profile' value (${formatWarnValue(val.profile)}): expected a non-empty string; dropping entry`);
+          continue;
+        }
+        const profileName = val.profile.trim();
+        profiles[prefix] = profileName;
+
+        if (val.worktrees !== undefined) {
+          for (const pfx of readSoftStringArray(
+            val.worktrees,
+            `profiles.${prefix}.worktrees`,
+            warn,
+          ).items) {
+            profiles[pfx] = profileName;
+          }
+        }
+        if (val.prefixes !== undefined) {
+          for (const pfx of readSoftStringArray(
+            val.prefixes,
+            `profiles.${prefix}.prefixes`,
+            warn,
+          ).items) {
+            profiles[pfx] = profileName;
+          }
+        }
+
+        const entryRepliesDir = val.repliesDir ?? val.replies_dir;
+        if (entryRepliesDir !== undefined) {
+          if (typeof entryRepliesDir !== "string" || !entryRepliesDir.trim()) {
+            warn(`Invalid profiles.json 'profiles.${prefix}.repliesDir' value (${formatWarnValue(entryRepliesDir)}): expected a non-empty string; ignoring`);
+          } else if (!repliesDir) {
+            repliesDir = entryRepliesDir.trim();
+          }
+        }
+
+        if (val.store !== undefined) {
+          if (typeof val.store !== "string" || !val.store.trim()) {
+            warn(`Invalid profiles.json 'profiles.${prefix}.store' value (${formatWarnValue(val.store)}): expected a non-empty string; ignoring`);
+          } else {
+            const st = val.store.trim();
+            storePaths.push(st);
+            if (!profileStores[profileName]) profileStores[profileName] = st;
+            projectStores[prefix] = st;
+          }
+        }
+
+        if (val.stores !== undefined) {
+          for (const st of readSoftStringArray(
+            val.stores,
+            `profiles.${prefix}.stores`,
+            warn,
+          ).items) {
+            storePaths.push(st);
+            if (!profileStores[profileName]) profileStores[profileName] = st;
+            if (!projectStores[prefix]) projectStores[prefix] = st;
+          }
+        }
       }
     }
-    parseSeatEntries(obj.seats as Record<string, unknown>);
-  } else {
-    parseSeatEntries(obj);
+  }
+
+  const ruleAliases =
+    parsed.ruleAliases !== undefined
+      ? (readSoftStringRecord(parsed.ruleAliases, "ruleAliases", warn) ?? {})
+      : {};
+
+  const rules: Record<string, RuleConfigOverride> = {};
+  if (parsed.rules !== undefined) {
+    if (!isPlainObject(parsed.rules)) {
+      warn(`Invalid profiles.json 'rules' value (${formatWarnValue(parsed.rules)}): expected a JSON object; ignoring`);
+    } else {
+      for (const [rawRuleId, rawOverride] of Object.entries(parsed.rules)) {
+        if (!isPlainObject(rawOverride)) {
+          warn(`Invalid profiles.json 'rules.${rawRuleId}' value (${formatWarnValue(rawOverride)}): expected a JSON object; dropping rule override`);
+          continue;
+        }
+        for (const k of Object.keys(rawOverride)) {
+          if (!RULE_OVERRIDE_KEYS.has(k)) {
+            warn(`Unknown key '${k}' in rule '${rawRuleId}'`);
+          }
+        }
+
+        const override: RuleConfigOverride = {};
+        if (rawOverride.action !== undefined) {
+          if (!isPlainObject(rawOverride.action)) {
+            warn(`Invalid profiles.json 'rules.${rawRuleId}.action' value (${formatWarnValue(rawOverride.action)}): expected a JSON object; ignoring`);
+          } else {
+            const actionMap: Record<string, RuleAction> = {};
+            for (const [prof, act] of Object.entries(rawOverride.action)) {
+              if (typeof act !== "string" || !VALID_RULE_ACTIONS.has(act as RuleAction)) {
+                warn(
+                  `Invalid profiles.json 'rules.${rawRuleId}.action.${prof}' value (${formatWarnValue(act)}): expected 'block', 'warn', or 'off'; dropping invalid override`,
+                );
+                continue;
+              }
+              actionMap[prof] = act as RuleAction;
+            }
+            if (Object.keys(actionMap).length > 0) {
+              override.action = actionMap;
+            }
+          }
+        }
+
+        if (rawOverride.memory !== undefined) {
+          const memMap = readSoftStringRecord(
+            rawOverride.memory,
+            `rules.${rawRuleId}.memory`,
+            warn,
+          );
+          if (memMap) override.memory = memMap;
+        }
+
+        if (rawOverride.skill !== undefined) {
+          if (typeof rawOverride.skill !== "string" || !rawOverride.skill.trim()) {
+            warn(`Invalid profiles.json 'rules.${rawRuleId}.skill' value (${formatWarnValue(rawOverride.skill)}): expected a non-empty string; ignoring`);
+          } else {
+            override.skill = rawOverride.skill.trim();
+          }
+        }
+
+        if (rawOverride.note !== undefined) {
+          const noteMap = readSoftStringRecord(
+            rawOverride.note,
+            `rules.${rawRuleId}.note`,
+            warn,
+            true,
+          );
+          if (noteMap) override.note = noteMap;
+        }
+
+        if (
+          override.action !== undefined ||
+          override.memory !== undefined ||
+          override.skill !== undefined ||
+          override.note !== undefined
+        ) {
+          const canonicalId = ruleAliases[rawRuleId] ?? rawRuleId;
+          const isCanonicalKey = canonicalId === rawRuleId;
+          rules[canonicalId] = mergeRuleOverride(rules[canonicalId], override, isCanonicalKey);
+        }
+      }
+    }
+  }
+
+  let quoteGate: QuoteGateConfig | undefined;
+  if (parsed.quoteGate !== undefined) {
+    if (!isPlainObject(parsed.quoteGate)) {
+      warn(`Invalid profiles.json 'quoteGate' value (${formatWarnValue(parsed.quoteGate)}): expected a JSON object; ignoring`);
+    } else {
+      for (const k of Object.keys(parsed.quoteGate)) {
+        if (!QUOTE_GATE_KEYS.has(k)) {
+          warn(`Unknown key '${k}' in quoteGate`);
+        }
+      }
+      const nextGate: QuoteGateConfig = {};
+      if (parsed.quoteGate.speakers !== undefined) {
+        const res = readSoftStringArray(parsed.quoteGate.speakers, "quoteGate.speakers", warn);
+        if (res.valid && (res.items.length > 0 || (parsed.quoteGate.speakers as unknown[]).length === 0)) {
+          nextGate.speakers = res.items;
+        }
+      }
+      if (parsed.quoteGate.namedSpeakers !== undefined) {
+        const res = readSoftStringArray(parsed.quoteGate.namedSpeakers, "quoteGate.namedSpeakers", warn);
+        if (res.valid && (res.items.length > 0 || (parsed.quoteGate.namedSpeakers as unknown[]).length === 0)) {
+          nextGate.namedSpeakers = res.items;
+        }
+      }
+      if (parsed.quoteGate.allowlistSuffixes !== undefined) {
+        const res = readSoftStringArray(
+          parsed.quoteGate.allowlistSuffixes,
+          "quoteGate.allowlistSuffixes",
+          warn,
+        );
+        if (res.valid && (res.items.length > 0 || (parsed.quoteGate.allowlistSuffixes as unknown[]).length === 0)) {
+          nextGate.allowlistSuffixes = res.items;
+        }
+      }
+      if (
+        nextGate.speakers !== undefined ||
+        nextGate.namedSpeakers !== undefined ||
+        nextGate.allowlistSuffixes !== undefined
+      ) {
+        quoteGate = nextGate;
+      }
+    }
   }
 
   return {
-    seats,
+    ...(defaultStore ? { defaultStore } : {}),
+    profiles,
     storePaths,
-    seatStores,
+    profileStores,
     projectStores,
     ...(repliesDir ? { repliesDir } : {}),
+    rules,
+    ruleAliases,
+    ...(quoteGate ? { quoteGate } : {}),
+    warnings,
   };
 }
 
 /**
- * Resolve the active seat from `cwd` and a loaded `SeatConfig`.
+ * Resolve the active profile from `cwd` and a loaded `ProfileConfig`.
  * The longest matching path-boundary prefix wins; returns `"default"` when no prefix matches.
  */
-export function resolveSeat(cwd: string, config: SeatConfig): SeatName {
+export function resolveProfile(cwd: string, config: ProfileConfig): ProfileName {
   const normCwd = normalizePreToolPath(cwd);
   if (!normCwd) return "default";
 
-  let bestSeat: SeatName = "default";
+  let bestProfile: ProfileName = "default";
   let bestLen = -1;
 
-  for (const [rawPrefix, seat] of Object.entries(config.seats)) {
+  for (const [rawPrefix, profile] of Object.entries(config.profiles)) {
     const normPrefix = normalizePreToolPath(rawPrefix);
     if (!normPrefix) continue;
 
@@ -533,11 +873,11 @@ export function resolveSeat(cwd: string, config: SeatConfig): SeatName {
 
     if (matches && prefixCmp.length > bestLen) {
       bestLen = prefixCmp.length;
-      bestSeat = seat;
+      bestProfile = profile;
     }
   }
 
-  return bestSeat;
+  return bestProfile;
 }
 
 // ── Stdin Schema & Hash ───────────────────────────────────────
@@ -1492,23 +1832,109 @@ export function isReadOnlyPassThrough(
 
 // ── Rule Evaluation Helpers ───────────────────────────────────
 
-export function resolveRuleAction(rule: PreToolRule, seat: SeatName): RuleAction {
-  const seatAction = rule.action[seat];
-  if (seatAction === "block" || seatAction === "warn" || seatAction === "off") {
-    return seatAction;
+export function resolveCanonicalRuleId(
+  ruleId: string,
+  aliases?: Record<string, string>,
+): string {
+  if (!aliases) return ruleId;
+  return aliases[ruleId] ?? ruleId;
+}
+
+function findRuleOverride(
+  ruleId: string,
+  profileConfig?: ProfileConfig,
+): RuleConfigOverride | undefined {
+  if (!profileConfig) return undefined;
+  const canonicalId = resolveCanonicalRuleId(ruleId, profileConfig.ruleAliases);
+  const direct = profileConfig.rules[canonicalId] ?? profileConfig.rules[ruleId];
+  if (direct) return direct;
+
+  for (const [rawKey, override] of Object.entries(profileConfig.rules)) {
+    if (resolveCanonicalRuleId(rawKey, profileConfig.ruleAliases) === canonicalId) {
+      return override;
+    }
+  }
+  return undefined;
+}
+
+export function resolveRuleAction(
+  rule: PreToolRule,
+  profile: ProfileName,
+  profileConfig?: ProfileConfig,
+): RuleAction {
+  const override = findRuleOverride(rule.id, profileConfig);
+  const cfgProfileAction = override?.action?.[profile];
+  if (cfgProfileAction === "block" || cfgProfileAction === "warn" || cfgProfileAction === "off") {
+    return cfgProfileAction;
+  }
+  const cfgDefaultAction = override?.action?.default;
+  if (cfgDefaultAction === "block" || cfgDefaultAction === "warn" || cfgDefaultAction === "off") {
+    return cfgDefaultAction;
+  }
+
+  const profileAction = rule.action[profile];
+  if (profileAction === "block" || profileAction === "warn" || profileAction === "off") {
+    return profileAction;
   }
   return rule.action.default;
 }
 
-export function resolveRuleMemory(rule: PreToolRule, seat: SeatName): string {
+export function resolveRuleMemory(
+  rule: PreToolRule,
+  profile: ProfileName,
+  profileConfig?: ProfileConfig,
+): string {
+  const override = findRuleOverride(rule.id, profileConfig);
+  const cfgProfileMemory = override?.memory?.[profile];
+  if (typeof cfgProfileMemory === "string" && cfgProfileMemory.trim()) {
+    return cfgProfileMemory.trim();
+  }
+  const cfgDefaultMemory = override?.memory?.default;
+  if (typeof cfgDefaultMemory === "string" && cfgDefaultMemory.trim()) {
+    return cfgDefaultMemory.trim();
+  }
+
   if (typeof rule.memory === "string") {
-    return rule.memory;
+    return rule.memory.trim();
   }
-  const seatMemory = rule.memory[seat];
-  if (typeof seatMemory === "string" && seatMemory.trim()) {
-    return seatMemory.trim();
+  const profileMemory = rule.memory[profile];
+  if (typeof profileMemory === "string" && profileMemory.trim()) {
+    return profileMemory.trim();
   }
-  return rule.memory.default;
+  return typeof rule.memory.default === "string" ? rule.memory.default.trim() : "";
+}
+
+export function resolveRuleSkill(
+  rule: PreToolRule,
+  profileConfig?: ProfileConfig,
+): string {
+  const override = findRuleOverride(rule.id, profileConfig);
+  if (typeof override?.skill === "string" && override.skill.trim()) {
+    return override.skill.trim();
+  }
+  return rule.skill;
+}
+
+export function resolveRuleNote(
+  rule: PreToolRule,
+  profile: ProfileName,
+  profileConfig?: ProfileConfig,
+): string {
+  const override = findRuleOverride(rule.id, profileConfig);
+  const profileNote = override?.note?.[profile];
+  if (typeof profileNote === "string" && profileNote.trim()) {
+    return profileNote.trim();
+  }
+  const defaultNote = override?.note?.default;
+  if (typeof defaultNote === "string" && defaultNote.trim()) {
+    return defaultNote.trim();
+  }
+  return "";
+}
+
+export function formatMemorySuffix(memoryId: string | undefined): string {
+  const trimmed = memoryId?.trim();
+  return trimmed ? ` (memory: ${trimmed})` : "";
 }
 
 /**
@@ -1531,16 +1957,74 @@ export function appendDecisionLog(logPath: string, entry: DecisionLogEntry): voi
   appendFileSync(logPath, JSON.stringify(entry) + "\n", "utf-8");
 }
 
+/**
+ * Read decision-log entries from `logPath`, remapping any legacy rule ids in `evaluated`,
+ * `matched`, and `rule_error:<id>` notes through `ruleAliases`.
+ */
+export function readDecisionLog(
+  logPath: string = defaultDecisionLogPath(),
+  opts?: {
+    ruleAliases?: Record<string, string>;
+    profileConfig?: ProfileConfig;
+    profilesPath?: string;
+  },
+): DecisionLogEntry[] {
+  if (!existsSync(logPath)) return [];
+  const raw = readFileSync(logPath, "utf-8");
+  let aliases = opts?.ruleAliases ?? opts?.profileConfig?.ruleAliases;
+  if (!aliases && opts?.profilesPath) {
+    aliases = loadProfileConfig(opts.profilesPath).ruleAliases;
+  }
+
+  const out: DecisionLogEntry[] = [];
+  for (const line of raw.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    try {
+      const entry = JSON.parse(trimmed) as DecisionLogEntry;
+      if (!entry || typeof entry !== "object") continue;
+      const evaluated = Array.isArray(entry.evaluated)
+        ? entry.evaluated.map((id) => resolveCanonicalRuleId(id, aliases))
+        : [];
+      const matched = Array.isArray(entry.matched)
+        ? entry.matched.map((m) => ({
+            ...m,
+            id: resolveCanonicalRuleId(m.id, aliases),
+          }))
+        : [];
+      const notes = Array.isArray(entry.notes)
+        ? entry.notes.map((n) => {
+            if (n.startsWith("rule_error:")) {
+              const rawId = n.slice("rule_error:".length);
+              return `rule_error:${resolveCanonicalRuleId(rawId, aliases)}`;
+            }
+            return n;
+          })
+        : undefined;
+
+      out.push({
+        ...entry,
+        evaluated,
+        matched,
+        ...(notes ? { notes } : {}),
+      });
+    } catch {
+      /* skip malformed JSONL line */
+    }
+  }
+  return out;
+}
+
 // ── Pre-Tool Hook Execution (Parts 1 & 2) ─────────────────────
 
 export function collectStorePaths(
-  seatConfig: SeatConfig,
+  profileConfig: ProfileConfig,
   extraStorePaths?: string[],
 ): string[] {
   const out = new Set<string>();
   out.add(`${HOMEDIR_SLASH}/.claude/projects/*/memory`);
 
-  for (const p of seatConfig.storePaths) {
+  for (const p of profileConfig.storePaths) {
     if (p.trim()) out.add(p.trim());
   }
   const envStores = process.env.AI_LOADOUT_STORE_PATHS?.trim();
@@ -1572,7 +2056,7 @@ export function prenormalizeStorePaths(storePaths: string[]): string[] {
  *
  * Failure policy (Part 2):
  *   - Fail open (`error_open`, exit 0) on any error before a block rule matches
- *     (unreadable stdin, bad seat map, crash in parser) and on the warn layer.
+ *     (unreadable stdin, bad profile config, crash in parser) and on the warn layer.
  *   - Fail closed (`error_closed`, exit 2) once a block rule has matched, even if a
  *     later step errors.
  *   - Never emit a JSON `permissionDecision: "deny"` together with exit 2.
@@ -1592,7 +2076,7 @@ export function runPreTool(opts: PreToolOptions = {}): PreToolResult {
 
   const rawStdin = opts.stdinJson ?? "";
   let inputHash = "";
-  let seat: SeatName = "default";
+  let profile: ProfileName = "default";
   let session = "";
   let toolName = "unknown";
   let mode: HookMode = "enforce";
@@ -1616,7 +2100,7 @@ export function runPreTool(opts: PreToolOptions = {}): PreToolResult {
     const logPath = opts.logPath ? resolve(opts.logPath) : defaultDecisionLogPath();
     const entry: DecisionLogEntry = {
       ts: new Date(nowMs).toISOString(),
-      seat,
+      profile,
       session,
       tool: toolName,
       mode,
@@ -1635,9 +2119,9 @@ export function runPreTool(opts: PreToolOptions = {}): PreToolResult {
     }
   };
 
-  // ── 1. Validate mode & parse stdin + seat map (Pre-match: fail open) ──
+  // ── 1. Validate mode & parse stdin + profile config (Pre-match: fail open) ──
   let payload: PreToolStdinPayload;
-  let seatConfig: SeatConfig;
+  let profileConfig: ProfileConfig;
   let parsedCommand: ParsedBashCommand | undefined;
   let writePayload: WritePayload | undefined;
   let cwd = process.cwd();
@@ -1662,7 +2146,7 @@ export function runPreTool(opts: PreToolOptions = {}): PreToolResult {
         stdout: "",
         stderr: "",
         passThrough: true,
-        seat,
+        profile,
         outcome: "pass_through",
       };
     }
@@ -1682,7 +2166,7 @@ export function runPreTool(opts: PreToolOptions = {}): PreToolResult {
           stdout: "",
           stderr: "",
           passThrough: true,
-          seat,
+          profile,
           outcome: "pass_through",
         };
       }
@@ -1691,8 +2175,12 @@ export function runPreTool(opts: PreToolOptions = {}): PreToolResult {
     }
 
     inputHash = hashToolInput(payload.tool_input);
-    seatConfig = loadSeatConfig(opts.seatsPath);
-    seat = resolveSeat(cwd, seatConfig);
+    profileConfig = loadProfileConfig(opts.profilesPath, {
+      onWarning: (w) => {
+        notes.push(`config_warning:${w}`);
+      },
+    });
+    profile = resolveProfile(cwd, profileConfig);
 
     // Check internal timeout before matching
     if (elapsedMs(1) > timeoutMs) {
@@ -1702,7 +2190,7 @@ export function runPreTool(opts: PreToolOptions = {}): PreToolResult {
         stdout: "",
         stderr: "",
         passThrough: false,
-        seat,
+        profile,
         outcome: "timeout",
         logEntry: entry,
       };
@@ -1715,7 +2203,7 @@ export function runPreTool(opts: PreToolOptions = {}): PreToolResult {
       stdout: "",
       stderr: "",
       passThrough: false,
-      seat,
+      profile,
       outcome: "error_open",
       logEntry: entry,
     };
@@ -1723,20 +2211,21 @@ export function runPreTool(opts: PreToolOptions = {}): PreToolResult {
 
   // ── 4. Evaluate rule table ──────────────────────────────────
   const rules = opts.rules ?? PRETOOL_RULES;
-  const storePaths = collectStorePaths(seatConfig, opts.storePaths);
+  const storePaths = collectStorePaths(profileConfig, opts.storePaths);
   const normalizedStorePaths = prenormalizeStorePaths(storePaths);
   const repliesDir =
-    opts.repliesDir ?? seatConfig.repliesDir ?? defaultRepliesDir();
+    opts.repliesDir ?? profileConfig.repliesDir ?? defaultRepliesDir();
   const matchInput: RuleMatchInput = {
     toolName,
     toolInput: payload.tool_input,
     cwd,
-    seat,
+    profile,
     parsedCommand,
     writePayload,
     storePaths,
     normalizedStorePaths,
     repliesDir,
+    profileConfig,
     nowMs,
     recordNote: (n: string) => {
       notes.push(n);
@@ -1754,7 +2243,7 @@ export function runPreTool(opts: PreToolOptions = {}): PreToolResult {
     const rule = rules[idx];
     if (!rule.tools.includes(toolName)) continue;
 
-    const action = resolveRuleAction(rule, seat);
+    const action = resolveRuleAction(rule, profile, profileConfig);
     if (action === "off") continue;
 
     // Hard internal timeout check before evaluating each rule (unless a block rule already matched)
@@ -1765,7 +2254,7 @@ export function runPreTool(opts: PreToolOptions = {}): PreToolResult {
         stdout: "",
         stderr: "",
         passThrough: false,
-        seat,
+        profile,
         outcome: "timeout",
         logEntry: entry,
       };
@@ -1784,7 +2273,9 @@ export function runPreTool(opts: PreToolOptions = {}): PreToolResult {
           typeof rule.message === "function"
             ? rule.message(res, matchInput)
             : rule.message;
-        const msg = capRuleMessage(rawMsg);
+        const cappedBase = capRuleMessage(rawMsg);
+        const noteLine = resolveRuleNote(rule, profile, profileConfig);
+        const msg = noteLine ? `${cappedBase}\n${noteLine}` : cappedBase;
 
         if (action === "block") {
           blockMatched = true;
@@ -1817,7 +2308,7 @@ export function runPreTool(opts: PreToolOptions = {}): PreToolResult {
       stdout: "",
       stderr: "",
       passThrough: false,
-      seat,
+      profile,
       outcome: "timeout",
       logEntry: entry,
     };
@@ -1856,7 +2347,7 @@ export function runPreTool(opts: PreToolOptions = {}): PreToolResult {
       stdout: "",
       stderr: "",
       passThrough: false,
-      seat,
+      profile,
       outcome,
       logEntry: entry,
     };
@@ -1873,7 +2364,7 @@ export function runPreTool(opts: PreToolOptions = {}): PreToolResult {
       stdout: "",
       stderr: stderrText,
       passThrough: false,
-      seat,
+      profile,
       outcome,
       logEntry: entry,
     };
@@ -1892,7 +2383,7 @@ export function runPreTool(opts: PreToolOptions = {}): PreToolResult {
       stdout: stdoutJson,
       stderr: "",
       passThrough: false,
-      seat,
+      profile,
       outcome: "warn",
       logEntry: entry,
     };
@@ -1903,7 +2394,7 @@ export function runPreTool(opts: PreToolOptions = {}): PreToolResult {
     stdout: "",
     stderr: "",
     passThrough: false,
-    seat,
+    profile,
     outcome,
     logEntry: entry,
   };

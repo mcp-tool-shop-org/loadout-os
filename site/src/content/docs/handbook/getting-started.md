@@ -52,8 +52,8 @@ loadout-os report --json
 To generate a dispatch table from a `MEMORY.md` store:
 
 ```bash
-loadout-os memories index ~/.claude/projects/F--AI/memory/MEMORY.md
-loadout-os memories validate ~/.claude/projects/F--AI/memory/MEMORY.md
+loadout-os memories index ~/.claude/projects/my-project/memory/MEMORY.md
+loadout-os memories validate ~/.claude/projects/my-project/memory/MEMORY.md
 ```
 
 `index` writes a dispatch table (`index.json`) derived from your memory topic files; `validate` lints the store and exits `1` if it finds any error-severity issue (warnings alone do not fail). For the full sync-and-publish flow, see [Rituals](../rituals/).

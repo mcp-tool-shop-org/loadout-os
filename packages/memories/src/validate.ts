@@ -132,7 +132,7 @@ export function validateMemory(
   const issues: ValidationIssue[] = [];
 
   // Part B.3 & Q5-1(b): Loader-limit check on MEMORY.md.
-  // Warning by default so large intentional stores (e.g. F--AI) never halt refresh/doctor.
+  // Warning by default so large intentional stores never halt refresh/doctor.
   // Becomes an error when the store opts in (frontmatter metadata or .loadout.json)
   // or when the caller explicitly passes maxLines / maxBytes / enforceLimits.
   try {

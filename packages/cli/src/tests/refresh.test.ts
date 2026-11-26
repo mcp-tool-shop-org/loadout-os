@@ -742,7 +742,7 @@ test("Q2-6 / follow-up 1: runRefresh writes <dest>.tmp.<pid> and renameSyncs ove
   }
 });
 
-test("Publisher ruling B (CLI): refresh and memories commands honor idSource defaults (global=title, --project=name), per-store config, --id-source override, and explicit frontmatter id:", () => {
+test("idSource resolution (CLI): refresh and memories commands honor idSource defaults (global=title, --project=name), per-store config, --id-source override, and explicit frontmatter id:", () => {
   const sb = makeRefreshSandbox({ valid: true });
   try {
     const projRoot = join(sb.dir, "proj-ruling-b");
@@ -753,8 +753,8 @@ test("Publisher ruling B (CLI): refresh and memories commands honor idSource def
       join(sb.storeDir, "user_profile.md"),
       [
         "---",
-        "name: Mike User Profile Studio Model",
-        "description: User profile and studio model",
+        "name: Ada User Profile",
+        "description: User profile and preferences",
         "---",
         "# User Profile",
         "",
@@ -781,27 +781,27 @@ test("Publisher ruling B (CLI): refresh and memories commands honor idSource def
       sb.memoryMd,
       [
         "# Memory",
-        "- [Mike](user_profile.md) — User profile",
+        "- [Ada](user_profile.md) — User profile",
         "- [Ollama Bullet](ollama-sizing.md) — Sizing reference",
         "",
       ].join("\n"),
       "utf-8",
     );
 
-    // 1. Default global/--dest refresh -> idSource: "title" ("mike"), explicit id: wins ("ollama-model-sizing")
+    // 1. Default global/--dest refresh -> idSource: "title" ("ada"), explicit id: wins ("ollama-model-sizing")
     runRefresh({ store: sb.storeDir, dest: sb.destPath });
     const globalWritten = JSON.parse(readFileSync(sb.destPath, "utf-8"));
     assert.deepEqual(
       globalWritten.entries.map((e: { id: string }) => e.id),
-      ["mike", "ollama-model-sizing"],
+      ["ada", "ollama-model-sizing"],
     );
 
-    // 2. Default --project refresh -> idSource: "name" ("mike-user-profile-studio-model"), explicit id: still wins ("ollama-model-sizing")
+    // 2. Default --project refresh -> idSource: "name" ("ada-user-profile"), explicit id: still wins ("ollama-model-sizing")
     runRefresh({ store: sb.storeDir, project: projRoot });
     const projWritten = JSON.parse(readFileSync(projectDest(projRoot), "utf-8"));
     assert.deepEqual(
       projWritten.entries.map((e: { id: string }) => e.id),
-      ["mike-user-profile-studio-model", "ollama-model-sizing"],
+      ["ada-user-profile", "ollama-model-sizing"],
     );
 
     // 3. CLI flag `--id-source` on `refresh` and `memories index` beats store `.loadout.json` setting
@@ -810,20 +810,20 @@ test("Publisher ruling B (CLI): refresh and memories commands honor idSource def
     // Store config says "name", so global refresh without flag uses "name"
     dispatch(["refresh", "--store", sb.storeDir, "--dest", sb.destPath]);
     const cfgNameWritten = JSON.parse(readFileSync(sb.destPath, "utf-8"));
-    assert.equal(cfgNameWritten.entries[0].id, "mike-user-profile-studio-model");
+    assert.equal(cfgNameWritten.entries[0].id, "ada-user-profile");
 
     // CLI flag `--id-source title` beats store config `"name"` on `refresh`
     captureLog(() =>
       dispatch(["refresh", "--store", sb.storeDir, "--dest", sb.destPath, "--id-source", "title"]),
     );
     const flagTitleWritten = JSON.parse(readFileSync(sb.destPath, "utf-8"));
-    assert.equal(flagTitleWritten.entries[0].id, "mike");
+    assert.equal(flagTitleWritten.entries[0].id, "ada");
 
     // CLI flag `--id-source title` on `memories index` and `memories validate` beats store config `"name"`
     const memIdxJson = captureLog(() =>
       dispatch(["memories", "index", sb.memoryMd, "--id-source", "title", "--json"]),
     );
-    assert.equal(JSON.parse(memIdxJson).index.entries[0].id, "mike");
+    assert.equal(JSON.parse(memIdxJson).index.entries[0].id, "ada");
     assert.equal(JSON.parse(memIdxJson).index.entries[1].id, "ollama-model-sizing");
 
     const memValJson = captureLog(() =>
@@ -841,13 +841,13 @@ test("Publisher ruling B (CLI): refresh and memories commands honor idSource def
   }
 });
 
-test("Issue #25 Item 5: refresh --project without --store uses seats.json store or refuses with PROJECT_STORE_REQUIRED; checks source_store on refresh; and preserves .bak across stores on the exact two-run sequence", () => {
+test("Issue #25 Item 5: refresh --project without --store uses profiles.json store or refuses with PROJECT_STORE_REQUIRED; checks source_store on refresh; and preserves .bak across stores on the exact two-run sequence", () => {
   const sbA = makeRefreshSandbox({ valid: true });
   const sbB = makeRefreshSandbox({ valid: true });
   try {
-    const projRoot = join(sbA.dir, "publisher-proj");
+    const projRoot = join(sbA.dir, "release-proj");
     mkdirSync(projRoot, { recursive: true });
-    const seatsFile = join(sbA.dir, "seats.json");
+    const profilesFile = join(sbA.dir, "profiles.json");
 
     // Give store B a distinct second entry so we can distinguish store A vs store B indexes
     writeFileSync(
@@ -861,10 +861,10 @@ test("Issue #25 Item 5: refresh --project without --store uses seats.json store 
       "utf-8",
     );
 
-    // 1. With --project and no --store, when project is NOT in seats.json -> refuses with PROJECT_STORE_REQUIRED (exit 2)
-    writeFileSync(seatsFile, JSON.stringify({ seats: {} }), "utf-8");
+    // 1. With --project and no --store, when project is NOT in profiles.json -> refuses with PROJECT_STORE_REQUIRED (exit 2)
+    writeFileSync(profilesFile, JSON.stringify({ profiles: {} }), "utf-8");
     assert.throws(
-      () => runRefresh({ project: projRoot, seatsPath: seatsFile }),
+      () => runRefresh({ project: projRoot, profilesPath: profilesFile }),
       (err: unknown) => {
         assert.ok(err instanceof RefreshError);
         assert.equal(err.code, "PROJECT_STORE_REQUIRED");
@@ -873,17 +873,17 @@ test("Issue #25 Item 5: refresh --project without --store uses seats.json store 
       },
     );
 
-    // 2. With --project and no --store, when project IS recorded in seats.json -> uses that store and writes source_store into index
+    // 2. With --project and no --store, when project IS recorded in profiles.json -> uses that store and writes source_store into index
     writeFileSync(
-      seatsFile,
+      profilesFile,
       JSON.stringify({
-        seats: {
-          [projRoot]: { seat: "publisher", store: sbA.storeDir },
+        profiles: {
+          [projRoot]: { profile: "release", store: sbA.storeDir },
         },
       }),
       "utf-8",
     );
-    const rInitial = runRefresh({ project: projRoot, seatsPath: seatsFile });
+    const rInitial = runRefresh({ project: projRoot, profilesPath: profilesFile });
     assert.equal(rInitial.wrote, true);
     assert.equal(rInitial.store, resolve(sbA.storeDir));
     const dest = projectDest(projRoot);
@@ -941,13 +941,13 @@ test("Issue #25 Item 5: refresh --project without --store uses seats.json store 
     assert.equal(secondBak.source_store, resolve(sbB.storeDir));
     assert.equal(secondBak.entries.length, 2);
 
-    // 5. Also verify CLI dispatch(["refresh", ...]) with --seats and --allow-store-change
+    // 5. Also verify CLI dispatch(["refresh", ...]) with --profiles and --allow-store-change
     dispatch([
       "refresh",
       "--project",
       projRoot,
-      "--seats",
-      seatsFile,
+      "--profiles",
+      profilesFile,
       "--allow-store-change",
     ]);
     const restoredIdx = JSON.parse(readFileSync(dest, "utf-8"));
@@ -955,6 +955,93 @@ test("Issue #25 Item 5: refresh --project without --store uses seats.json store 
   } finally {
     sbA.cleanup();
     sbB.cleanup();
+  }
+});
+
+test("FIX-2 Item 1: global refresh refuses with DEFAULT_STORE_REQUIRED when unconfigured, resolves defaultStore from profiles.json across any cwd, and enforces --store > AI_LOADOUT_STORE > defaultStore", () => {
+  const sbDefault = makeRefreshSandbox({ valid: true });
+  const sbEnv = makeRefreshSandbox({ valid: true });
+  const sbFlag = makeRefreshSandbox({ valid: true });
+  const sbDecoyCwd = makeRefreshSandbox({ valid: true });
+  const prevCwd = process.cwd();
+  const prevEnvStore = process.env.AI_LOADOUT_STORE;
+  const prevEnvProfiles = process.env.AI_LOADOUT_PROFILES_PATH;
+
+  try {
+    const emptyProfiles = join(sbDefault.dir, "empty-profiles.json");
+    writeFileSync(emptyProfiles, JSON.stringify({}), "utf-8");
+
+    const scratchDest = join(sbDefault.dir, "out", "global-index.json");
+    delete process.env.AI_LOADOUT_STORE;
+    delete process.env.AI_LOADOUT_PROFILES_PATH;
+
+    // 1. With neither --store, AI_LOADOUT_STORE, nor defaultStore configured: refuses & writes nothing
+    assert.throws(
+      () => runRefresh({ dest: scratchDest, profilesPath: emptyProfiles }),
+      (err: unknown) =>
+        err instanceof RefreshError &&
+        err.code === "DEFAULT_STORE_REQUIRED" &&
+        err.exitCode === 2 &&
+        typeof err.hint === "string" &&
+        err.hint.includes("--store") &&
+        err.hint.includes("AI_LOADOUT_STORE") &&
+        err.hint.includes("defaultStore"),
+    );
+    assert.equal(existsSync(scratchDest), false);
+
+    // 2. With defaultStore in profiles.json: resolves identically from two different cwds (even a decoy dir with MEMORY.md)
+    const profilesWithDefault = join(sbDefault.dir, "profiles.json");
+    writeFileSync(
+      profilesWithDefault,
+      JSON.stringify({ defaultStore: sbDefault.storeDir }, null, 2),
+      "utf-8",
+    );
+
+    process.chdir(sbDecoyCwd.storeDir);
+    const resFromCwd1 = runRefresh({
+      dest: scratchDest,
+      profilesPath: profilesWithDefault,
+      dryRun: true,
+    });
+    assert.equal(resFromCwd1.store, resolve(sbDefault.storeDir));
+    assert.equal(resFromCwd1.wrote, false);
+
+    process.chdir(sbEnv.dir);
+    const resFromCwd2 = runRefresh({
+      dest: scratchDest,
+      profilesPath: profilesWithDefault,
+      dryRun: true,
+    });
+    assert.equal(resFromCwd2.store, resolve(sbDefault.storeDir));
+    assert.equal(resFromCwd2.wrote, false);
+
+    // 3. Precedence: AI_LOADOUT_STORE overrides profiles.json defaultStore
+    process.env.AI_LOADOUT_STORE = sbEnv.storeDir;
+    const resEnvWins = runRefresh({
+      dest: scratchDest,
+      profilesPath: profilesWithDefault,
+      dryRun: true,
+    });
+    assert.equal(resEnvWins.store, resolve(sbEnv.storeDir));
+
+    // 4. Precedence: --store overrides both AI_LOADOUT_STORE and profiles.json defaultStore
+    const resFlagWins = runRefresh({
+      store: sbFlag.storeDir,
+      dest: scratchDest,
+      profilesPath: profilesWithDefault,
+      dryRun: true,
+    });
+    assert.equal(resFlagWins.store, resolve(sbFlag.storeDir));
+  } finally {
+    process.chdir(prevCwd);
+    if (prevEnvStore === undefined) delete process.env.AI_LOADOUT_STORE;
+    else process.env.AI_LOADOUT_STORE = prevEnvStore;
+    if (prevEnvProfiles === undefined) delete process.env.AI_LOADOUT_PROFILES_PATH;
+    else process.env.AI_LOADOUT_PROFILES_PATH = prevEnvProfiles;
+    sbDefault.cleanup();
+    sbEnv.cleanup();
+    sbFlag.cleanup();
+    sbDecoyCwd.cleanup();
   }
 });
 

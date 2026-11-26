@@ -2,7 +2,7 @@
   "name": "loadout-os",
   "version": "0.0.0",
   "private": true,
-  "description": "loadout-os — consolidated Knowledge OS for the studio — kernel (ai-loadout) + memories (claude-memories) + rules (claude-rules) + the runtime loadout hook, under one npm-workspaces root.",
+  "description": "loadout-os — consolidated Knowledge OS for AI coding agents — kernel (ai-loadout) + memories (claude-memories) + rules (claude-rules) + the runtime loadout hook, under one npm-workspaces root.",
   "license": "MIT",
   "author": "mcp-tool-shop",
   "type": "module",

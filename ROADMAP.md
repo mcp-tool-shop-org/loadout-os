@@ -15,7 +15,7 @@
 
 Goal: make the four trees install + build + test under one root.
 
-- [x] Root `package.json` with `workspaces: ["packages/*", "apps/*"]` — **npm workspaces** (studio standard; not pnpm/yarn — `workspace:*` protocol is NOT valid npm, depend by package name and let the workspace resolve it) — commit `ab8aad8`
+- [x] Root `package.json` with `workspaces: ["packages/*", "apps/*"]` — **npm workspaces** (workspace standard; not pnpm/yarn — `workspace:*` protocol is NOT valid npm, depend by package name and let the workspace resolve it) — commit `ab8aad8`
 - [x] One root `tsconfig.base.json` extended by each package — commit `ab8aad8`
 - [ ] **Package names do not change in this phase.** `packages/kernel` keeps `@mcptoolshop/ai-loadout` (it is published under that name; renaming is a Phase 5 decision). `apps/hook`'s existing `"@mcptoolshop/ai-loadout"` dependency then resolves to the workspace copy automatically.
 - [ ] Each package keeps its own `package.json`; versions follow the root version from Phase 5 onward
@@ -68,7 +68,7 @@ Goal: one Starlight handbook + one landing page covers the whole layer.
 
 Goal: reserve the name, set up Trusted Publishing, create the GitHub repo.
 
-- [x] **Naming — RESOLVED 2026-06-16: `loadout-os`** (rebrand from `memory-os`; director call). Matches the `*-os` sister pattern (game-foundry-os, research-os) and keeps continuity with `@mcptoolshop/ai-loadout` + `~/.ai-loadout/`.
+- [x] **Naming — RESOLVED 2026-06-16: `loadout-os`** (rebrand from `memory-os`; maintainer call). Matches the `*-os` sister pattern (game-foundry-os, research-os) and keeps continuity with `@mcptoolshop/ai-loadout` + `~/.ai-loadout/`.
 - [ ] Reserve `@mcptoolshop/loadout-os` — **deferred to the Phase 6 real publish**: the `@mcptoolshop` scope already protects the name (no squat risk on a scoped package), and the don't-default-to-empty-placeholder rule favors publishing the real treatment-complete package over a 0.0.0 placeholder. Wire OIDC/Trusted Publishing in the root `publish.yml`.
 - [ ] Create `mcp-tool-shop-org/loadout-os` on GitHub (private at first; public at Phase 6 publish) — this closes the repo-first waiver
 - [ ] Add remote, push everything to date
@@ -104,13 +104,13 @@ Gate: shipcheck 31/31, CI green, hook works through the published package on a l
 - Multi-rig sync of `~/.ai-loadout/index.json` — no second rig exists.
 - Web UI for browsing the dispatch table — nice-to-have, not critical path.
 
-## Open questions (for the director)
+## Open questions (for the maintainer)
 
 - ~~Naming: keep or rebrand?~~ **RESOLVED 2026-06-16 → `loadout-os`** (see Phase 5).
 - Kernel CLI surface preserved verbatim under `loadout-os …` (lower migration cost) or restructured (fix ergonomics warts)? Default: verbatim, restructure later behind the same bin.
 - License: three sources are MIT; root stays MIT? (Default yes.)
 
-Resolved 2026-06-10: package manager = **npm workspaces** (matches every other studio monorepo; `workspace:*` in the original draft was pnpm syntax and would fail under npm).
+Resolved 2026-06-10: package manager = **npm workspaces** (matches sibling monorepos; `workspace:*` in the original draft was pnpm syntax and would fail under npm).
 
 ## When this is done
 

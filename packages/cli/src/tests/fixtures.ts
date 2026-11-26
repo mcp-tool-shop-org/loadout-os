@@ -279,19 +279,16 @@ export function captureLog(fn: () => void): string {
 }
 
 /**
- * The 5 R&D project index entries referenced by the Part 3/Part 4.3 rule table,
- * copied from `.claude/loadout/index.json` with store-relative paths (`memory/<id>.md`)
- * so no home paths are committed.
+ * Sample docs-profile index entries referenced by the test rule table.
  */
-export const RND_TRIAD_ENTRIES: LoadoutIndex["entries"] = [
+export const DOCS_TRIAD_ENTRIES: LoadoutIndex["entries"] = [
   {
-    id: "rnd-memory-system",
-    path: "memory/rnd-memory-system.md",
-    keywords: ["loadout", "memory", "rnd", "system", "works"],
-    patterns: ["rnd_memory_system"],
+    id: "docs-memory",
+    path: "memory/docs-memory.md",
+    keywords: ["loadout", "memory", "docs", "system", "works"],
+    patterns: ["docs_memory"],
     priority: "domain",
-    summary:
-      "How R&D memory works since the 2026-11-08 cutover to loadout-os 1.1.0: BOARD injected at start/compaction by loadout-os ",
+    summary: "How docs memory works: board injection, validation, and Edit-tool writes",
     triggers: { task: true, plan: true, edit: false },
     tokens_est: 977,
     lines: 52,
@@ -303,13 +300,12 @@ export const RND_TRIAD_ENTRIES: LoadoutIndex["entries"] = [
     },
   },
   {
-    id: "publisher-approves-every-publish",
-    path: "memory/publisher-approves-every-publish.md",
-    keywords: ["approves", "publish", "publisher"],
-    patterns: ["publisher_approves_every_publish"],
+    id: "release-approvals",
+    path: "memory/release-approvals.md",
+    keywords: ["approves", "publish", "release"],
+    patterns: ["release_approvals"],
     priority: "domain",
-    summary:
-      "Director 2026-10-21 via Publisher — nothing publishes (npm/PyPI/binary, a tag or release that triggers one, Store, repo/",
+    summary: "Release approval policy before npm/PyPI publish or tag creation",
     triggers: { task: true, plan: true, edit: false },
     tokens_est: 336,
     lines: 18,
@@ -322,13 +318,12 @@ export const RND_TRIAD_ENTRIES: LoadoutIndex["entries"] = [
     subindex: true,
   },
   {
-    id: "publisher-merges",
-    path: "memory/publisher-merges.md",
-    keywords: ["merges", "publisher"],
-    patterns: ["publisher_merges"],
+    id: "release-merges",
+    path: "memory/release-merges.md",
+    keywords: ["merges", "release"],
+    patterns: ["release_merges"],
     priority: "domain",
-    summary:
-      "R&D never merges PRs, even when its re-check is the last gate; the Publisher merges via gatemerge",
+    summary: "Release maintainers merge reviewed PRs via the merge gate",
     triggers: { task: true, plan: true, edit: false },
     tokens_est: 228,
     lines: 16,
@@ -340,13 +335,12 @@ export const RND_TRIAD_ENTRIES: LoadoutIndex["entries"] = [
     },
   },
   {
-    id: "never-quote-director-in-public",
-    path: "memory/never-quote-director-in-public.md",
-    keywords: ["director", "never", "public", "quote"],
-    patterns: ["never_quote_director_in_public"],
+    id: "quote-policy",
+    path: "memory/quote-policy.md",
+    keywords: ["quote", "verbatim", "public"],
+    patterns: ["quote_policy"],
     priority: "domain",
-    summary:
-      "Records carry the Director's decisions, never his words; brief status lines are where the slip happens; nothing is exemp",
+    summary: "Record decisions rather than verbatim speaker quotes",
     triggers: { task: true, plan: true, edit: false },
     tokens_est: 364,
     lines: 20,
@@ -358,13 +352,12 @@ export const RND_TRIAD_ENTRIES: LoadoutIndex["entries"] = [
     },
   },
   {
-    id: "build-in-studio-tools-not-side-scripts",
-    path: "memory/build-in-studio-tools-not-side-scripts.md",
-    keywords: ["build", "scripts", "side", "studio", "tools"],
-    patterns: ["build_in_studio_tools_not_side_scripts"],
+    id: "workspace-tools",
+    path: "memory/workspace-tools.md",
+    keywords: ["build", "tools", "loadout", "scripts"],
+    patterns: ["workspace_tools"],
     priority: "domain",
-    summary:
-      "Director 2026-11-08 (very unhappy): infrastructure is built INSIDE the studio's own tools (loadout-os etc.) as Argon bui",
+    summary: "Use loadout-os memory commands instead of ad-hoc shell mutation scripts",
     triggers: { task: true, plan: true, edit: false },
     tokens_est: 388,
     lines: 26,
@@ -378,42 +371,38 @@ export const RND_TRIAD_ENTRIES: LoadoutIndex["entries"] = [
 ];
 
 /**
- * The Publisher-store entries the `publisher` column of the rule table cites, under the ids the
- * Publisher store uses since its 2026-11-21 rebuild (`idSource: name`). Three entries carry all five
- * rules: the coordinator entry carries unreviewed-merge and release-reminder, the Director
- * communication entry carries director-quote, and the memory-system entry carries memory-shell-write
- * and future-stamp.
+ * Sample release-profile entries referenced by the test rule table.
  */
-export const PUBLISHER_TRIAD_ENTRIES: LoadoutIndex["entries"] = [
+export const RELEASE_TRIAD_ENTRIES: LoadoutIndex["entries"] = [
   {
-    id: "rule-coordinator-and-merges",
-    path: "memory/rule-coordinator-and-merges.md",
-    keywords: ["coordinator", "merges", "publish", "gate"],
-    patterns: ["rule_coordinator_and_merges"],
+    id: "release-rules",
+    path: "memory/release-rules.md",
+    keywords: ["release", "merges", "publish", "gate"],
+    patterns: ["release_rules"],
     priority: "domain",
-    summary: "Coordinator authority, merge and publish gating, cross-family code verdicts at the head",
+    summary: "Release authority, merge and publish gating, code review verdicts at head",
     triggers: { task: true, plan: true, edit: false },
     tokens_est: 1800,
     lines: 50,
   },
   {
-    id: "rule-director-communication",
-    path: "memory/rule-director-communication.md",
-    keywords: ["director", "communication", "quote", "eastern"],
-    patterns: ["rule_director_communication"],
+    id: "communication-policy",
+    path: "memory/communication-policy.md",
+    keywords: ["communication", "quote", "eastern"],
+    patterns: ["communication_policy"],
     priority: "domain",
-    summary: "Standing Director communication rules: never reproduce his words, Eastern time only",
+    summary: "Standing communication policy: paraphrase decisions, Eastern time only",
     triggers: { task: true, plan: true, edit: false },
     tokens_est: 1100,
     lines: 50,
   },
   {
-    id: "reference-memory-system",
-    path: "memory/reference-memory-system.md",
+    id: "memory-reference",
+    path: "memory/memory-reference.md",
     keywords: ["memory", "system", "loadout", "refresh"],
-    patterns: ["reference_memory_system"],
+    patterns: ["memory_reference"],
     priority: "domain",
-    summary: "How Publisher memory operates on loadout-os: board injection, refresh guard, Edit-tool-only writes",
+    summary: "How release memory operates: board injection, refresh guard, Edit-tool writes",
     triggers: { task: true, plan: true, edit: false },
     tokens_est: 1200,
     lines: 35,
@@ -421,18 +410,16 @@ export const PUBLISHER_TRIAD_ENTRIES: LoadoutIndex["entries"] = [
 ];
 
 /**
- * The studio (global index) entry the `default` column cites for director-quote. The studio store
- * has no `.loadout.json`, so its ids derive from the file path (`Feedback/feedback_...md`) with the
- * separators and punctuation removed. No studio entry carries the other four rules.
+ * Sample global index entry for default profile quote-gate tests.
  */
-export const STUDIO_TRIAD_ENTRIES: LoadoutIndex["entries"] = [
+export const GLOBAL_TRIAD_ENTRIES: LoadoutIndex["entries"] = [
   {
-    id: "feedbackfeedbackneverquotethedirectormd",
-    path: "memory/Feedback/feedback_never_quote_the_director.md",
-    keywords: ["quote", "director", "verbatim", "speech"],
-    patterns: ["feedback_never_quote_the_director", "feedbackfeedbackneverquotethedirectormd"],
+    id: "quote-law",
+    path: "memory/quote-law.md",
+    keywords: ["quote", "verbatim", "speech"],
+    patterns: ["quote_law"],
     priority: "domain",
-    summary: "Hard law: never reproduce the Director's words verbatim in any artifact",
+    summary: "Hard law: never reproduce configured speaker words verbatim in artifacts",
     triggers: { task: true, plan: true, edit: false },
     tokens_est: 2462,
     lines: 154,
@@ -449,15 +436,15 @@ export interface ReplayCasePair {
   expectedAllowedOutcome: "allow" | "warn";
 }
 
-export const REPLAY_2026_11_08_STORE = "E:/AI/StudioStore/memory";
+export const REPLAY_2026_11_08_STORE = "E:/AI/CustomStore/memory";
 /** Fixed clock: 2026-11-08 15:44:00 EST (20:44:00 UTC). */
 export const REPLAY_2026_11_08_CLOCK_MS = Date.UTC(2026, 10, 8, 20, 44, 0, 0);
 
 /**
  * Canned PreToolUse JSON fixture of the four slips from 2026-11-08 and their
  * matching allowed calls (Part 5.1, with a real board line carrying trailing text).
- * Note: Under Ruling 2 (#25), unreviewed-merge is permanently warn-only on every
- * seat, and suppressed when a matching Argon `PASS at <head8>` reply exists.
+ * Note: unreviewed-merge is warn-only by default, and suppressed when a matching
+ * `PASS at <head8>` reply exists.
  */
 export const REPLAY_2026_11_08_FIXTURE: readonly ReplayCasePair[] = [
   {
@@ -474,15 +461,15 @@ export const REPLAY_2026_11_08_FIXTURE: readonly ReplayCasePair[] = [
     allowedStdin: {
       hook_event_name: "PreToolUse",
       session_id: "replay-2026-11-08",
-      cwd: "E:/AI/Publisher",
+      cwd: "E:/AI/ReleaseRepo",
       tool_name: "Bash",
       tool_input: { command: "gh pr merge 21" },
     },
     expectedAllowedOutcome: "warn",
   },
   {
-    id: "slip-2-dated-director-quote",
-    ruleId: "director-quote",
+    id: "slip-2-dated-quote-gate",
+    ruleId: "quote-gate",
     blockedStdin: {
       hook_event_name: "PreToolUse",
       session_id: "replay-2026-11-08",
@@ -491,7 +478,7 @@ export const REPLAY_2026_11_08_FIXTURE: readonly ReplayCasePair[] = [
       tool_input: {
         file_path: "E:/AI/Research and Development/docs/handoff.md",
         content:
-          '# Handoff\n\nDirector 2026-11-08: "I want every build to go through the card process before any code is merged."\n',
+          '# Handoff\n\nLead 2026-11-08: "I want every build to go through the card process before any code is merged."\n',
       },
     },
     allowedStdin: {
@@ -502,7 +489,7 @@ export const REPLAY_2026_11_08_FIXTURE: readonly ReplayCasePair[] = [
       tool_input: {
         file_path: "E:/AI/Research and Development/docs/handoff.md",
         content:
-          "# Handoff\n\nDirector 2026-11-08 ruled that every build goes through the card process before any code is merged.\n",
+          "# Handoff\n\nLead 2026-11-08 ruled that every build goes through the card process before any code is merged.\n",
       },
     },
     expectedAllowedOutcome: "allow",
@@ -539,32 +526,32 @@ export const REPLAY_2026_11_08_FIXTURE: readonly ReplayCasePair[] = [
     expectedAllowedOutcome: "allow",
   },
   {
-    id: "slip-3b-publisher-heading-updated",
+    id: "slip-3b-release-heading-updated",
     ruleId: "future-stamp",
     blockedStdin: {
       hook_event_name: "PreToolUse",
       session_id: "replay-2026-11-08",
-      cwd: "E:/AI/Publisher",
+      cwd: "E:/AI/ReleaseRepo",
       tool_name: "Edit",
       tool_input: {
         file_path: `${REPLAY_2026_11_08_STORE}/BOARD.md`,
         old_string:
-          "# Publisher BOARD — updated 2026-11-08 15:03 ET (stamped from date)",
+          "# Release BOARD — updated 2026-11-08 15:03 ET (stamped from date)",
         new_string:
-          "# Publisher BOARD — updated 2026-11-08 23:59 ET (stamped from date)",
+          "# Release BOARD — updated 2026-11-08 23:59 ET (stamped from date)",
       },
     },
     allowedStdin: {
       hook_event_name: "PreToolUse",
       session_id: "replay-2026-11-08",
-      cwd: "E:/AI/Publisher",
+      cwd: "E:/AI/ReleaseRepo",
       tool_name: "Edit",
       tool_input: {
         file_path: `${REPLAY_2026_11_08_STORE}/BOARD.md`,
         old_string:
-          "# Publisher BOARD — updated 2026-11-08 15:03 ET (stamped from date)",
+          "# Release BOARD — updated 2026-11-08 15:03 ET (stamped from date)",
         new_string:
-          "# Publisher BOARD — updated 2026-11-08 15:44 ET (stamped from date)",
+          "# Release BOARD — updated 2026-11-08 15:44 ET (stamped from date)",
       },
     },
     expectedAllowedOutcome: "allow",

@@ -120,7 +120,7 @@ ${BOLD}Options:${RESET}
   --version    Show version
 
 ${BOLD}Examples:${RESET}
-  loadout-os memories validate ~/.claude/projects/F--AI/memory/MEMORY.md
+  loadout-os memories validate ~/.claude/projects/my-project/memory/MEMORY.md
   loadout-os rules analyze .claude/CLAUDE.md
   loadout-os validate ~/.ai-loadout/index.json
   loadout-os doctor
@@ -228,7 +228,7 @@ function dispatchDoctor(args: string[]): void {
   const usage = flagValue(args, "usage");
   const skills = flagValue(args, "skills");
   const projectIndex = flagValue(args, "project-index");
-  const seats = flagValue(args, "seats");
+  const profiles = flagValue(args, "profiles");
   const memoryWarnBytesRaw = flagValue(args, "memory-warn-bytes");
   const subindexWarnEntriesRaw = flagValue(args, "subindex-warn-entries");
   if (store) paths.store = resolve(store);
@@ -237,8 +237,8 @@ function dispatchDoctor(args: string[]): void {
   if (usage) paths.usage = resolve(usage);
   if (skills) paths.skillsDir = resolve(skills);
   if (projectIndex) paths.extraIndexes = [resolve(projectIndex)];
-  if (seats !== undefined) {
-    paths.seatsPath = seats.trim() ? resolve(seats) : undefined;
+  if (profiles !== undefined) {
+    paths.profilesPath = profiles.trim() ? resolve(profiles) : undefined;
   }
   if (memoryWarnBytesRaw !== undefined) {
     const n = Number(memoryWarnBytesRaw);
@@ -395,7 +395,7 @@ function dispatchHook(args: string[]): void {
     case "pre-tool": {
       const stdinRaw = readHookStdin();
       const mode = flagValue(rest, "mode");
-      const seatsPath = flagValue(rest, "seats");
+      const profilesPath = flagValue(rest, "profiles");
       const logPath = flagValue(rest, "log");
       const timeoutRaw = flagValue(rest, "timeout-ms");
       const nowRaw = flagValue(rest, "now");
@@ -414,7 +414,7 @@ function dispatchHook(args: string[]): void {
       const res = runPreTool({
         stdinJson: stdinRaw,
         mode,
-        seatsPath,
+        profilesPath,
         logPath,
         timeoutMs: Number.isFinite(timeoutMs) ? timeoutMs : undefined,
         nowMs,

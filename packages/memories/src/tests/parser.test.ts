@@ -181,7 +181,7 @@ See also: the post-proof balance tuning notes live at \`memory/post-proof-balanc
   it("parses Markdown-link entries in Claude Code's index format (MEM-B12)", () => {
     const content = `## Feedback corrections (index)
 
-- [Docs as you go](Feedback/feedback_docs_as_you_go.md) — Director 2026-09-25: update docs after each merge
+- [Docs as you go](Feedback/feedback_docs_as_you_go.md) — Maintainer 2026-09-25: update docs after each merge
 - [python-gpu — GPU Python on the rig](python-gpu.md) — run CUDA scripts with \`python-gpu\`
 - **[Bold entry](bold.md)** — emphasised in the index
 - [No hook](no-hook.md)
@@ -193,7 +193,7 @@ See also: the post-proof balance tuning notes live at \`memory/post-proof-balanc
       "Feedback/feedback_docs_as_you_go.md", "python-gpu.md", "bold.md", "no-hook.md", "anchored.md",
     ]);
     assert.equal(refs[0].name, "Docs as you go");
-    assert.equal(refs[0].description, "Director 2026-09-25: update docs after each merge");
+    assert.equal(refs[0].description, "Maintainer 2026-09-25: update docs after each merge");
     // An em-dash inside the link text splits name from subtitle; the text after
     // the link still wins as the description.
     assert.equal(refs[1].name, "python-gpu");
