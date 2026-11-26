@@ -94,10 +94,17 @@ Swapping them — `dead usage.jsonl index.json` — makes the kernel try to read
 
 ```
 loadout-os hook test [--prompt "<text>"] [--repo-root <dir>] [--json]
+loadout-os hook session-start [--project <root>] [--store <dir>] [--user-prompt-submit]
+loadout-os hook pre-compact   [--project <root>] [--store <dir>] [--stale-after-min <n>]
+loadout-os hook post-write    [--project <root>] [--store <dir>] [--fix]
+loadout-os hook pre-tool      [--mode enforce|log-only] [--profiles <path>] [--log <path>] [--timeout-ms <ms>]
 ```
 
-Drives the real runtime hook against a sample prompt. `--prompt` supplies the text (a default sample is used otherwise); `--repo-root` points at the repo holding `apps/hook/loadout-hook.mjs` (default cwd). It runs in an isolated HOME so the live `usage.jsonl` is never written. Exit `0` when the hook ran, `1` when the hook binary is not found.
+- `hook test` drives the `UserPromptSubmit` runtime hook against a sample prompt in an isolated HOME so the live `usage.jsonl` is never written. Exit `0` when the hook ran, `1` when the hook binary is not found.
+- `hook session-start`, `hook pre-compact`, and `hook post-write` manage project-layer board injection and automatic index refreshes.
+- `hook pre-tool` evaluates the Layer A/B rule table against `PreToolUse` payloads using `~/.ai-loadout/profiles.json` (`AI_LOADOUT_PROFILES_PATH`), failing open before a block match and exiting `2` with stderr only when blocked in `enforce` mode.
 
 ```bash
 loadout-os hook test --prompt "scaffold a new game"
+loadout-os hook pre-tool --mode enforce
 ```

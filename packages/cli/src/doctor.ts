@@ -39,7 +39,13 @@ import {
 } from "@mcptoolshop/ai-loadout";
 
 import { BOLD, DIM, RESET, GREEN, YELLOW, RED, log } from "./console.js";
-import { loadSeatConfig, resolveRuleMemory, type PreToolRule } from "./pretool.js";
+import {
+  loadProfileConfig,
+  resolveRuleMemory,
+  resolveRuleSkill,
+  type PreToolRule,
+  type ProfileConfig,
+} from "./pretool.js";
 import { PRETOOL_RULES } from "./pretool-rules.js";
 
 export type CheckStatus = "pass" | "warn" | "fail";
@@ -73,10 +79,10 @@ export interface DoctorPaths {
   skillsDir?: string;
   /** Additional index paths (e.g. project `.claude/loadout/index.json`) searched by the triad memory check. */
   extraIndexes?: string[];
-  /** Optional path to `seats.json` for per-seat triad memory checks. */
-  seatsPath?: string;
-  /** Optional per-seat memory store directory map (`{ rnd: "<store>", publisher: "<store>" }`) for per-seat triad memory checks. */
-  seatStores?: Record<string, string>;
+  /** Optional path to `profiles.json` for per-profile triad memory and skill checks. */
+  profilesPath?: string;
+  /** Optional per-profile memory store directory map (`{ docs: "<store>", release: "<store>" }`) for per-profile triad memory checks. */
+  profileStores?: Record<string, string>;
   /** Override pre-tool rule table for the triad check (defaults to `PRETOOL_RULES`). */
   rules?: readonly PreToolRule[];
   /** Warn threshold in bytes for MEMORY.md size (defaults to 60% of 24.4 KB = 14,640 B). */
@@ -205,7 +211,10 @@ export function defaultDoctorPaths(
 ): DoctorPaths {
   const home = homeDir;
   const projectIndex = resolve(repoRoot, ".claude", "loadout", "index.json");
-  const seatsPath = resolve(home, ".ai-loadout", "seats.json");
+  const envProfilesPath = process.env.AI_LOADOUT_PROFILES_PATH?.trim();
+  const profilesPath = envProfilesPath
+    ? resolve(envProfilesPath)
+    : resolve(home, ".ai-loadout", "profiles.json");
   return {
     store: resolve(home, ".claude", "projects", "F--AI", "memory"),
     index: resolve(home, ".ai-loadout", "index.json"),
@@ -215,7 +224,7 @@ export function defaultDoctorPaths(
     hookMirror: resolve(home, ".claude", "loadout-hook", "loadout-hook.mjs"),
     skillsDir: resolve(home, ".claude", "skills"),
     extraIndexes: existsSync(projectIndex) ? [projectIndex] : [],
-    ...(existsSync(seatsPath) ? { seatsPath } : {}),
+    ...(existsSync(profilesPath) ? { profilesPath } : {}),
   };
 }
 
@@ -640,7 +649,7 @@ export function runDoctor(paths: DoctorPaths): DoctorResult {
   // ── Part 4.2: Triad checks (memory, skill, pre-tool hook) ─────
   const rules = paths.rules ?? PRETOOL_RULES;
 
-  // (i) triad-memories: every rule in the table names a memory id that exists in the seat's store/index
+  // (i) triad-memories: every rule with a configured memory id names an id that exists in the profile's store/index
   const loadStoreMemoryIds = (storeDir: string): Set<string> => {
     const ids = new Set<string>();
     const storeIndexFile = join(storeDir, "index.json");
@@ -668,45 +677,64 @@ export function runDoctor(paths: DoctorPaths): DoctorResult {
     return ids;
   };
 
-  let configuredSeatStores: Record<string, string> = {};
-  if (paths.seatStores && Object.keys(paths.seatStores).length > 0) {
-    configuredSeatStores = { ...paths.seatStores };
-  } else if (paths.seatsPath && existsSync(paths.seatsPath)) {
+  let loadedProfileConfig: ProfileConfig | undefined;
+  if (paths.profilesPath && existsSync(paths.profilesPath)) {
     try {
-      const sc = loadSeatConfig(paths.seatsPath);
-      if (sc.seatStores && Object.keys(sc.seatStores).length > 0) {
-        configuredSeatStores = { ...sc.seatStores };
-      }
+      loadedProfileConfig = loadProfileConfig(paths.profilesPath);
     } catch {
-      /* ignore unreadable seats.json; falls back to single-store triad check */
+      /* ignore unreadable profiles.json; falls back to single-store triad check */
     }
   }
 
-  const seatNames = Object.keys(configuredSeatStores);
-  if (seatNames.length > 0) {
-    const missingSeatMemoryRules: string[] = [];
-    for (const seat of seatNames) {
-      const storeDir = configuredSeatStores[seat];
-      const seatKnownIds = loadStoreMemoryIds(storeDir);
+  let configuredProfileStores: Record<string, string> = {};
+  if (paths.profileStores && Object.keys(paths.profileStores).length > 0) {
+    configuredProfileStores = { ...paths.profileStores };
+  } else if (
+    loadedProfileConfig?.profileStores &&
+    Object.keys(loadedProfileConfig.profileStores).length > 0
+  ) {
+    configuredProfileStores = { ...loadedProfileConfig.profileStores };
+  }
+
+  const profileNames = Object.keys(configuredProfileStores);
+  if (profileNames.length > 0) {
+    const missingProfileMemoryRules: string[] = [];
+    let checkedRuleRefs = 0;
+    for (const profile of profileNames) {
+      const storeDir = configuredProfileStores[profile];
+      const profileKnownIds = loadStoreMemoryIds(storeDir);
       for (const r of rules) {
-        const memId = resolveRuleMemory(r, seat);
-        if (!memId || !seatKnownIds.has(memId)) {
-          missingSeatMemoryRules.push(`${seat}: ${r.id} -> ${memId || "(empty)"}`);
+        const memId = resolveRuleMemory(r, profile, loadedProfileConfig);
+        if (!memId) {
+          if (typeof r.memory === "string") {
+            missingProfileMemoryRules.push(`${profile}: ${r.id} -> (empty)`);
+          }
+          continue;
+        }
+        checkedRuleRefs++;
+        if (!profileKnownIds.has(memId)) {
+          missingProfileMemoryRules.push(`${profile}: ${r.id} -> ${memId}`);
         }
       }
     }
-    if (missingSeatMemoryRules.length > 0) {
+    if (missingProfileMemoryRules.length > 0) {
       checks.push({
         id: "triad-memories",
         status: "fail",
-        message: `Triad memory id missing from seat store(s): ${missingSeatMemoryRules.join(", ")}`,
-        hint: "Ensure every rule in PRETOOL_RULES references a memory id present in each configured seat's own store/index.",
+        message: `Triad memory id missing from profile store(s): ${missingProfileMemoryRules.join(", ")}`,
+        hint: "Ensure every configured rule memory id exists in each profile's own store/index.",
+      });
+    } else if (checkedRuleRefs === 0) {
+      checks.push({
+        id: "triad-memories",
+        status: "pass",
+        message: `No per-profile rule memory ids configured across ${profileNames.length} profile store(s) (${profileNames.join(", ")})`,
       });
     } else {
       checks.push({
         id: "triad-memories",
         status: "pass",
-        message: `All ${rules.length} pre-tool rule memory id(s) exist per seat across ${seatNames.length} seat store(s) (${seatNames.join(", ")})`,
+        message: `All ${checkedRuleRefs} configured pre-tool rule memory ref(s) exist per profile across ${profileNames.length} profile store(s) (${profileNames.join(", ")})`,
       });
     }
   } else {
@@ -726,10 +754,18 @@ export function runDoctor(paths: DoctorPaths): DoctorResult {
     }
 
     const missingMemoryRules: string[] = [];
+    let checkedDefaultRefs = 0;
     for (const r of rules) {
-      const memId = resolveRuleMemory(r, "default");
-      if (!memId || !knownMemoryIds.has(memId)) {
-        missingMemoryRules.push(`${r.id} -> ${memId || "(empty)"}`);
+      const memId = resolveRuleMemory(r, "default", loadedProfileConfig);
+      if (!memId) {
+        if (typeof r.memory === "string") {
+          missingMemoryRules.push(`${r.id} -> (empty)`);
+        }
+        continue;
+      }
+      checkedDefaultRefs++;
+      if (!knownMemoryIds.has(memId)) {
+        missingMemoryRules.push(`${r.id} -> ${memId}`);
       }
     }
     if (missingMemoryRules.length > 0) {
@@ -737,13 +773,19 @@ export function runDoctor(paths: DoctorPaths): DoctorResult {
         id: "triad-memories",
         status: "fail",
         message: `Triad memory id missing from index(es): ${missingMemoryRules.join(", ")}`,
-        hint: "Ensure every rule in PRETOOL_RULES references a memory id present in the global or project index.json.",
+        hint: "Ensure every configured rule memory id exists in the global or project index.json.",
+      });
+    } else if (checkedDefaultRefs === 0) {
+      checks.push({
+        id: "triad-memories",
+        status: "pass",
+        message: "No default pre-tool rule memory ids configured (configure via profiles.json)",
       });
     } else {
       checks.push({
         id: "triad-memories",
         status: "pass",
-        message: `All ${rules.length} pre-tool rule memory id(s) exist in loaded index(es)`,
+        message: `All ${checkedDefaultRefs} configured pre-tool rule memory id(s) exist in loaded index(es)`,
       });
     }
   }
@@ -755,18 +797,19 @@ export function runDoctor(paths: DoctorPaths): DoctorResult {
   const noneWithReasonRules: string[] = [];
 
   for (const r of rules) {
-    if (r.skill === "none") {
+    const skillName = resolveRuleSkill(r, loadedProfileConfig);
+    if (skillName === "none") {
       if (r.skillNoneReason && r.skillNoneReason.trim().length > 0) {
         noneWithReasonRules.push(`${r.id} (${r.skillNoneReason.trim()})`);
       } else {
         brokenSkillRules.push(`${r.id} (skill: none without reason)`);
       }
-    } else if (!r.skill || !r.skill.trim()) {
+    } else if (!skillName || !skillName.trim()) {
       brokenSkillRules.push(`${r.id} (empty skill)`);
     } else {
-      const skillFile = join(skillsDir, r.skill, "SKILL.md");
+      const skillFile = join(skillsDir, skillName, "SKILL.md");
       if (!existsSync(skillFile)) {
-        brokenSkillRules.push(`${r.id} -> ${r.skill}/SKILL.md`);
+        brokenSkillRules.push(`${r.id} -> ${skillName}/SKILL.md`);
       }
     }
   }

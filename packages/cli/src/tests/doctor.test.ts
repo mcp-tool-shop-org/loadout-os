@@ -189,11 +189,6 @@ test("doctor: defaultDoctorPaths points hookSource at bundled apps/hook/dist/loa
 
 import { parseFrontmatter, serializeFrontmatter } from "@mcptoolshop/ai-loadout";
 import { analyzeMemoryMd, generateIndex } from "@mcptoolshop/claude-memories";
-import {
-  RND_TRIAD_ENTRIES,
-  PUBLISHER_TRIAD_ENTRIES,
-  STUDIO_TRIAD_ENTRIES,
-} from "./fixtures.js";
 import { PRETOOL_RULES } from "../pretool-rules.js";
 
 test("Part 4.1: provenance & triad frontmatter fields read at top-level or under metadata, and carried into index entries", () => {
@@ -315,7 +310,7 @@ test("Part 4.1: provenance & triad frontmatter fields read at top-level or under
   }
 });
 
-test("Part 4.2 & 4.3: doctor triad check in temp HOME verifies all 5 rules' memories, skills (WARN on skill: none with reason), and PreToolUse hook command+mode", () => {
+test("Part 4.2 & 4.3: doctor triad check in temp HOME verifies configured rule memories, skills (WARN on skill: none with reason), and PreToolUse hook command+mode", () => {
   const sb = makeSandbox({
     withUsage: true,
     withSettingsHook: true,
@@ -323,21 +318,36 @@ test("Part 4.2 & 4.3: doctor triad check in temp HOME verifies all 5 rules' memo
     observedAvg: 130,
   });
   try {
-    // Populate temp HOME's project index with the 5 R&D triad entries from the Part 4.3 fixture, plus the
-    // studio entry the `default` seat cites for director-quote (the single-index fallback validates the
-    // `default` column against the global and project indexes together)
+    // Populate temp HOME's project index with neutral default rule memory ids configured via profiles.json
     const projectIndexPath = join(sb.dir, "project-index.json");
+    const defaultTriadIds = [
+      "merge-review-policy",
+      "quote-gate-policy",
+      "memory-store-policy",
+      "timestamp-policy",
+      "release-checklist-policy",
+    ];
     writeFileSync(
       projectIndexPath,
       JSON.stringify(
         {
           version: "1.0.0",
           generated: "2026-11-08T20:00:00.000Z",
-          entries: [...RND_TRIAD_ENTRIES, ...STUDIO_TRIAD_ENTRIES],
+          entries: defaultTriadIds.map((id) => ({
+            id,
+            path: `memory/${id}.md`,
+            keywords: [id],
+            patterns: [],
+            priority: "domain",
+            summary: `Policy entry for ${id}`,
+            triggers: { task: true, plan: true, edit: false },
+            tokens_est: 100,
+            lines: 10,
+          })),
           budget: {
             always_loaded_est: 0,
-            on_demand_total_est: 2293,
-            avg_task_load_est: 458,
+            on_demand_total_est: 500,
+            avg_task_load_est: 100,
             avg_task_load_observed: null,
           },
         },
@@ -347,9 +357,28 @@ test("Part 4.2 & 4.3: doctor triad check in temp HOME verifies all 5 rules' memo
       "utf-8",
     );
 
-    // Populate temp HOME's ~/.claude/skills/<name>/SKILL.md for the 3 skills in the table
+    const profilesPath = join(sb.dir, "profiles.json");
+    writeFileSync(
+      profilesPath,
+      JSON.stringify(
+        {
+          rules: {
+            "unreviewed-merge": { memory: { default: "merge-review-policy" }, skill: "review-gate" },
+            "quote-gate": { memory: { default: "quote-gate-policy" } },
+            "memory-shell-write": { memory: { default: "memory-store-policy" }, skill: "loadout-os" },
+            "future-stamp": { memory: { default: "timestamp-policy" }, skill: "loadout-os" },
+            "release-reminder": { memory: { default: "release-checklist-policy" }, skill: "release-flow" },
+          },
+        },
+        null,
+        2,
+      ),
+      "utf-8",
+    );
+
+    // Populate temp HOME's ~/.claude/skills/<name>/SKILL.md for the configured skills
     const skillsDir = join(sb.dir, ".claude", "skills");
-    for (const skillName of ["remote-argon", "loadout-os", "full-treatment"]) {
+    for (const skillName of ["review-gate", "loadout-os", "release-flow"]) {
       const sDir = join(skillsDir, skillName);
       mkdirSync(sDir, { recursive: true });
       writeFileSync(
@@ -398,6 +427,7 @@ test("Part 4.2 & 4.3: doctor triad check in temp HOME verifies all 5 rules' memo
       ...pathsFor(sb),
       skillsDir,
       extraIndexes: [projectIndexPath],
+      profilesPath,
     };
 
     const res = runDoctor(basePaths);
@@ -407,19 +437,26 @@ test("Part 4.2 & 4.3: doctor triad check in temp HOME verifies all 5 rules' memo
     assert.equal(memCheck.status, "pass");
 
     const skillCheck = find(res.checks, "triad-skills");
-    // WARN because director-quote is marked `skill: "none"` with a reason
+    // WARN because quote-gate is marked `skill: "none"` with a reason
     assert.equal(skillCheck.status, "warn");
-    assert.match(skillCheck.message, /director-quote/);
+    assert.match(skillCheck.message, /quote-gate/);
 
     const hookCheck = find(res.checks, "triad-pretool-hook");
     assert.equal(hookCheck.status, "pass");
     assert.match(hookCheck.message, /loadout-os hook pre-tool --mode log-only/);
     assert.match(hookCheck.message, /mode: log-only/);
 
+    // 0. With no profiles.json (no memory refs configured), triad-memories passes cleanly
+    const unconfiguredRes = runDoctor({
+      ...pathsFor(sb),
+      skillsDir,
+    });
+    assert.equal(find(unconfiguredRes.checks, "triad-memories").status, "pass");
+
     // 1. Broken memory link -> FAIL
     const brokenMemRes = runDoctor({
       ...basePaths,
-      extraIndexes: [], // removes the R&D project index so the 5 rule memories are missing
+      extraIndexes: [], // removes the project index so configured rule memories are missing
     });
     assert.equal(find(brokenMemRes.checks, "triad-memories").status, "fail");
     assert.equal(brokenMemRes.ok, false);
@@ -478,7 +515,7 @@ test("Part 4.2 & 4.3: doctor triad check in temp HOME verifies all 5 rules' memo
   }
 });
 
-test("Issue #25 / Ruling 1: doctor triad-memories check runs per seat across two temp seat stores, passing when each seat's ids resolve only in its own store, and failing naming the seat when one id is missing", () => {
+test("Issue #25 / Ruling 1: doctor triad-memories check runs per profile across two temp profile stores, passing when each profile's ids resolve only in its own store, and failing naming the profile when one id is missing", () => {
   const sb = makeSandbox({
     withUsage: true,
     withSettingsHook: true,
@@ -486,23 +523,48 @@ test("Issue #25 / Ruling 1: doctor triad-memories check runs per seat across two
     observedAvg: 130,
   });
   try {
-    const rndStoreDir = join(sb.dir, "rnd-store", "memory");
-    const pubStoreDir = join(sb.dir, "pub-store", "memory");
-    mkdirSync(rndStoreDir, { recursive: true });
-    mkdirSync(pubStoreDir, { recursive: true });
+    const docsStoreDir = join(sb.dir, "docs-store", "memory");
+    const relStoreDir = join(sb.dir, "release-store", "memory");
+    mkdirSync(docsStoreDir, { recursive: true });
+    mkdirSync(relStoreDir, { recursive: true });
 
-    // Write R&D index.json with ONLY R&D's 5 memory IDs
+    const makeEntries = (ids: string[]) =>
+      ids.map((id) => ({
+        id,
+        path: `memory/${id}.md`,
+        keywords: [id],
+        patterns: [id.replace(/-/g, "_")],
+        priority: "domain" as const,
+        summary: `Entry for ${id}`,
+        triggers: { task: true, plan: true, edit: false },
+        tokens_est: 100,
+        lines: 10,
+      }));
+
+    const docsEntries = makeEntries([
+      "docs-merge-rule",
+      "docs-quote-rule",
+      "docs-shell-rule",
+      "docs-stamp-rule",
+      "docs-release-rule",
+    ]);
+    const relEntries = makeEntries([
+      "rel-merge-rule",
+      "rel-quote-rule",
+      "rel-memory-system",
+    ]);
+
     writeFileSync(
-      join(rndStoreDir, "index.json"),
+      join(docsStoreDir, "index.json"),
       JSON.stringify(
         {
           version: "1.0.0",
           generated: "2026-11-09T00:00:00.000Z",
-          entries: RND_TRIAD_ENTRIES,
+          entries: docsEntries,
           budget: {
             always_loaded_est: 0,
-            on_demand_total_est: 2293,
-            avg_task_load_est: 458,
+            on_demand_total_est: 500,
+            avg_task_load_est: 100,
             avg_task_load_observed: null,
           },
         },
@@ -512,18 +574,17 @@ test("Issue #25 / Ruling 1: doctor triad-memories check runs per seat across two
       "utf-8",
     );
 
-    // Write Publisher index.json with ONLY Publisher's 5 memory IDs
     writeFileSync(
-      join(pubStoreDir, "index.json"),
+      join(relStoreDir, "index.json"),
       JSON.stringify(
         {
           version: "1.0.0",
           generated: "2026-11-09T00:00:00.000Z",
-          entries: PUBLISHER_TRIAD_ENTRIES,
+          entries: relEntries,
           budget: {
             always_loaded_est: 0,
-            on_demand_total_est: 1220,
-            avg_task_load_est: 244,
+            on_demand_total_est: 300,
+            avg_task_load_est: 100,
             avg_task_load_observed: null,
           },
         },
@@ -533,14 +594,35 @@ test("Issue #25 / Ruling 1: doctor triad-memories check runs per seat across two
       "utf-8",
     );
 
-    const seatsPath = join(sb.dir, "seats.json");
+    const profilesPath = join(sb.dir, "profiles.json");
     writeFileSync(
-      seatsPath,
+      profilesPath,
       JSON.stringify(
         {
-          seats: {
-            "E:/AI/Research and Development": { seat: "rnd", store: rndStoreDir },
-            "E:/AI/Publisher": { seat: "publisher", store: pubStoreDir },
+          profiles: {
+            "/repos/docs": { profile: "docs", store: docsStoreDir },
+            "/repos/release": { profile: "release", store: relStoreDir },
+          },
+          rules: {
+            "unreviewed-merge": {
+              memory: { docs: "docs-merge-rule", release: "rel-merge-rule" },
+              skill: "review-gate",
+            },
+            "quote-gate": {
+              memory: { docs: "docs-quote-rule", release: "rel-quote-rule" },
+            },
+            "memory-shell-write": {
+              memory: { docs: "docs-shell-rule", release: "rel-memory-system" },
+              skill: "loadout-os",
+            },
+            "future-stamp": {
+              memory: { docs: "docs-stamp-rule", release: "rel-memory-system" },
+              skill: "loadout-os",
+            },
+            "release-reminder": {
+              memory: { docs: "docs-release-rule", release: "rel-merge-rule" },
+              skill: "release-flow",
+            },
           },
         },
         null,
@@ -550,7 +632,7 @@ test("Issue #25 / Ruling 1: doctor triad-memories check runs per seat across two
     );
 
     const skillsDir = join(sb.dir, ".claude", "skills");
-    for (const skillName of ["remote-argon", "loadout-os", "full-treatment"]) {
+    for (const skillName of ["review-gate", "loadout-os", "release-flow"]) {
       const sDir = join(skillsDir, skillName);
       mkdirSync(sDir, { recursive: true });
       writeFileSync(
@@ -590,18 +672,18 @@ test("Issue #25 / Ruling 1: doctor triad-memories check runs per seat across two
       "utf-8",
     );
 
-    // 1. Positive: both seats have their own 5 memory IDs in their own stores (and neither store has the other's IDs) -> PASS
+    // 1. Positive: both profiles have their own configured memory IDs in their own stores -> PASS
     const passRes = runDoctor({
       ...pathsFor(sb),
       skillsDir,
-      seatsPath,
+      profilesPath,
     });
     const passTriad = find(passRes.checks, "triad-memories");
     assert.equal(passTriad.status, "pass");
-    assert.match(passTriad.message, /rnd, publisher/);
+    assert.match(passTriad.message, /docs, release/);
     assert.equal(passRes.ok, true);
 
-    // Exercise dispatchDoctor `--seats` CLI wiring
+    // Exercise dispatchDoctor `--profiles` CLI wiring
     dispatch([
       "doctor",
       "--store",
@@ -614,24 +696,24 @@ test("Issue #25 / Ruling 1: doctor triad-memories check runs per seat across two
       sb.usagePath,
       "--skills",
       skillsDir,
-      "--seats",
-      seatsPath,
+      "--profiles",
+      profilesPath,
       "--json",
     ]);
     process.exitCode = 0;
 
-    // 2. Negative: remove the one memory ID only `director-quote` cites (`rule-director-communication`) from Publisher's store -> FAIL naming `publisher`
+    // 2. Negative: remove `rel-quote-rule` from release store -> FAIL naming `release`
     writeFileSync(
-      join(pubStoreDir, "index.json"),
+      join(relStoreDir, "index.json"),
       JSON.stringify(
         {
           version: "1.0.0",
           generated: "2026-11-09T00:00:00.000Z",
-          entries: PUBLISHER_TRIAD_ENTRIES.filter((e) => e.id !== "rule-director-communication"),
+          entries: relEntries.filter((e) => e.id !== "rel-quote-rule"),
           budget: {
             always_loaded_est: 0,
-            on_demand_total_est: 1020,
-            avg_task_load_est: 204,
+            on_demand_total_est: 200,
+            avg_task_load_est: 100,
             avg_task_load_observed: null,
           },
         },
@@ -644,51 +726,34 @@ test("Issue #25 / Ruling 1: doctor triad-memories check runs per seat across two
     const failRes = runDoctor({
       ...pathsFor(sb),
       skillsDir,
-      seatsPath,
+      profilesPath,
     });
     const failTriad = find(failRes.checks, "triad-memories");
     assert.equal(failTriad.status, "fail");
     assert.match(
       failTriad.message,
-      /publisher: director-quote -> rule-director-communication/,
-      "Failure message must name the seat (`publisher`), rule (`director-quote`), and missing memory ID (`rule-director-communication`)",
+      /release: quote-gate -> rel-quote-rule/,
+      "Failure message must name the profile (`release`), rule (`quote-gate`), and missing memory ID (`rel-quote-rule`)",
     );
     assert.doesNotMatch(
       failTriad.message,
-      /rnd: /,
-      "A Publisher-store gap must not be reported against the R&D seat",
+      /docs: /,
+      "A release-store gap must not be reported against the docs profile",
     );
     assert.equal(failRes.ok, false);
 
-    // 2b. Stale ids after a store rebuild: a Publisher store that still carries only the entry ids it
-    // used before its 2026-11-21 rebuild fails for every rule, each pair naming the id the table now cites
-    const preRebuildIds = [
-      "publisher-merges-as-coordinator",
-      "feedback-never-quote-director",
-      "project-memory-system",
-      "feedback-eastern-time",
-      "publishing-tags-need-publisher-ok",
-    ];
+    // 2b. Stale ids after a store rebuild: a store carrying old ids fails for every rule
+    const preRebuildIds = ["legacy-a", "legacy-b"];
     writeFileSync(
-      join(pubStoreDir, "index.json"),
+      join(relStoreDir, "index.json"),
       JSON.stringify(
         {
           version: "1.0.0",
           generated: "2026-11-09T00:00:00.000Z",
-          entries: preRebuildIds.map((id) => ({
-            id,
-            path: `memory/${id}.md`,
-            keywords: [id],
-            patterns: [id.replace(/-/g, "_")],
-            priority: "domain",
-            summary: "Entry id from before the store rebuild",
-            triggers: { task: true, plan: true, edit: false },
-            tokens_est: 100,
-            lines: 10,
-          })),
+          entries: makeEntries(preRebuildIds),
           budget: {
             always_loaded_est: 0,
-            on_demand_total_est: 500,
+            on_demand_total_est: 200,
             avg_task_load_est: 100,
             avg_task_load_observed: null,
           },
@@ -701,32 +766,32 @@ test("Issue #25 / Ruling 1: doctor triad-memories check runs per seat across two
     const staleRes = runDoctor({
       ...pathsFor(sb),
       skillsDir,
-      seatsPath,
+      profilesPath,
     });
     const staleTriad = find(staleRes.checks, "triad-memories");
     assert.equal(staleTriad.status, "fail");
     for (const pair of [
-      "unreviewed-merge -> rule-coordinator-and-merges",
-      "director-quote -> rule-director-communication",
-      "memory-shell-write -> reference-memory-system",
-      "future-stamp -> reference-memory-system",
-      "release-reminder -> rule-coordinator-and-merges",
+      "unreviewed-merge -> rel-merge-rule",
+      "quote-gate -> rel-quote-rule",
+      "memory-shell-write -> rel-memory-system",
+      "future-stamp -> rel-memory-system",
+      "release-reminder -> rel-merge-rule",
     ]) {
       assert.ok(
-        staleTriad.message.includes(`publisher: ${pair}`),
-        `Stale Publisher store must report \`publisher: ${pair}\`; got: ${staleTriad.message}`,
+        staleTriad.message.includes(`release: ${pair}`),
+        `Stale release store must report \`release: ${pair}\`; got: ${staleTriad.message}`,
       );
     }
-    assert.doesNotMatch(staleTriad.message, /rnd: /);
+    assert.doesNotMatch(staleTriad.message, /docs: /);
     assert.equal(staleRes.ok, false);
 
-    // 3. Direct `seatStores` option in DoctorPaths also validates per seat
+    // 3. Direct `profileStores` option in DoctorPaths also validates per profile
     const directRes = runDoctor({
       ...pathsFor(sb),
       skillsDir,
-      seatStores: { rnd: rndStoreDir, publisher: pubStoreDir },
+      profileStores: { docs: docsStoreDir, release: relStoreDir },
     });
-    assert.equal(find(directRes.checks, "triad-memories").status, "fail");
+    assert.equal(find(directRes.checks, "triad-memories").status, "pass");
   } finally {
     sb.cleanup();
   }

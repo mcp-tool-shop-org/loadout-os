@@ -650,15 +650,15 @@ describe("sub-index expansion, frontmatter summary authority, and keyword extrac
     }
   });
 
-  it("idSource='title' (global default) derives entry ids from first bullet title when frontmatter has no explicit id: (Publisher ruling B)", () => {
+  it("idSource='title' (global default) derives entry ids from first bullet title when frontmatter has no explicit id: (#19)", () => {
     const tmp = mkdtempSync(join(tmpdir(), "loadout-idsource-title-"));
     try {
       writeFileSync(
         join(tmp, "user_profile.md"),
         [
           "---",
-          "name: Mike User Profile Studio Model",
-          "description: User profile and studio model",
+          "name: Ada User Profile",
+          "description: User profile and preferences",
           "---",
           "# User Profile",
           "",
@@ -682,7 +682,7 @@ describe("sub-index expansion, frontmatter summary authority, and keyword extrac
         memPath,
         [
           "# Memory",
-          "- [Mike](user_profile.md) — User profile",
+          "- [Ada](user_profile.md) — User profile",
           "- [forkctl](forkctl.md) — First forkctl bullet",
           "- [forkable v1.0.0 ship](forkctl.md) — Duplicate forkctl bullet",
           "",
@@ -694,27 +694,27 @@ describe("sub-index expansion, frontmatter summary authority, and keyword extrac
       // Default without options is idSource: "title"
       const defaultIndex = generateIndex(analysis);
       assert.equal(defaultIndex.entries.length, 2);
-      assert.equal(defaultIndex.entries[0].id, "mike");
+      assert.equal(defaultIndex.entries[0].id, "ada");
       assert.equal(defaultIndex.entries[1].id, "forkctl");
 
       // Explicit idSource: "title" produces the same result
       const explicitTitleIndex = generateIndex(analysis, { idSource: "title" });
-      assert.equal(explicitTitleIndex.entries[0].id, "mike");
+      assert.equal(explicitTitleIndex.entries[0].id, "ada");
       assert.equal(explicitTitleIndex.entries[1].id, "forkctl");
     } finally {
       rmSync(tmp, { recursive: true, force: true });
     }
   });
 
-  it("idSource='name' derives entry ids from frontmatter name: when frontmatter has no explicit id: (Publisher ruling B)", () => {
+  it("idSource='name' derives entry ids from frontmatter name: when frontmatter has no explicit id: (#19)", () => {
     const tmp = mkdtempSync(join(tmpdir(), "loadout-idsource-name-"));
     try {
       writeFileSync(
         join(tmp, "user_profile.md"),
         [
           "---",
-          "name: Mike User Profile Studio Model",
-          "description: User profile and studio model",
+          "name: Ada User Profile",
+          "description: User profile and preferences",
           "---",
           "# User Profile",
           "",
@@ -724,28 +724,28 @@ describe("sub-index expansion, frontmatter summary authority, and keyword extrac
       const memPath = join(tmp, "MEMORY.md");
       writeFileSync(
         memPath,
-        "# Memory\n- [Mike](user_profile.md) — User profile\n",
+        "# Memory\n- [Ada](user_profile.md) — User profile\n",
         "utf-8",
       );
 
       const analysis = analyzeMemoryMd(memPath);
       const nameIndex = generateIndex(analysis, { idSource: "name" });
       assert.equal(nameIndex.entries.length, 1);
-      assert.equal(nameIndex.entries[0].id, "mike-user-profile-studio-model");
+      assert.equal(nameIndex.entries[0].id, "ada-user-profile");
     } finally {
       rmSync(tmp, { recursive: true, force: true });
     }
   });
 
-  it("explicit idSource option (--id-source) beats the per-store setting in .loadout.json and MEMORY.md frontmatter (Publisher ruling B)", () => {
+  it("explicit idSource option (--id-source) beats the per-store setting in .loadout.json and MEMORY.md frontmatter (#19)", () => {
     const tmp = mkdtempSync(join(tmpdir(), "loadout-idsource-override-"));
     try {
       writeFileSync(
         join(tmp, "user_profile.md"),
         [
           "---",
-          "name: Mike User Profile Studio Model",
-          "description: User profile and studio model",
+          "name: Ada User Profile",
+          "description: User profile and preferences",
           "---",
           "# User Profile",
           "",
@@ -762,7 +762,7 @@ describe("sub-index expansion, frontmatter summary authority, and keyword extrac
           "  id_source: name",
           "---",
           "# Memory",
-          "- [Mike](user_profile.md) — User profile",
+          "- [Ada](user_profile.md) — User profile",
           "",
         ].join("\n"),
         "utf-8",
@@ -770,19 +770,19 @@ describe("sub-index expansion, frontmatter summary authority, and keyword extrac
 
       // 1. Store frontmatter sets id_source: name -> produces name-derived id when no flag passed
       const analysis = analyzeMemoryMd(memPath);
-      assert.equal(generateIndex(analysis).entries[0].id, "mike-user-profile-studio-model");
+      assert.equal(generateIndex(analysis).entries[0].id, "ada-user-profile");
 
       // 2. Explicit idSource: "title" beats MEMORY.md frontmatter id_source: name
-      assert.equal(generateIndex(analysis, { idSource: "title" }).entries[0].id, "mike");
+      assert.equal(generateIndex(analysis, { idSource: "title" }).entries[0].id, "ada");
 
       // 3. Store .loadout.json sets idSource: "title", explicit idSource: "name" beats it (and vice versa)
       writeFileSync(join(tmp, ".loadout.json"), JSON.stringify({ idSource: "name" }), "utf-8");
-      assert.equal(generateIndex(analysis).entries[0].id, "mike-user-profile-studio-model");
-      assert.equal(generateIndex(analysis, { idSource: "title" }).entries[0].id, "mike");
+      assert.equal(generateIndex(analysis).entries[0].id, "ada-user-profile");
+      assert.equal(generateIndex(analysis, { idSource: "title" }).entries[0].id, "ada");
 
       writeFileSync(join(tmp, ".loadout.json"), JSON.stringify({ idSource: "title" }), "utf-8");
-      assert.equal(generateIndex(analysis, { projectMode: true }).entries[0].id, "mike");
-      assert.equal(generateIndex(analysis, { projectMode: true, idSource: "name" }).entries[0].id, "mike-user-profile-studio-model");
+      assert.equal(generateIndex(analysis, { projectMode: true }).entries[0].id, "ada");
+      assert.equal(generateIndex(analysis, { projectMode: true, idSource: "name" }).entries[0].id, "ada-user-profile");
 
       // 4. Top-level `id_source: name` in MEMORY.md frontmatter without `name:`/`id:` (raw fallback)
       writeFileSync(join(tmp, ".loadout.json"), "{ invalid json", "utf-8");
@@ -793,13 +793,13 @@ describe("sub-index expansion, frontmatter summary authority, and keyword extrac
           'id_source: "name"',
           "---",
           "# Memory",
-          "- [Mike](user_profile.md) — User profile",
+          "- [Ada](user_profile.md) — User profile",
           "",
         ].join("\n"),
         "utf-8",
       );
       const rawAnalysis = analyzeMemoryMd(memPath);
-      assert.equal(generateIndex(rawAnalysis).entries[0].id, "mike-user-profile-studio-model");
+      assert.equal(generateIndex(rawAnalysis).entries[0].id, "ada-user-profile");
     } finally {
       rmSync(tmp, { recursive: true, force: true });
     }

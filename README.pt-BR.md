@@ -70,7 +70,7 @@ loadout-os refresh [--store <d>] [--dest <p>] [--project <r>] [--id-source title
 
 ## Conexão de memória da camada do projeto e gancho de código do Claude
 
-Cada "seat" de projeto pode manter seu próprio `.claude/loadout/index.json`, construído a partir de seu armazenamento de memória (`loadout-os refresh --store <store> --project <root>`).
+Cada perfil de projeto pode manter seu próprio `.claude/loadout/index.json`, construído a partir de seu armazenamento de memória (`loadout-os refresh --store <store> --project <root>`).
 
 ### 1. Cabeçalho de tópico e quadro
 

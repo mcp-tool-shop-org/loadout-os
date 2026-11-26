@@ -449,15 +449,15 @@ export interface ReplayCasePair {
   expectedAllowedOutcome: "allow" | "warn";
 }
 
-export const REPLAY_2026_11_08_STORE = "E:/AI/StudioStore/memory";
+export const REPLAY_2026_11_08_STORE = "E:/AI/CustomStore/memory";
 /** Fixed clock: 2026-11-08 15:44:00 EST (20:44:00 UTC). */
 export const REPLAY_2026_11_08_CLOCK_MS = Date.UTC(2026, 10, 8, 20, 44, 0, 0);
 
 /**
  * Canned PreToolUse JSON fixture of the four slips from 2026-11-08 and their
  * matching allowed calls (Part 5.1, with a real board line carrying trailing text).
- * Note: Under Ruling 2 (#25), unreviewed-merge is permanently warn-only on every
- * seat, and suppressed when a matching Argon `PASS at <head8>` reply exists.
+ * Note: unreviewed-merge is warn-only by default, and suppressed when a matching
+ * `PASS at <head8>` reply exists.
  */
 export const REPLAY_2026_11_08_FIXTURE: readonly ReplayCasePair[] = [
   {
@@ -481,8 +481,8 @@ export const REPLAY_2026_11_08_FIXTURE: readonly ReplayCasePair[] = [
     expectedAllowedOutcome: "warn",
   },
   {
-    id: "slip-2-dated-director-quote",
-    ruleId: "director-quote",
+    id: "slip-2-dated-quote-gate",
+    ruleId: "quote-gate",
     blockedStdin: {
       hook_event_name: "PreToolUse",
       session_id: "replay-2026-11-08",

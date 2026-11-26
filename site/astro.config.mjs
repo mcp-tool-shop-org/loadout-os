@@ -16,7 +16,7 @@ export default defineConfig({
         href: '/loadout-os/',
         replacesTitle: false,
       },
-      description: 'loadout-os — consolidated Knowledge OS for the studio — kernel (ai-loadout) + memories (claude-memories) + rules (claude-rules) + the runtime loadout hook, under one npm-workspaces root.',
+      description: 'loadout-os — consolidated Knowledge OS for AI coding agents — kernel (ai-loadout) + memories (claude-memories) + rules (claude-rules) + the runtime loadout hook, under one npm-workspaces root.',
       disable404Route: true,
       social: [
         { icon: 'github', label: 'GitHub', href: 'https://github.com/mcp-tool-shop-org/loadout-os' },

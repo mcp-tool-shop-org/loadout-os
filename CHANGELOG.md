@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **PreToolUse hook framework (`loadout-os hook pre-tool`) and triad `doctor` checks** (`packages/cli`, `packages/kernel`, `packages/memories`, #24) —
+  - Added the in-process `PreToolUse` guard (`runPreTool`, `--mode enforce|log-only`) with `stdin` schema validation, zero-I/O read-only tool and read-only Bash pipeline pass-through, longest-prefix `cwd` profile resolution, SHA-256 `input_hash` decision logging (`~/.ai-loadout/hook-decisions.jsonl`, `AI_LOADOUT_DECISIONS_LOG`), hard internal timeout (`300 ms`), and fail-open / fail-closed policy (`exit 2` + stderr only on block).
+  - Added the 5-rule Layer A/B rule table (`unreviewed-merge`, `quote-gate`, `memory-shell-write`, `future-stamp`, `release-reminder`), provenance frontmatter metadata (`loadout_skill`, `loadout_triggers`, `author_agent`, `created_at`, `verification_status`, `evidence_ref`, `supersedes`), and `doctor` triad checks (`triad-memories`, `triad-skills`, `triad-pretool-hook`).
 - **Memory-index scaling warnings in `doctor`** (`packages/cli`) — `loadout-os doctor` now runs two
   configurable capacity checks: `memory-read-limit` (warns when `MEMORY.md` passes 60% of Claude Code's
   24.4 KB read limit = 14,640 bytes by default) and `subindex-entries` (warns when a sub-index marked
@@ -27,6 +30,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   staged verification pass under `basename(storeDir)` before committing (refusing with
   `ENTRY_COUNT_MISMATCH` / `PRIORITY_MISMATCH` if they differ).
 
+### Changed
+
+- **Generic profile-driven PreToolUse framework (`profiles.json` and `quote-gate`)** (`packages/cli`) —
+  - Replaced workspace-specific profile names and terminology with generic `profile` resolution (`ProfileName`, `ProfileConfig`, `loadProfileConfig`, `resolveProfile`, `defaultProfilesPath`), reading `~/.ai-loadout/profiles.json` (`AI_LOADOUT_PROFILES_PATH`, `--profiles <path>`). The only built-in profile is `default`.
+  - Removed all built-in per-profile actions, skill names, and memory IDs from `PRETOOL_RULES`; every rule message now states the rule in neutral terms, appends `(memory: <id>)` only when configured, and supports per-profile `action`, `memory`, `skill`, and extra `note` lines from `profiles.json` (e.g., `docs` and `release` profiles).
+  - Renamed the quote rule to `quote-gate` (`QUOTE_GATE_RULE`, `matchQuoteGate`) with configurable `quoteGate.speakers` (defaulting to pronouns and generic role nouns: `He`, `She`, `They`, `the User`), configurable `quoteGate.allowlistSuffixes` (defaulting only to loadout-os's own rule and test files), and `ruleAliases` for rule lookups and `readDecisionLog` decision-log reading.
+
 ### Fixed
 
 - **Matched topic entries reach the prompt hook again** (`apps/hook`) — within each layer, entries the prompt
@@ -35,13 +45,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   0.53) never surfaced. Measured on a real two-layer setup: 9 of 11 sample prompts now surface their topic
   entry, against 2 of 11 before. With no match, the output is unchanged. New test `7b` in `hook.test.ts`.
 - **Merge reminder wording** (`packages/cli`, `pretool-rules.ts`) — the `unreviewed-merge` reminder asks for
-  an other-family verdict at the exact head sha (Opus for Carbon or Neon builds, Carbon in AI Studio for
-  Claude-written work) instead of the retired "Argon-verdict sha".
+  a recorded review verdict matching the exact PR head commit rather than a legacy runner name.
 - **Pre-tool hook enforce-readiness & issue #25** (`packages/cli`, closes #25) —
-  - **Read-only pass-through & seat map hardening (P1.1–P1.3):** rejected `git -c <key>=<val>`
+  - **Read-only pass-through & profile map hardening (P1.1–P1.3):** rejected `git -c <key>=<val>`
     and leading `VAR=val` environment variable prefixes on read-only pass-through segments;
     rejected `sed -n` scripts containing `w`/`W` write commands; added `worktrees` and
-    `prefixes` arrays per seat in `seats.json`.
+    `prefixes` arrays per profile in `profiles.json`.
   - **`memory-shell-write` coverage & false-positive fixes (P2.4–P2.9, FP-MSW-1..4):** expanded
     detection to `pwsh`/`powershell`, `bash -c`/`sh -c`, `env`/`command`/`nohup`/`nice`/`time`/`xargs`
     wrappers, and `find <store> -delete|-exec`; expanded Python/Node write APIs (`shutil.copy|move`,
@@ -52,7 +61,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
     `am`, `cherry-pick`, and `pull` to `GIT_STORE_WRITE_SUBCOMMANDS`; expanded `%USERPROFILE%`,
     `$USERPROFILE`, `$HOME`, quoted `~`, and doubled backslashes `\\`; and avoided false positives
     on `sed -i` substitution patterns on non-store files, inline Python/Node scripts that read from
-    a store and write only to non-store literal paths, studio CLIs (`claude-memories`, `cli.js`) and
+    a store and write only to non-store literal paths, loadout CLIs (`claude-memories`, `cli.js`) and
     read-only inspection scripts, and PowerShell `Copy-Item` copying from a store to a non-store
     destination.
   - **`future-stamp` reconstruction, forms, and privacy (P3.10–P3.13, P4.14, FP-FS-1..3):**
@@ -66,13 +75,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
     scoped frontmatter date keys (`created_at`, `modified`, `verified_at`) to the YAML frontmatter
     block; scoped `future-stamp` strictly to configured memory store paths; and hashed unparseable
     timestamp values in `notes` (`sha256:<hash12>(len=<n>)`) instead of logging raw prose.
-  - **Per-seat memory IDs & per-seat `doctor` triad check (Ruling 1):** `PRETOOL_RULES` now
-    maps `memory` per seat (`rnd` vs `publisher`), rule messages cite the active seat's memory
-    ID, and `doctor`'s `triad-memories` check (`--seats <p>`) validates each configured seat against
-    its own store/index and names the failing seat on mismatch.
-  - **`unreviewed-merge` warn-only with Argon `PASS at <head8>` suppression (Ruling 2):**
-    `unreviewed-merge` is permanently `warn` on all seats (never `block`) and suppresses its
-    warning when `repliesDir` is explicitly configured (`seats.json` or `AI_LOADOUT_REPLIES_DIR`,
+  - **Per-profile memory IDs & per-profile `doctor` triad check (Ruling 1):** rule `memory` maps resolve
+    per profile from `profiles.json`, rule messages cite the active profile's memory ID when configured,
+    and `doctor`'s `triad-memories` check (`--profiles <p>`) validates each configured profile against
+    its own store/index and names the failing profile on mismatch.
+  - **`unreviewed-merge` warn-only with `PASS at <head8>` suppression (Ruling 2):**
+    `unreviewed-merge` is permanently `warn` across all profiles (never `block`) and suppresses its
+    warning when `repliesDir` is explicitly configured (`profiles.json` or `AI_LOADOUT_REPLIES_DIR`,
     with no hardcoded path default) and a review reply's first line names the target repo, `#<pr>`,
     and `PASS at <head8>` matching `--match-head-commit <sha>`, `--head <sha>`, or
     `gatemerge <repo> <pr> <head8>`.
@@ -84,23 +93,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
     and `existsSync` stat calls.
   - **`refresh --project` store resolution, `source_store` guard, and cross-store `.bak`
     preservation:** `loadout-os refresh --project <root>` without `--store` now resolves the
-    project's store from `seats.json` or refuses with `PROJECT_STORE_REQUIRED` instead of
+    project's store from `profiles.json` or refuses with `PROJECT_STORE_REQUIRED` instead of
     falling back to `DEFAULT_STORE`; stamps `source_store` in generated indexes and refuses
     cross-store overwrites with `STORE_MISMATCH` unless `--allow-store-change` is passed; and
     never overwrites an existing `<dest>.bak` whose `source_store` differs (preserving both
     backups).
-
-- **Pre-tool rule memory ids follow the stores they point into** (`packages/cli`) — the `publisher`
-  ids in `PRETOOL_RULES` named entries the Publisher store renamed in its 2026-11-21 rebuild, so every
-  `publisher` pair failed `doctor`'s per-seat `triad-memories` check once seat stores were declared.
-  They now name the entries that absorbed them: `rule-coordinator-and-merges` (`unreviewed-merge`,
-  `release-reminder`), `rule-director-communication` (`director-quote`) and `reference-memory-system`
-  (`memory-shell-write`, `future-stamp`). The `default` id of `director-quote` now names the studio-store
-  entry that carries that rule (`feedbackfeedbackneverquotethedirectormd`). The `default` ids of
-  `unreviewed-merge`, `memory-shell-write`, `future-stamp` and `release-reminder` still name R&D entries:
-  no studio-store entry carries those rules, so doctor's single-index fallback reports them until one
-  does. Declaring a `store` for each seat in `seats.json` makes `doctor` validate every seat against its
-  own store instead. Tests lock the full three-column table and cover a store whose entries were renamed.
+- **Pre-tool rule memory IDs follow configured store entries** (`packages/cli`) — updated the rule
+  table tests and `doctor`'s per-profile `triad-memories` check to verify configured rule memory IDs
+  against each profile's store/index (including stores whose entry IDs use `idSource: name`).
 
 ## [1.1.1] - 2026-11-08
 

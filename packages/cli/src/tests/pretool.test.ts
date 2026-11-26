@@ -1,5 +1,5 @@
 /**
- * Tests for `loadout-os hook pre-tool` — Part 1 (hook entry, seat resolution,
+ * Tests for `loadout-os hook pre-tool` — Part 1 (hook entry, profile resolution,
  * read-only pass-through, typed rule table, decision log, enforce vs log-only modes).
  *
  * All tests run in isolated temp directories and never touch live ~/.claude or ~/.ai-loadout.
@@ -14,8 +14,8 @@ import { tmpdir } from "node:os";
 import {
   runPreTool,
   parsePreToolStdin,
-  loadSeatConfig,
-  resolveSeat,
+  loadProfileConfig,
+  resolveProfile,
   normalizePreToolPath,
   parseBashCommand,
   isSegmentReadOnly,
@@ -23,36 +23,44 @@ import {
   isReadOnlyPassThrough,
   extractWritePayload,
   resolveRuleAction,
+  resolveRuleSkill,
+  resolveRuleNote,
+  formatMemorySuffix,
+  readDecisionLog,
   capRuleMessage,
   hashToolInput,
-  defaultSeatsPath,
-  defaultDecisionLogPath, DEFAULT_PRETOOL_TIMEOUT_MS,
+  defaultProfilesPath,
+  defaultDecisionLogPath,
+  DEFAULT_PRETOOL_TIMEOUT_MS,
+  ProfileConfigError,
   type PreToolRule,
   type DecisionLogEntry,
 } from "../pretool.js";
 import { dispatch } from "../cli.js";
 
-describe("Part 1: hook pre-tool entry, seat map, pass-through, rule table, decision log, modes", () => {
+describe("Part 1: hook pre-tool entry, profile map, pass-through, rule table, decision log, modes", () => {
   let tempDir: string;
-  let seatsPath: string;
+  let profilesPath: string;
   let logPath: string;
-  let savedSeatsEnv: string | undefined;
+  let savedProfilesEnv: string | undefined;
   let savedLogEnv: string | undefined;
 
   beforeEach(() => {
     tempDir = mkdtempSync(join(tmpdir(), "loadout-pretool-p1-"));
-    seatsPath = join(tempDir, "seats.json");
+    profilesPath = join(tempDir, "profiles.json");
     logPath = join(tempDir, "hook-decisions.jsonl");
-    savedSeatsEnv = process.env.AI_LOADOUT_SEATS_PATH;
+    savedProfilesEnv = process.env.AI_LOADOUT_PROFILES_PATH;
     savedLogEnv = process.env.AI_LOADOUT_DECISIONS_LOG;
 
     writeFileSync(
-      seatsPath,
+      profilesPath,
       JSON.stringify(
         {
-          "E:/AI/Research and Development": "rnd",
-          "E:/AI/Publisher": "publisher",
-          "E:/AI/Research and Development/nested/pub-sandbox": "publisher",
+          profiles: {
+            "E:/AI/Research and Development": "docs",
+            "E:/AI/Publisher": "release",
+            "E:/AI/Research and Development/nested/pub-sandbox": "release",
+          },
         },
         null,
         2,
@@ -62,10 +70,10 @@ describe("Part 1: hook pre-tool entry, seat map, pass-through, rule table, decis
   });
 
   afterEach(() => {
-    if (savedSeatsEnv === undefined) {
-      delete process.env.AI_LOADOUT_SEATS_PATH;
+    if (savedProfilesEnv === undefined) {
+      delete process.env.AI_LOADOUT_PROFILES_PATH;
     } else {
-      process.env.AI_LOADOUT_SEATS_PATH = savedSeatsEnv;
+      process.env.AI_LOADOUT_PROFILES_PATH = savedProfilesEnv;
     }
     if (savedLogEnv === undefined) {
       delete process.env.AI_LOADOUT_DECISIONS_LOG;
@@ -112,47 +120,47 @@ describe("Part 1: hook pre-tool entry, seat map, pass-through, rule table, decis
     });
   });
 
-  // ── 1.2 Seat resolution ───────────────────────────────────────
-  describe("1.2 Seat resolution from seats.json", () => {
+  // ── 1.2 Profile resolution ────────────────────────────────────
+  describe("1.2 Profile resolution from profiles.json", () => {
     it("resolves longest matching prefix of cwd (case- and slash-normalised on Windows)", () => {
-      const cfg = loadSeatConfig(seatsPath);
+      const cfg = loadProfileConfig(profilesPath);
 
-      assert.equal(resolveSeat("E:/AI/Research and Development", cfg), "rnd");
-      assert.equal(resolveSeat("e:\\ai\\research and development\\packages\\cli", cfg), "rnd");
-      assert.equal(resolveSeat("/e/AI/Publisher/subproject", cfg), "publisher");
-      assert.equal(resolveSeat("\\\\?\\E:\\AI\\Publisher\\repo\\", cfg), "publisher");
+      assert.equal(resolveProfile("E:/AI/Research and Development", cfg), "docs");
+      assert.equal(resolveProfile("e:\\ai\\research and development\\packages\\cli", cfg), "docs");
+      assert.equal(resolveProfile("/e/AI/Publisher/subproject", cfg), "release");
+      assert.equal(resolveProfile("\\\\?\\E:\\AI\\Publisher\\repo\\", cfg), "release");
       // Longest prefix wins over shorter parent prefix
       assert.equal(
-        resolveSeat("E:\\AI\\Research and Development\\nested\\pub-sandbox\\work", cfg),
-        "publisher",
+        resolveProfile("E:\\AI\\Research and Development\\nested\\pub-sandbox\\work", cfg),
+        "release",
       );
       // Sibling prefix with shared string prefix must not match (boundary check)
-      assert.equal(resolveSeat("E:/AI/Publisher-Extra", cfg), "default");
+      assert.equal(resolveProfile("E:/AI/Publisher-Extra", cfg), "default");
       // Unmatched path returns default
-      assert.equal(resolveSeat("E:/AI/OtherRepo", cfg), "default");
-      assert.equal(resolveSeat("", cfg), "default");
+      assert.equal(resolveProfile("E:/AI/OtherRepo", cfg), "default");
+      assert.equal(resolveProfile("", cfg), "default");
     });
 
-    it("honours AI_LOADOUT_SEATS_PATH env override and nested seat objects with stores", () => {
-      const customSeats = join(tempDir, "custom-seats.json");
+    it("honours AI_LOADOUT_PROFILES_PATH env override and nested profile objects with stores", () => {
+      const customProfiles = join(tempDir, "custom-profiles.json");
       writeFileSync(
-        customSeats,
+        customProfiles,
         JSON.stringify({
-          seats: {
-            "E:/AI/CustomRnd": { seat: "rnd", store: "E:/AI/CustomRnd/memory" },
+          profiles: {
+            "E:/AI/CustomDocs": { profile: "docs", store: "E:/AI/CustomDocs/memory" },
           },
           stores: ["E:/AI/SharedStore/memory"],
         }),
         "utf-8",
       );
-      process.env.AI_LOADOUT_SEATS_PATH = customSeats;
-      assert.equal(defaultSeatsPath(), customSeats);
+      process.env.AI_LOADOUT_PROFILES_PATH = customProfiles;
+      assert.equal(defaultProfilesPath(), customProfiles);
 
-      const cfg = loadSeatConfig();
-      assert.equal(resolveSeat("e:\\ai\\customrnd\\src", cfg), "rnd");
+      const cfg = loadProfileConfig();
+      assert.equal(resolveProfile("e:\\ai\\customdocs\\src", cfg), "docs");
       assert.deepEqual(cfg.storePaths, [
         "E:/AI/SharedStore/memory",
-        "E:/AI/CustomRnd/memory",
+        "E:/AI/CustomDocs/memory",
       ]);
     });
 
@@ -165,6 +173,77 @@ describe("Part 1: hook pre-tool entry, seat map, pass-through, rule table, decis
         normalizePreToolPath("/e/AI/Publisher/"),
         "e:/ai/publisher",
       );
+    });
+
+    it("validates profiles.json with structured ProfileConfigError and warns on unknown keys without crashing", () => {
+      const badCases: Array<[unknown, string]> = [
+        [[], "PROFILE_CONFIG_NOT_OBJECT"],
+        [{ profiles: "bad" }, "INVALID_PROFILES_MAP"],
+        [{ profiles: { "/repo": {} } }, "MISSING_PROFILE_NAME"],
+        [{ profiles: { "/repo": "" } }, "MISSING_PROFILE_NAME"],
+        [{ stores: ["ok", ""] }, "INVALID_STORE_PATH"],
+        [{ repliesDir: 123 }, "INVALID_REPLIES_DIR"],
+        [{ ruleAliases: { old: 42 } }, "INVALID_RULE_ALIASES"],
+        [{ rules: [] }, "INVALID_RULES_MAP"],
+        [{ rules: { "quote-gate": "bad" } }, "INVALID_RULE_OVERRIDE"],
+        [{ rules: { "quote-gate": { action: { docs: "explode" } } } }, "INVALID_RULE_ACTION"],
+        [{ rules: { "quote-gate": { memory: { docs: "" } } } }, "INVALID_RULE_MEMORY"],
+        [{ rules: { "quote-gate": { skill: "" } } }, "INVALID_RULE_SKILL"],
+        [{ rules: { "quote-gate": { note: { docs: 99 } } } }, "INVALID_RULE_NOTE"],
+        [{ quoteGate: "bad" }, "INVALID_QUOTE_GATE"],
+        [{ quoteGate: { speakers: [123] } }, "INVALID_QUOTE_GATE_SPEAKERS"],
+        [{ quoteGate: { allowlistSuffixes: "bad" } }, "INVALID_QUOTE_GATE_ALLOWLIST"],
+      ];
+
+      for (let i = 0; i < badCases.length; i++) {
+        const [badObj, expectedCode] = badCases[i]!;
+        const p = join(tempDir, `bad-${i}.json`);
+        writeFileSync(p, JSON.stringify(badObj), "utf-8");
+        assert.throws(
+          () => loadProfileConfig(p),
+          (err: unknown) => err instanceof ProfileConfigError && err.code === expectedCode,
+          `Expected ProfileConfigError(${expectedCode}) for case ${i}`,
+        );
+      }
+
+      // Unknown keys warn and do not crash
+      const unknownKeysPath = join(tempDir, "unknown-keys.json");
+      writeFileSync(
+        unknownKeysPath,
+        JSON.stringify({
+          extraTop: true,
+          profiles: {
+            "/repos/docs": { profile: "docs", extraEntry: 1 },
+          },
+          rules: {
+            "quote-gate": { action: { docs: "warn" }, extraRuleKey: "x" },
+          },
+          quoteGate: { speakers: ["He"], extraGateKey: "y" },
+        }),
+        "utf-8",
+      );
+      const seenWarnings: string[] = [];
+      const loaded = loadProfileConfig(unknownKeysPath, {
+        onWarning: (w) => seenWarnings.push(w),
+      });
+      assert.equal(loaded.warnings.length, 4);
+      assert.equal(seenWarnings.length, 4);
+      assert.equal(resolveProfile("/repos/docs/sub", loaded), "docs");
+
+      // In runPreTool, unknown keys do not crash and record config_warning notes
+      const res = runPreTool({
+        stdinJson: JSON.stringify({
+          tool_name: "Bash",
+          tool_input: { command: "echo hi" },
+          cwd: "/repos/docs/sub",
+        }),
+        profilesPath: unknownKeysPath,
+        logPath,
+      });
+      assert.equal(res.exitCode, 0);
+      assert.equal(res.outcome, "allow");
+      assert.equal(res.profile, "docs");
+      assert.ok(res.logEntry?.notes?.some((n) => n.startsWith("config_warning:")));
     });
   });
 
@@ -179,7 +258,7 @@ describe("Part 1: hook pre-tool entry, seat map, pass-through, rule table, decis
             cwd: "E:/AI/Research and Development",
             session_id: "s1",
           }),
-          seatsPath,
+          profilesPath,
           logPath,
         });
         assert.equal(res.exitCode, 0);
@@ -224,7 +303,7 @@ describe("Part 1: hook pre-tool entry, seat map, pass-through, rule table, decis
             cwd: "E:/AI/Research and Development",
             session_id: "s1",
           }),
-          seatsPath,
+          profilesPath,
           logPath,
         });
         assert.equal(res.exitCode, 0);
@@ -268,7 +347,7 @@ describe("Part 1: hook pre-tool entry, seat map, pass-through, rule table, decis
   });
 
   // ── 1.4 Typed rule table & matcher inputs ─────────────────────
-  describe("1.4 Typed rule table, matcher inputs, per-seat action, <=5-line message cap", () => {
+  describe("1.4 Typed rule table, matcher inputs, per-profile action, <=5-line message cap", () => {
     it("delivers parsedCommand segments to Bash matchers and writePayload to Write/Edit/MultiEdit matchers", () => {
       let seenSegments: string[][] = [];
       let seenWriteTexts: string[] = [];
@@ -278,7 +357,7 @@ describe("Part 1: hook pre-tool entry, seat map, pass-through, rule table, decis
           id: "test-bash-rule",
           layer: "A",
           tools: ["Bash"],
-          action: { default: "warn", rnd: "block", publisher: "off" },
+          action: { default: "warn", docs: "block", release: "off" },
           memory: "mem-bash",
           skill: "skill-bash",
           message: "Line 1\nLine 2\nLine 3\nLine 4\nLine 5\nLine 6 should be truncated",
@@ -303,41 +382,41 @@ describe("Part 1: hook pre-tool entry, seat map, pass-through, rule table, decis
         },
       ];
 
-      // R&D seat -> block, message capped at 5 lines
-      const rndRes = runPreTool({
+      // docs profile -> block, message capped at 5 lines
+      const docsRes = runPreTool({
         stdinJson: JSON.stringify({
           tool_name: "Bash",
           tool_input: { command: "npm test && npm publish" },
           cwd: "E:/AI/Research and Development",
-          session_id: "sess-rnd",
+          session_id: "sess-docs",
         }),
-        seatsPath,
+        profilesPath,
         logPath,
         rules: testRules,
       });
-      assert.equal(rndRes.exitCode, 2);
-      assert.equal(rndRes.outcome, "block");
+      assert.equal(docsRes.exitCode, 2);
+      assert.equal(docsRes.outcome, "block");
       assert.deepEqual(seenSegments, [
         ["npm", "test"],
         ["npm", "publish"],
       ]);
-      assert.equal(rndRes.stderr.trim().split("\n").length, 5);
-      assert.equal(rndRes.stderr.includes("Line 6"), false);
+      assert.equal(docsRes.stderr.trim().split("\n").length, 5);
+      assert.equal(docsRes.stderr.includes("Line 6"), false);
 
-      // Publisher seat -> action is "off", so rule is skipped and call is allowed
-      const pubRes = runPreTool({
+      // release profile -> action is "off", so rule is skipped and call is allowed
+      const relRes = runPreTool({
         stdinJson: JSON.stringify({
           tool_name: "Bash",
           tool_input: { command: "npm publish" },
           cwd: "E:/AI/Publisher",
-          session_id: "sess-pub",
+          session_id: "sess-rel",
         }),
-        seatsPath,
+        profilesPath,
         logPath,
         rules: testRules,
       });
-      assert.equal(pubRes.exitCode, 0);
-      assert.equal(pubRes.outcome, "allow");
+      assert.equal(relRes.exitCode, 0);
+      assert.equal(relRes.outcome, "allow");
 
       // MultiEdit payload extraction
       const multiEditPayload = extractWritePayload("MultiEdit", {
@@ -366,20 +445,20 @@ describe("Part 1: hook pre-tool entry, seat map, pass-through, rule table, decis
           cwd: "E:/AI/Other",
           session_id: "sess-default",
         }),
-        seatsPath,
+        profilesPath,
         logPath,
         rules: testRules,
       });
       assert.equal(writeRes.exitCode, 2);
       assert.equal(writeRes.outcome, "block");
-      assert.equal(resolveRuleAction(testRules[0], "unknown-seat"), "warn");
+      assert.equal(resolveRuleAction(testRules[0], "unknown-profile"), "warn");
       assert.equal(capRuleMessage("1\n2\n3\n4\n5\n6\n7").split("\n").length, 5);
     });
   });
 
   // ── 1.5 Decision log & privacy ────────────────────────────────
   describe("1.5 Append-only JSONL decision log and input hash privacy", () => {
-    it("logs ts, seat, session, tool, evaluated, matched, outcome, latency_ms, input_hash and NEVER logs raw command or payload text", () => {
+    it("logs ts, profile, session, tool, evaluated, matched, outcome, latency_ms, input_hash and NEVER logs raw command or payload text", () => {
       const secretCommand = "echo SUPER_SECRET_API_KEY_99999_DO_NOT_LOG";
       const secretContent = "PRIVATE_PAYLOAD_BODY_88888_DO_NOT_LOG";
 
@@ -404,7 +483,7 @@ describe("Part 1: hook pre-tool entry, seat map, pass-through, rule table, decis
           cwd: "E:/AI/Research and Development",
           session_id: "sess-hash-1",
         }),
-        seatsPath,
+        profilesPath,
         rules: [sampleRule],
         nowMs: Date.parse("2026-11-08T20:00:00.000Z"),
       });
@@ -416,7 +495,7 @@ describe("Part 1: hook pre-tool entry, seat map, pass-through, rule table, decis
           cwd: "E:/AI/Publisher",
           session_id: "sess-hash-2",
         }),
-        seatsPath,
+        profilesPath,
         rules: [sampleRule],
         nowMs: Date.parse("2026-11-08T20:01:00.000Z"),
       });
@@ -433,7 +512,7 @@ describe("Part 1: hook pre-tool entry, seat map, pass-through, rule table, decis
       assert.equal(lines.length, 2);
 
       assert.equal(lines[0].ts, "2026-11-08T20:00:00.000Z");
-      assert.equal(lines[0].seat, "rnd");
+      assert.equal(lines[0].profile, "docs");
       assert.equal(lines[0].session, "sess-hash-1");
       assert.equal(lines[0].tool, "Bash");
       assert.deepEqual(lines[0].evaluated, ["sample-warn"]);
@@ -443,7 +522,7 @@ describe("Part 1: hook pre-tool entry, seat map, pass-through, rule table, decis
       assert.equal(lines[0].input_hash, hashToolInput({ command: secretCommand }));
       assert.match(lines[0].input_hash, /^[0-9a-f]{64}$/);
 
-      assert.equal(lines[1].seat, "publisher");
+      assert.equal(lines[1].profile, "release");
       assert.equal(lines[1].tool, "Write");
       assert.equal(
         lines[1].input_hash,
@@ -488,7 +567,7 @@ describe("Part 1: hook pre-tool entry, seat map, pass-through, rule table, decis
           session_id: "s-enforce",
         }),
         mode: "enforce",
-        seatsPath,
+        profilesPath,
         logPath,
         rules: modeRules,
       });
@@ -505,7 +584,7 @@ describe("Part 1: hook pre-tool entry, seat map, pass-through, rule table, decis
           session_id: "s-enforce",
         }),
         mode: "enforce",
-        seatsPath,
+        profilesPath,
         logPath,
         rules: modeRules,
       });
@@ -529,7 +608,7 @@ describe("Part 1: hook pre-tool entry, seat map, pass-through, rule table, decis
           session_id: "s-logonly",
         }),
         mode: "log-only",
-        seatsPath,
+        profilesPath,
         logPath,
         rules: modeRules,
       });
@@ -551,7 +630,7 @@ describe("Part 1: hook pre-tool entry, seat map, pass-through, rule table, decis
           session_id: "s-logonly",
         }),
         mode: "log-only",
-        seatsPath,
+        profilesPath,
         logPath,
         rules: modeRules,
       });
@@ -575,16 +654,16 @@ describe("Part 1: hook pre-tool entry, seat map, pass-through, rule table, decis
 
 describe("Part 2: failure policy (fail-open, fail-closed, single exit-2 mechanism, internal timeout)", () => {
   let tempDir: string;
-  let seatsPath: string;
+  let profilesPath: string;
   let logPath: string;
 
   beforeEach(() => {
     tempDir = mkdtempSync(join(tmpdir(), "loadout-pretool-p2-"));
-    seatsPath = join(tempDir, "seats.json");
+    profilesPath = join(tempDir, "profiles.json");
     logPath = join(tempDir, "hook-decisions.jsonl");
     writeFileSync(
-      seatsPath,
-      JSON.stringify({ "E:/AI/Research and Development": "rnd" }),
+      profilesPath,
+      JSON.stringify({ profiles: { "E:/AI/Research and Development": "docs" } }),
       "utf-8",
     );
   });
@@ -599,7 +678,7 @@ describe("Part 2: failure policy (fail-open, fail-closed, single exit-2 mechanis
       for (const badStdin of ["", "{not-json", JSON.stringify({ no_tool: 1 })]) {
         const res = runPreTool({
           stdinJson: badStdin,
-          seatsPath,
+          profilesPath,
           logPath,
         });
         assert.equal(res.exitCode, 0);
@@ -618,9 +697,9 @@ describe("Part 2: failure policy (fail-open, fail-closed, single exit-2 mechanis
       }
     });
 
-    it("fails open and logs error_open on a bad or missing explicit seat map", () => {
-      const corruptSeats = join(tempDir, "corrupt-seats.json");
-      writeFileSync(corruptSeats, "{ broken json", "utf-8");
+    it("fails open and logs error_open on a bad or missing explicit profile config", () => {
+      const corruptProfiles = join(tempDir, "corrupt-profiles.json");
+      writeFileSync(corruptProfiles, "{ broken json", "utf-8");
 
       const resCorrupt = runPreTool({
         stdinJson: JSON.stringify({
@@ -628,7 +707,7 @@ describe("Part 2: failure policy (fail-open, fail-closed, single exit-2 mechanis
           tool_input: { command: "echo hi" },
           cwd: "E:/AI/Research and Development",
         }),
-        seatsPath: corruptSeats,
+        profilesPath: corruptProfiles,
         logPath,
       });
       assert.equal(resCorrupt.exitCode, 0);
@@ -639,7 +718,7 @@ describe("Part 2: failure policy (fail-open, fail-closed, single exit-2 mechanis
           tool_name: "Bash",
           tool_input: { command: "echo hi" },
         }),
-        seatsPath: join(tempDir, "does-not-exist.json"),
+        profilesPath: join(tempDir, "does-not-exist.json"),
         logPath,
       });
       assert.equal(resMissingExplicit.exitCode, 0);
@@ -653,7 +732,7 @@ describe("Part 2: failure policy (fail-open, fail-closed, single exit-2 mechanis
           tool_input: { command: "npm publish" },
           cwd: "E:/AI/Research and Development",
         }),
-        seatsPath,
+        profilesPath,
         logPath,
         bashParser: () => {
           throw new Error("Simulated parser crash");
@@ -681,7 +760,7 @@ describe("Part 2: failure policy (fail-open, fail-closed, single exit-2 mechanis
           tool_input: { command: "npm publish" },
           cwd: "E:/AI/Research and Development",
         }),
-        seatsPath,
+        profilesPath,
         logPath,
         rules: [throwingBlockRule],
       });
@@ -709,7 +788,7 @@ describe("Part 2: failure policy (fail-open, fail-closed, single exit-2 mechanis
           tool_input: { command: "npm publish" },
           cwd: "E:/AI/Research and Development",
         }),
-        seatsPath,
+        profilesPath,
         logPath,
         rules: [throwingWarnRule],
       });
@@ -755,7 +834,7 @@ describe("Part 2: failure policy (fail-open, fail-closed, single exit-2 mechanis
           tool_input: { command: "gh pr merge 21" },
           cwd: "E:/AI/Research and Development",
         }),
-        seatsPath,
+        profilesPath,
         logPath,
         rules,
       });
@@ -787,7 +866,7 @@ describe("Part 2: failure policy (fail-open, fail-closed, single exit-2 mechanis
           tool_input: { command: "gh pr merge 21" },
           cwd: "E:/AI/Research and Development",
         }),
-        seatsPath,
+        profilesPath,
         logPath,
         rules,
         logWriter: () => {
@@ -821,7 +900,7 @@ describe("Part 2: failure policy (fail-open, fail-closed, single exit-2 mechanis
           tool_name: "Bash",
           tool_input: { command: "gh pr merge 21" },
         }),
-        seatsPath,
+        profilesPath,
         logPath,
         rules: [rule],
       });
@@ -860,7 +939,7 @@ describe("Part 2: failure policy (fail-open, fail-closed, single exit-2 mechanis
           tool_input: { command: "npm publish" },
           cwd: "E:/AI/Research and Development",
         }),
-        seatsPath,
+        profilesPath,
         logPath,
         rules: [slowRule],
         timeoutMs: 300,
@@ -886,18 +965,28 @@ describe("Part 2: failure policy (fail-open, fail-closed, single exit-2 mechanis
 
 import {
   PRETOOL_RULES,
+  DEFAULT_QUOTE_GATE_SPEAKERS,
+  QUOTE_GATE_ALLOWLIST_SUFFIXES,
   findQuoteViolations,
   quoteTextsFromTool,
   parseToolStampedTime,
 } from "../pretool-rules.js";
 
 /**
- * Ported verbatim from `~/.claude/hooks/quote-gate.py` (sha256 af95dd4e...):
- * 15 `_MUST_BLOCK` cases and 19 `_MUST_PASS` cases = 34 total cases.
- * (In the 19th `_MUST_PASS` case, the home directory prefix before
- * `.claude/projects/F--AI/memory/Feedback/feedback_never_quote_the_director.md`
- * is `/home/user` so no home path is committed.)
+ * Ported 34-case quote-gate suite (15 `_MUST_BLOCK` + 19 `_MUST_PASS`).
+ * Supplied speakers (`Director`, `Ada`, `He`, `She`, `They`, `the User`) and the
+ * extra law-file allowlist suffix are passed via `profiles.json` config rather than
+ * hard-coded in source.
  */
+export const QUOTE_GATE_TEST_SPEAKERS: readonly string[] = [
+  "Director",
+  "Ada",
+  "He",
+  "She",
+  "They",
+  "the User",
+];
+
 export const QUOTE_GATE_MUST_BLOCK: ReadonlyArray<readonly [string, string]> = [
   [
     "P1 practice marker",
@@ -913,7 +1002,7 @@ export const QUOTE_GATE_MUST_BLOCK: ReadonlyArray<readonly [string, string]> = [
   ],
   [
     "P2 past attribution + long span",
-    'Mike said: "the whole thing needs to be rebuilt from the ground up again".',
+    'Ada said: "the whole thing needs to be rebuilt from the ground up again".',
   ],
   [
     "P2 possessive + first person",
@@ -957,14 +1046,14 @@ export const QUOTE_GATE_MUST_BLOCK: ReadonlyArray<readonly [string, string]> = [
   ],
   [
     "P2 dated, no colon",
-    'Director 2026-10-23 "I would rather you delegate the writing to the other seats".',
+    'Director 2026-10-23 "I would rather you delegate the writing to the other profiles".',
   ],
 ];
 
 export const QUOTE_GATE_MUST_PASS: ReadonlyArray<readonly [string, string]> = [
   [
     "trigger phrase, present frame",
-    'When Mike says "dogfood swarm" on a repo, execute the funnel above.',
+    'When Ada says "dogfood swarm" on a repo, execute the funnel above.',
   ],
   [
     "trigger phrase in description",
@@ -984,7 +1073,7 @@ export const QUOTE_GATE_MUST_PASS: ReadonlyArray<readonly [string, string]> = [
   ],
   [
     "paraphrased decision",
-    "Mike ruled it a law on the spot: no public surface is ever outsourced.",
+    "Ada ruled it a law on the spot: no public surface is ever outsourced.",
   ],
   [
     "plain block quote / character dialogue",
@@ -1040,29 +1129,65 @@ export const QUOTE_GATE_MUST_PASS: ReadonlyArray<readonly [string, string]> = [
   ],
 ];
 
-describe("Part 3: the first five rules (unreviewed-merge, director-quote, memory-shell-write, future-stamp, release-reminder)", () => {
+describe("Part 3: the five generic rules (unreviewed-merge, quote-gate, memory-shell-write, future-stamp, release-reminder)", () => {
   let tempDir: string;
-  let seatsPath: string;
+  let profilesPath: string;
   let logPath: string;
-  const configuredStore = "E:/AI/CustomSeatStore/memory";
+  const configuredStore = "E:/AI/CustomProfileStore/memory";
 
   beforeEach(() => {
     tempDir = mkdtempSync(join(tmpdir(), "loadout-pretool-p3-"));
-    seatsPath = join(tempDir, "seats.json");
+    profilesPath = join(tempDir, "profiles.json");
     logPath = join(tempDir, "hook-decisions.jsonl");
     writeFileSync(
-      seatsPath,
+      profilesPath,
       JSON.stringify(
         {
-          seats: {
+          profiles: {
             "E:/AI/Research and Development": {
-              seat: "rnd",
+              profile: "docs",
               store: configuredStore,
             },
             "E:/AI/Publisher": {
-              seat: "publisher",
-              store: "E:/AI/PublisherStore/memory",
+              profile: "release",
+              store: "E:/AI/ReleaseStore/memory",
             },
+          },
+          rules: {
+            "unreviewed-merge": {
+              memory: { docs: "docs-merge-policy", release: "release-merge-policy" },
+              note: {
+                docs: "Docs profile: route reviewed PRs to release maintainers.",
+                release: "Release profile: confirm required checks and ledger entry.",
+              },
+            },
+            "quote-gate": {
+              memory: {
+                default: "default-quote-policy",
+                docs: "docs-quote-policy",
+                release: "release-quote-policy",
+              },
+            },
+            "memory-shell-write": {
+              memory: { docs: "docs-memory-policy", release: "release-memory-policy" },
+            },
+            "future-stamp": {
+              memory: { docs: "docs-memory-policy", release: "release-memory-policy" },
+            },
+            "release-reminder": {
+              memory: { docs: "docs-release-policy", release: "release-merge-policy" },
+              skill: "release-checklist",
+              note: {
+                release: "Run release checklist before publishing.",
+              },
+            },
+          },
+          ruleAliases: {
+            "legacy-quote-rule": "quote-gate",
+          },
+          quoteGate: {
+            speakers: QUOTE_GATE_TEST_SPEAKERS,
+            allowlistSuffixes: ["feedback/feedback_never_quote_the_director.md"],
           },
         },
         null,
@@ -1077,8 +1202,8 @@ describe("Part 3: the first five rules (unreviewed-merge, director-quote, memory
   });
 
   // ── 3.1 unreviewed-merge ──────────────────────────────────────
-  describe("3.1 unreviewed-merge (Layer A, permanently warn-only on every seat per Ruling 2)", () => {
-    it("warns on `gh pr merge` and `gatemerge` (any path/form) on R&D, Publisher, and default seats (never blocks), naming the seat's memory id", () => {
+  describe("3.1 unreviewed-merge (Layer A, warn-only across all profiles)", () => {
+    it("warns on `gh pr merge` and `gatemerge` (any path/form) on configured and default profiles (never blocks), citing configured memory ids and notes", () => {
       const mergeCommands = [
         "gh pr merge 21 --squash",
         "gh -R mcp-tool-shop-org/loadout-os pr merge 21",
@@ -1088,52 +1213,50 @@ describe("Part 3: the first five rules (unreviewed-merge, director-quote, memory
       ];
 
       for (const command of mergeCommands) {
-        // R&D seat -> warn (exit 0, permanently warn-only per Ruling 2)
-        const rndRes = runPreTool({
+        // docs profile -> warn with configured memory id & note
+        const docsRes = runPreTool({
           stdinJson: JSON.stringify({
             tool_name: "Bash",
             tool_input: { command },
             cwd: "E:/AI/Research and Development",
           }),
-          seatsPath,
+          profilesPath,
           logPath,
         });
-        assert.equal(rndRes.exitCode, 0, `R&D should warn (never block): ${command}`);
-        assert.equal(rndRes.outcome, "warn");
-        assert.match(rndRes.stdout, /R&D hands reviewed PRs to the Publisher to merge/i);
-        assert.match(rndRes.stdout, /publisher-merges/);
-        assert.match(rndRes.stdout, /other-family verdict at the exact head sha/);
-        assert.doesNotMatch(rndRes.stdout, /Argon/);
+        assert.equal(docsRes.exitCode, 0, `docs should warn (never block): ${command}`);
+        assert.equal(docsRes.outcome, "warn");
+        assert.match(docsRes.stdout, /docs-merge-policy/);
+        assert.match(docsRes.stdout, /Docs profile: route reviewed PRs to release maintainers/);
+        assert.match(docsRes.stdout, /Confirm a recorded review pass matches the exact PR head commit/);
 
-        // Publisher seat -> warn (exit 0 + other-family verdict reminder mentioning ledger step 2 and rule-coordinator-and-merges)
-        const pubRes = runPreTool({
+        // release profile -> warn with configured memory id & note
+        const relRes = runPreTool({
           stdinJson: JSON.stringify({
             tool_name: "Bash",
             tool_input: { command },
             cwd: "E:/AI/Publisher",
           }),
-          seatsPath,
+          profilesPath,
           logPath,
         });
-        assert.equal(pubRes.exitCode, 0, `Publisher should warn: ${command}`);
-        assert.equal(pubRes.outcome, "warn");
-        assert.match(pubRes.stdout, /other-family verdict at the exact head sha/);
-        assert.doesNotMatch(pubRes.stdout, /Argon/);
-        assert.match(pubRes.stdout, /step 2/);
-        assert.match(pubRes.stdout, /rule-coordinator-and-merges/);
+        assert.equal(relRes.exitCode, 0, `release should warn: ${command}`);
+        assert.equal(relRes.outcome, "warn");
+        assert.match(relRes.stdout, /release-merge-policy/);
+        assert.match(relRes.stdout, /Release profile: confirm required checks and ledger entry/);
 
-        // Default seat -> warn
+        // default profile (no memory configured) -> neutral warn without "(memory:"
         const defRes = runPreTool({
           stdinJson: JSON.stringify({
             tool_name: "Bash",
             tool_input: { command },
             cwd: "E:/AI/UnmappedRepo",
           }),
-          seatsPath,
+          profilesPath,
           logPath,
         });
         assert.equal(defRes.exitCode, 0, `Default should warn: ${command}`);
         assert.equal(defRes.outcome, "warn");
+        assert.equal(defRes.stdout.includes("(memory:"), false);
       }
     });
 
@@ -1141,12 +1264,12 @@ describe("Part 3: the first five rules (unreviewed-merge, director-quote, memory
       const repliesDir = join(tempDir, "replies");
       mkdirSync(repliesDir, { recursive: true });
       writeFileSync(
-        seatsPath,
+        profilesPath,
         JSON.stringify({
           repliesDir,
-          seats: {
-            "E:/AI/Research and Development": { seat: "rnd", store: configuredStore },
-            "E:/AI/Publisher": { seat: "publisher", store: "E:/AI/PublisherStore/memory" },
+          profiles: {
+            "E:/AI/Research and Development": { profile: "docs", store: configuredStore },
+            "E:/AI/Publisher": { profile: "release", store: "E:/AI/ReleaseStore/memory" },
           },
         }),
         "utf-8",
@@ -1164,7 +1287,7 @@ describe("Part 3: the first five rules (unreviewed-merge, director-quote, memory
           tool_input: { command: mergeWithMatchHead },
           cwd: "E:/AI/Publisher",
         }),
-        seatsPath,
+        profilesPath,
         logPath,
       });
       assert.equal(noReplyRes.outcome, "warn");
@@ -1181,7 +1304,7 @@ describe("Part 3: the first five rules (unreviewed-merge, director-quote, memory
           tool_input: { command: mergeWithMatchHead },
           cwd: "E:/AI/Publisher",
         }),
-        seatsPath,
+        profilesPath,
         logPath,
       });
       assert.equal(fixReplyRes.outcome, "warn");
@@ -1198,7 +1321,7 @@ describe("Part 3: the first five rules (unreviewed-merge, director-quote, memory
           tool_input: { command: mergeWithMatchHead },
           cwd: "E:/AI/Publisher",
         }),
-        seatsPath,
+        profilesPath,
         logPath,
       });
       assert.equal(wrongHeadRes.outcome, "warn");
@@ -1216,7 +1339,7 @@ describe("Part 3: the first five rules (unreviewed-merge, director-quote, memory
             tool_input: { command: cmd },
             cwd: "E:/AI/Publisher",
           }),
-          seatsPath,
+          profilesPath,
           logPath,
         });
         assert.equal(passReplyRes.exitCode, 0);
@@ -1226,9 +1349,64 @@ describe("Part 3: the first five rules (unreviewed-merge, director-quote, memory
     });
   });
 
-  // ── 3.2 director-quote (quote-gate.py port) ───────────────────
-  describe("3.2 director-quote (Layer A, all 34 quote-gate.py self-test cases)", () => {
-    it("blocks all 15 _MUST_BLOCK cases and passes all 19 _MUST_PASS cases from quote-gate.py (34/34)", () => {
+  // ── 3.2 quote-gate (configurable speakers & allowlist) ────────
+  describe("3.2 quote-gate (Layer A, default generic speakers + 34/34 cases with speakers from config)", () => {
+    it("shipped default speakers include only pronouns and generic role nouns (no personal names)", () => {
+      assert.deepEqual(DEFAULT_QUOTE_GATE_SPEAKERS, ["He", "She", "They", "the User"]);
+      assert.deepEqual(QUOTE_GATE_ALLOWLIST_SUFFIXES, [
+        "packages/cli/src/pretool-rules.ts",
+        "packages/cli/src/tests/pretool.test.ts",
+      ]);
+
+      // With no config (shipped default speakers), pronouns and "the User" match, while unconfigured names pass
+      const emptyProfiles = join(tempDir, "empty-profiles.json");
+      writeFileSync(emptyProfiles, JSON.stringify({}), "utf-8");
+
+      const pronounBlock = runPreTool({
+        stdinJson: JSON.stringify({
+          tool_name: "Write",
+          tool_input: {
+            file_path: "docs/handoff.md",
+            content: 'His verdict: "I would rather wait than ship this."',
+          },
+          cwd: "E:/AI/OtherRepo",
+        }),
+        profilesPath: emptyProfiles,
+        logPath,
+      });
+      assert.equal(pronounBlock.exitCode, 2);
+      assert.equal(pronounBlock.stderr.includes("(memory:"), false);
+
+      const userBlock = runPreTool({
+        stdinJson: JSON.stringify({
+          tool_name: "Write",
+          tool_input: {
+            file_path: "docs/handoff.md",
+            content: 'The User said: "I need every change verified before merge."\n',
+          },
+          cwd: "E:/AI/OtherRepo",
+        }),
+        profilesPath: emptyProfiles,
+        logPath,
+      });
+      assert.equal(userBlock.exitCode, 2);
+
+      const unconfiguredNameAllow = runPreTool({
+        stdinJson: JSON.stringify({
+          tool_name: "Write",
+          tool_input: {
+            file_path: "docs/handoff.md",
+            content: 'Ada said: "the whole thing needs to be rebuilt from the ground up again".',
+          },
+          cwd: "E:/AI/OtherRepo",
+        }),
+        profilesPath: emptyProfiles,
+        logPath,
+      });
+      assert.equal(unconfiguredNameAllow.exitCode, 0);
+    });
+
+    it("blocks all 15 _MUST_BLOCK cases and passes all 19 _MUST_PASS cases (34/34) when speakers are supplied by config", () => {
       assert.equal(QUOTE_GATE_MUST_BLOCK.length, 15);
       assert.equal(QUOTE_GATE_MUST_PASS.length, 19);
 
@@ -1242,8 +1420,12 @@ describe("Part 3: the first five rules (unreviewed-merge, director-quote, memory
           ? { command: text }
           : { file_path: "docs/handoff.md", content: text };
 
-        const extracted = quoteTextsFromTool(toolName, toolInput);
-        const violations = extracted.flatMap((t) => findQuoteViolations(t));
+        const extracted = quoteTextsFromTool(toolName, toolInput, [
+          "feedback/feedback_never_quote_the_director.md",
+        ]);
+        const violations = extracted.flatMap((t) =>
+          findQuoteViolations(t, QUOTE_GATE_TEST_SPEAKERS),
+        );
         assert.ok(
           violations.length > 0,
           `Expected _MUST_BLOCK case '${name}' to produce violations`,
@@ -1255,7 +1437,7 @@ describe("Part 3: the first five rules (unreviewed-merge, director-quote, memory
             tool_input: toolInput,
             cwd: "E:/AI/Research and Development",
           }),
-          seatsPath,
+          profilesPath,
           logPath,
         });
         assert.equal(
@@ -1276,8 +1458,12 @@ describe("Part 3: the first five rules (unreviewed-merge, director-quote, memory
           ? { command: text }
           : { file_path: "docs/handoff.md", content: text };
 
-        const extracted = quoteTextsFromTool(toolName, toolInput);
-        const violations = extracted.flatMap((t) => findQuoteViolations(t));
+        const extracted = quoteTextsFromTool(toolName, toolInput, [
+          "feedback/feedback_never_quote_the_director.md",
+        ]);
+        const violations = extracted.flatMap((t) =>
+          findQuoteViolations(t, QUOTE_GATE_TEST_SPEAKERS),
+        );
         assert.equal(
           violations.length,
           0,
@@ -1290,7 +1476,7 @@ describe("Part 3: the first five rules (unreviewed-merge, director-quote, memory
             tool_input: toolInput,
             cwd: "E:/AI/Research and Development",
           }),
-          seatsPath,
+          profilesPath,
           logPath,
         });
         assert.equal(
@@ -1301,7 +1487,7 @@ describe("Part 3: the first five rules (unreviewed-merge, director-quote, memory
       }
     });
 
-    it("blocks quotes in Edit, MultiEdit, git tag -m, and gh pr/issue/release, while allowing allowlisted law files", () => {
+    it("blocks quotes in Edit, MultiEdit, git tag -m, and gh pr/issue/release, while allowing configured allowlist suffixes", () => {
       const editRes = runPreTool({
         stdinJson: JSON.stringify({
           tool_name: "Edit",
@@ -1312,7 +1498,7 @@ describe("Part 3: the first five rules (unreviewed-merge, director-quote, memory
           },
           cwd: "E:/AI/Publisher",
         }),
-        seatsPath,
+        profilesPath,
         logPath,
       });
       assert.equal(editRes.exitCode, 2);
@@ -1326,7 +1512,7 @@ describe("Part 3: the first five rules (unreviewed-merge, director-quote, memory
           },
           cwd: "E:/AI/Unmapped",
         }),
-        seatsPath,
+        profilesPath,
         logPath,
       });
       assert.equal(ghPrRes.exitCode, 2);
@@ -1341,10 +1527,27 @@ describe("Part 3: the first five rules (unreviewed-merge, director-quote, memory
           },
           cwd: "E:/AI/Research and Development",
         }),
-        seatsPath,
+        profilesPath,
         logPath,
       });
       assert.equal(allowlistedWrite.exitCode, 0);
+
+      // Without configured allowlistSuffixes, external law file is NOT allowlisted by default
+      const defaultProfiles = join(tempDir, "default-only.json");
+      writeFileSync(defaultProfiles, JSON.stringify({}), "utf-8");
+      const notAllowlistedByDefault = runPreTool({
+        stdinJson: JSON.stringify({
+          tool_name: "Write",
+          tool_input: {
+            file_path: "/home/user/.claude/hooks/quote-gate.py",
+            content: 'His verdict: "I would rather wait than ship this."',
+          },
+          cwd: "E:/AI/Unmapped",
+        }),
+        profilesPath: defaultProfiles,
+        logPath,
+      });
+      assert.equal(notAllowlistedByDefault.exitCode, 2);
     });
   });
 
@@ -1353,19 +1556,19 @@ describe("Part 3: the first five rules (unreviewed-merge, director-quote, memory
     it("blocks redirection, tee, sed -i, cp, mv, rm, touch, python/node inline/heredoc writes, and git -C <store> commit/checkout/reset", () => {
       const claudeStoreFile =
         "~/.claude/projects/E--AI-Research-and-Development/memory/BOARD.md";
-      const seatStoreFile = `${configuredStore}/topic.md`;
+      const profileStoreFile = `${configuredStore}/topic.md`;
 
       const blockedShellWrites = [
         `echo "hi" > ${claudeStoreFile}`,
-        `echo "hi" >> ${seatStoreFile}`,
+        `echo "hi" >> ${profileStoreFile}`,
         `cat notes.md | tee ${claudeStoreFile}`,
-        `sed -i 's/old/new/' ${seatStoreFile}`,
+        `sed -i 's/old/new/' ${profileStoreFile}`,
         `cp /tmp/draft.md ${claudeStoreFile}`,
-        `mv /tmp/draft.md ${seatStoreFile}`,
+        `mv /tmp/draft.md ${profileStoreFile}`,
         `rm -f ${claudeStoreFile}`,
-        `touch ${seatStoreFile}`,
-        `python -c "open('${seatStoreFile}', 'w').write('x')"`,
-        `node -e "fs.writeFileSync('${seatStoreFile}', 'x')"`,
+        `touch ${profileStoreFile}`,
+        `python -c "open('${profileStoreFile}', 'w').write('x')"`,
+        `node -e "fs.writeFileSync('${profileStoreFile}', 'x')"`,
         `python - <<EOF\nwith open('${claudeStoreFile}', 'w') as f:\n    f.write('hi')\nEOF`,
         `git -C ${configuredStore} commit -m "manual store commit"`,
         `git -C ${configuredStore} checkout -- MEMORY.md`,
@@ -1379,7 +1582,7 @@ describe("Part 3: the first five rules (unreviewed-merge, director-quote, memory
             tool_input: { command },
             cwd: "E:/AI/Research and Development",
           }),
-          seatsPath,
+          profilesPath,
           logPath,
         });
         assert.equal(
@@ -1410,7 +1613,7 @@ describe("Part 3: the first five rules (unreviewed-merge, director-quote, memory
             tool_input: { command },
             cwd: "E:/AI/Research and Development",
           }),
-          seatsPath,
+          profilesPath,
           logPath,
         });
         assert.equal(
@@ -1430,7 +1633,7 @@ describe("Part 3: the first five rules (unreviewed-merge, director-quote, memory
           },
           cwd: "E:/AI/Research and Development",
         }),
-        seatsPath,
+        profilesPath,
         logPath,
       });
       assert.equal(writeRes.exitCode, 0);
@@ -1464,7 +1667,7 @@ describe("Part 3: the first five rules (unreviewed-merge, director-quote, memory
             },
             cwd: "E:/AI/Research and Development",
           }),
-          seatsPath,
+          profilesPath,
           logPath,
           nowMs: fixedClockMs,
         });
@@ -1491,7 +1694,7 @@ describe("Part 3: the first five rules (unreviewed-merge, director-quote, memory
           },
           cwd: "E:/AI/Research and Development",
         }),
-        seatsPath,
+        profilesPath,
         logPath,
         nowMs: fixedClockMs,
       });
@@ -1516,7 +1719,7 @@ describe("Part 3: the first five rules (unreviewed-merge, director-quote, memory
             },
             cwd: "E:/AI/Research and Development",
           }),
-          seatsPath,
+          profilesPath,
           logPath,
           nowMs: clock,
         });
@@ -1536,7 +1739,7 @@ describe("Part 3: the first five rules (unreviewed-merge, director-quote, memory
           },
           cwd: "E:/AI/Research and Development",
         }),
-        seatsPath,
+        profilesPath,
         logPath,
         nowMs: clock1739Ms,
       });
@@ -1558,7 +1761,7 @@ describe("Part 3: the first five rules (unreviewed-merge, director-quote, memory
             },
             cwd: "E:/AI/Research and Development",
           }),
-          seatsPath,
+          profilesPath,
           logPath,
           nowMs: clock1739Ms,
         });
@@ -1577,7 +1780,7 @@ describe("Part 3: the first five rules (unreviewed-merge, director-quote, memory
           },
           cwd: "E:/AI/Research and Development",
         }),
-        seatsPath,
+        profilesPath,
         logPath,
         nowMs: fixedClockMs,
       });
@@ -1595,7 +1798,7 @@ describe("Part 3: the first five rules (unreviewed-merge, director-quote, memory
           },
           cwd: "E:/AI/Research and Development",
         }),
-        seatsPath,
+        profilesPath,
         logPath,
         nowMs: fixedClockMs,
       });
@@ -1619,11 +1822,11 @@ describe("Part 3: the first five rules (unreviewed-merge, director-quote, memory
           tool_input: {
             file_path: `${configuredStore}/BOARD.md`,
             content:
-              "# R&D Board\n\n**Last updated:** 2026-11-08 15:03 ET (clock-checked). loadout-os 1.1.1 live.\n\n- Milestone 2: due 2026-12-01 (hard deadline)\n",
+              "# Project Board\n\n**Last updated:** 2026-11-08 15:03 ET (clock-checked). loadout-os 1.1.1 live.\n\n- Milestone 2: due 2026-12-01 (hard deadline)\n",
           },
           cwd: "E:/AI/Research and Development",
         }),
-        seatsPath,
+        profilesPath,
         logPath,
         nowMs: fixedClockMs,
       });
@@ -1672,7 +1875,7 @@ describe("Part 3: the first five rules (unreviewed-merge, director-quote, memory
           },
           cwd: "E:/AI/Publisher",
         }),
-        seatsPath,
+        profilesPath,
         logPath,
         nowMs: clock1757Ms,
       });
@@ -1691,7 +1894,7 @@ describe("Part 3: the first five rules (unreviewed-merge, director-quote, memory
           },
           cwd: "E:/AI/Publisher",
         }),
-        seatsPath,
+        profilesPath,
         logPath,
         nowMs: clock1757Ms,
       });
@@ -1710,7 +1913,7 @@ describe("Part 3: the first five rules (unreviewed-merge, director-quote, memory
           },
           cwd: "E:/AI/Publisher",
         }),
-        seatsPath,
+        profilesPath,
         logPath,
         nowMs: clock1757Ms,
       });
@@ -1733,7 +1936,7 @@ describe("Part 3: the first five rules (unreviewed-merge, director-quote, memory
             },
             cwd: "E:/AI/Publisher",
           }),
-          seatsPath,
+          profilesPath,
           logPath,
           nowMs: clock1757Ms,
         });
@@ -1756,7 +1959,7 @@ describe("Part 3: the first five rules (unreviewed-merge, director-quote, memory
             },
             cwd: "E:/AI/Publisher",
           }),
-          seatsPath,
+          profilesPath,
           logPath,
           nowMs: clock1757Ms,
         });
@@ -1788,7 +1991,7 @@ describe("Part 3: the first five rules (unreviewed-merge, director-quote, memory
             },
             cwd: "E:/AI/Research and Development",
           }),
-          seatsPath,
+          profilesPath,
           logPath,
           nowMs: fixedClockMs,
         });
@@ -1806,7 +2009,7 @@ describe("Part 3: the first five rules (unreviewed-merge, director-quote, memory
           },
           cwd: "E:/AI/Research and Development",
         }),
-        seatsPath,
+        profilesPath,
         logPath,
         nowMs: fixedClockMs,
       });
@@ -1822,8 +2025,8 @@ describe("Part 3: the first five rules (unreviewed-merge, director-quote, memory
   });
 
   // ── 3.5 release-reminder (Layer B) ────────────────────────────
-  describe("3.5 release-reminder (Layer B, soft warn on all seats)", () => {
-    it("warns on `npm publish`, `gh release create`, and `git push --tags` across all seats, and stays silent on dry-run or normal push", () => {
+  describe("3.5 release-reminder (Layer B, soft warn on all profiles)", () => {
+    it("warns on `npm publish`, `gh release create`, and `git push --tags` across all profiles, and stays silent on dry-run or normal push", () => {
       const releaseCommands = [
         "npm publish",
         "npm publish --access public",
@@ -1834,9 +2037,9 @@ describe("Part 3: the first five rules (unreviewed-merge, director-quote, memory
 
       for (const command of releaseCommands) {
         for (const [cwd, expectedMemId] of [
-          ["E:/AI/Research and Development", /publisher-approves-every-publish/],
-          ["E:/AI/Publisher", /rule-coordinator-and-merges/],
-          ["E:/AI/OtherRepo", /publisher-approves-every-publish/],
+          ["E:/AI/Research and Development", /docs-release-policy/],
+          ["E:/AI/Publisher", /release-merge-policy/],
+          ["E:/AI/OtherRepo", /Confirm release readiness/],
         ] as const) {
           const res = runPreTool({
             stdinJson: JSON.stringify({
@@ -1844,13 +2047,12 @@ describe("Part 3: the first five rules (unreviewed-merge, director-quote, memory
               tool_input: { command },
               cwd,
             }),
-            seatsPath,
+            profilesPath,
             logPath,
           });
           assert.equal(res.exitCode, 0);
           assert.equal(res.outcome, "warn");
           assert.match(res.stdout, expectedMemId);
-          assert.match(res.stdout, /full-treatment/);
         }
       }
 
@@ -1866,7 +2068,7 @@ describe("Part 3: the first five rules (unreviewed-merge, director-quote, memory
             tool_input: { command: safeCmd },
             cwd: "E:/AI/Publisher",
           }),
-          seatsPath,
+          profilesPath,
           logPath,
         });
         assert.equal(res.exitCode, 0);
@@ -1902,26 +2104,29 @@ export {
 
 describe("Part 5: 2026-11-08 four-slip replay fixture (4/4 blocked, 4/4 matching calls pass)", () => {
   let tempDir: string;
-  let seatsPath: string;
+  let profilesPath: string;
   let logPath: string;
 
   beforeEach(() => {
     tempDir = mkdtempSync(join(tmpdir(), "loadout-pretool-p5-"));
-    seatsPath = join(tempDir, "seats.json");
+    profilesPath = join(tempDir, "profiles.json");
     logPath = join(tempDir, "hook-decisions.jsonl");
     writeFileSync(
-      seatsPath,
+      profilesPath,
       JSON.stringify(
         {
-          seats: {
+          profiles: {
             "E:/AI/Research and Development": {
-              seat: "rnd",
+              profile: "docs",
               store: REPLAY_2026_11_08_STORE,
             },
             "E:/AI/Publisher": {
-              seat: "publisher",
+              profile: "release",
               store: REPLAY_2026_11_08_STORE,
             },
+          },
+          quoteGate: {
+            speakers: QUOTE_GATE_TEST_SPEAKERS,
           },
         },
         null,
@@ -1949,7 +2154,7 @@ describe("Part 5: 2026-11-08 four-slip replay fixture (4/4 blocked, 4/4 matching
       // 1. In-process check: violating slip
       const blockRes = runPreTool({
         stdinJson: JSON.stringify(pair.blockedStdin),
-        seatsPath,
+        profilesPath,
         logPath,
         nowMs: REPLAY_2026_11_08_CLOCK_MS,
       });
@@ -1981,8 +2186,8 @@ describe("Part 5: 2026-11-08 four-slip replay fixture (4/4 blocked, 4/4 matching
           cliEntry,
           "hook",
           "pre-tool",
-          "--seats",
-          seatsPath,
+          "--profiles",
+          profilesPath,
           "--log",
           logPath,
           "--now",
@@ -2010,7 +2215,7 @@ describe("Part 5: 2026-11-08 four-slip replay fixture (4/4 blocked, 4/4 matching
       // 3. In-process check: matching allowed call
       const allowRes = runPreTool({
         stdinJson: JSON.stringify(pair.allowedStdin),
-        seatsPath,
+        profilesPath,
         logPath,
         nowMs: REPLAY_2026_11_08_CLOCK_MS,
       });
@@ -2029,8 +2234,8 @@ describe("Part 5: 2026-11-08 four-slip replay fixture (4/4 blocked, 4/4 matching
           cliEntry,
           "hook",
           "pre-tool",
-          "--seats",
-          seatsPath,
+          "--profiles",
+          profilesPath,
           "--log",
           logPath,
           "--now",
@@ -2159,7 +2364,7 @@ describe("Part 5: 2026-11-08 four-slip replay fixture (4/4 blocked, 4/4 matching
       const t0 = performance.now();
       runPreTool({
         stdinJson,
-        seatsPath,
+        profilesPath,
         logPath,
         nowMs: REPLAY_2026_11_08_CLOCK_MS,
       });
@@ -2190,31 +2395,31 @@ import { resolveRuleMemory } from "../pretool.js";
 
 describe("Part 6: Issue #25 (P1.1–P4.15) and log-only rulings", () => {
   let tempDir: string;
-  let seatsPath: string;
+  let profilesPath: string;
   let logPath: string;
   let storeDir: string;
   const fixedClockMs = Date.UTC(2026, 10, 8, 20, 44, 0, 0); // 2026-11-08 15:44 ET
 
   beforeEach(() => {
     tempDir = mkdtempSync(join(tmpdir(), "loadout-pretool-25-"));
-    seatsPath = join(tempDir, "seats.json");
+    profilesPath = join(tempDir, "profiles.json");
     logPath = join(tempDir, "hook-decisions.jsonl");
     storeDir = join(tempDir, "store", "memory");
     mkdirSync(storeDir, { recursive: true });
 
     writeFileSync(
-      seatsPath,
+      profilesPath,
       JSON.stringify(
         {
-          seats: {
+          profiles: {
             "E:/AI/Research and Development": {
-              seat: "rnd",
+              profile: "docs",
               store: storeDir,
               worktrees: ["E:/AI/_worktrees/loadout-os-25-pr1"],
             },
             "E:/AI/Publisher": {
-              seat: "publisher",
-              store: "E:/AI/PublisherStore/memory",
+              profile: "release",
+              store: "E:/AI/ReleaseStore/memory",
               prefixes: ["E:/AI/_worktrees/publisher-pr"],
             },
           },
@@ -2253,17 +2458,17 @@ describe("Part 6: Issue #25 (P1.1–P4.15) and log-only rulings", () => {
           tool_input: { command: cmd },
           cwd: "E:/AI/Research and Development",
         }),
-        seatsPath,
+        profilesPath,
         logPath,
       });
       assert.equal(res.passThrough, false, `Expected passThrough=false for: ${cmd}`);
     }
   });
 
-  it("P1.2: resolves worktree and extra prefix roots per seat from seats.json (`worktrees` / `prefixes`)", () => {
-    const cfg = loadSeatConfig(seatsPath);
-    assert.equal(resolveSeat("E:/AI/_worktrees/loadout-os-25-pr1/packages/cli", cfg), "rnd");
-    assert.equal(resolveSeat("E:/AI/_worktrees/publisher-pr/src", cfg), "publisher");
+  it("P1.2: resolves worktree and extra prefix roots per profile from profiles.json (`worktrees` / `prefixes`)", () => {
+    const cfg = loadProfileConfig(profilesPath);
+    assert.equal(resolveProfile("E:/AI/_worktrees/loadout-os-25-pr1/packages/cli", cfg), "docs");
+    assert.equal(resolveProfile("E:/AI/_worktrees/publisher-pr/src", cfg), "release");
   });
 
   it("P1.3: disables read-only pass-through on `sed -n` scripts containing the `w` or `W` write command", () => {
@@ -2307,7 +2512,7 @@ describe("Part 6: Issue #25 (P1.1–P4.15) and log-only rulings", () => {
           tool_input: { command },
           cwd: "E:/AI/Research and Development",
         }),
-        seatsPath,
+        profilesPath,
         logPath,
       });
       assert.equal(res.exitCode, 2, `Expected P2.4 block for: ${command}`);
@@ -2338,7 +2543,7 @@ describe("Part 6: Issue #25 (P1.1–P4.15) and log-only rulings", () => {
           tool_input: { command },
           cwd: "E:/AI/Research and Development",
         }),
-        seatsPath,
+        profilesPath,
         logPath,
       });
       assert.equal(res.exitCode, 2, `Expected P2.5 block for: ${command}`);
@@ -2362,7 +2567,7 @@ describe("Part 6: Issue #25 (P1.1–P4.15) and log-only rulings", () => {
           tool_input: { command: cmd },
           cwd: "E:/AI/Research and Development",
         }),
-        seatsPath,
+        profilesPath,
         logPath,
       });
       assert.equal(res.exitCode, 2, `Expected P2.6 block after cd <store> for: ${cmd}`);
@@ -2381,7 +2586,7 @@ describe("Part 6: Issue #25 (P1.1–P4.15) and log-only rulings", () => {
           tool_input: { command: cmd },
           cwd: storeSlash,
         }),
-        seatsPath,
+        profilesPath,
         logPath,
       });
       assert.equal(res.exitCode, 2, `Expected P2.6 block when cwd is inside store for: ${cmd}`);
@@ -2399,7 +2604,7 @@ describe("Part 6: Issue #25 (P1.1–P4.15) and log-only rulings", () => {
           tool_input: { command: cmd },
           cwd: "E:/AI/Research and Development",
         }),
-        seatsPath,
+        profilesPath,
         logPath,
       });
       assert.equal(res.exitCode, 2, `Expected P2.7 block for: ${cmd}`);
@@ -2408,17 +2613,17 @@ describe("Part 6: Issue #25 (P1.1–P4.15) and log-only rulings", () => {
   });
 
   it("P2.8: normalizes `%USERPROFILE%`, `$USERPROFILE`, `$HOME`, quoted `~`, and doubled backslashes `\\\\` on store paths", () => {
-    // Configure a custom store under ~/custom-seat-store/memory (no .claude/projects fragment)
+    // Configure a custom store under ~/custom-profile-store/memory (no .claude/projects fragment)
     // so each test strictly depends on its corresponding path normalization step.
-    const customSeatsPath = join(tempDir, "seats-p28.json");
+    const customProfilesPath = join(tempDir, "profiles-p28.json");
     writeFileSync(
-      customSeatsPath,
+      customProfilesPath,
       JSON.stringify({
         stores: [storeDir],
-        seats: {
+        profiles: {
           "E:/AI/Research and Development": {
-            seat: "rnd",
-            store: "~/custom-seat-store/memory",
+            profile: "docs",
+            store: "~/custom-profile-store/memory",
           },
         },
       }),
@@ -2429,11 +2634,11 @@ describe("Part 6: Issue #25 (P1.1–P4.15) and log-only rulings", () => {
       "e:/ai/research and development",
     );
     const commands = [
-      'rm "%USERPROFILE%/custom-seat-store/memory/BOARD.md"',
-      'rm "$HOME/custom-seat-store/memory/BOARD.md"',
-      'rm "$USERPROFILE/custom-seat-store/memory/BOARD.md"',
-      'rm "~/custom-seat-store/memory/BOARD.md"',
-      'python -c "open(\'%USERPROFILE%/custom-seat-store/memory/BOARD.md\', \'w\').write(\'x\')"',
+      'rm "%USERPROFILE%/custom-profile-store/memory/BOARD.md"',
+      'rm "$HOME/custom-profile-store/memory/BOARD.md"',
+      'rm "$USERPROFILE/custom-profile-store/memory/BOARD.md"',
+      'rm "~/custom-profile-store/memory/BOARD.md"',
+      'python -c "open(\'%USERPROFILE%/custom-profile-store/memory/BOARD.md\', \'w\').write(\'x\')"',
       `rm "${storeDir.replace(/[\\/]+/g, "\\\\")}\\\\BOARD.md"`,
     ];
     for (const command of commands) {
@@ -2443,11 +2648,11 @@ describe("Part 6: Issue #25 (P1.1–P4.15) and log-only rulings", () => {
           tool_input: { command },
           cwd: "E:\\\\AI\\\\Research and Development",
         }),
-        seatsPath: customSeatsPath,
+        profilesPath: customProfilesPath,
         logPath,
       });
       assert.equal(res.exitCode, 2, `Expected P2.8 block for: ${command}`);
-      assert.equal(res.logEntry?.seat, "rnd");
+      assert.equal(res.logEntry?.profile, "docs");
       assert.ok(res.logEntry?.matched.some((m) => m.id === "memory-shell-write"));
     }
   });
@@ -2467,7 +2672,7 @@ describe("Part 6: Issue #25 (P1.1–P4.15) and log-only rulings", () => {
           tool_input: { command: cmd },
           cwd: "E:/AI/Research and Development",
         }),
-        seatsPath,
+        profilesPath,
         logPath,
       });
       assert.equal(res.exitCode, 0, `sed -i on non-store file should be allowed: ${cmd}`);
@@ -2479,7 +2684,7 @@ describe("Part 6: Issue #25 (P1.1–P4.15) and log-only rulings", () => {
     const boardPath = join(storeDir, "BOARD.md");
     writeFileSync(
       boardPath,
-      "# R&D Board\n\n**Last updated:** 2026-11-08 15:03 ET (clock-checked).\n",
+      "# Project Board\n\n**Last updated:** 2026-11-08 15:03 ET (clock-checked).\n",
       "utf-8",
     );
 
@@ -2494,7 +2699,7 @@ describe("Part 6: Issue #25 (P1.1–P4.15) and log-only rulings", () => {
         },
         cwd: "E:/AI/Research and Development",
       }),
-      seatsPath,
+      profilesPath,
       logPath,
       nowMs: fixedClockMs,
     });
@@ -2513,7 +2718,7 @@ describe("Part 6: Issue #25 (P1.1–P4.15) and log-only rulings", () => {
         },
         cwd: "E:/AI/Research and Development",
       }),
-      seatsPath,
+      profilesPath,
       logPath,
       nowMs: fixedClockMs,
     });
@@ -2539,7 +2744,7 @@ describe("Part 6: Issue #25 (P1.1–P4.15) and log-only rulings", () => {
           },
           cwd: "E:/AI/Research and Development",
         }),
-        seatsPath,
+        profilesPath,
         logPath,
         nowMs: fixedClockMs,
       });
@@ -2557,7 +2762,7 @@ describe("Part 6: Issue #25 (P1.1–P4.15) and log-only rulings", () => {
         },
         cwd: "E:/AI/Research and Development",
       }),
-      seatsPath,
+      profilesPath,
       logPath,
       nowMs: fixedClockMs,
     });
@@ -2574,7 +2779,7 @@ describe("Part 6: Issue #25 (P1.1–P4.15) and log-only rulings", () => {
         },
         cwd: "E:/AI/Research and Development",
       }),
-      seatsPath,
+      profilesPath,
       logPath,
       nowMs: fixedClockMs,
     });
@@ -2592,55 +2797,115 @@ describe("Part 6: Issue #25 (P1.1–P4.15) and log-only rulings", () => {
         },
         cwd: "E:/AI/Research and Development",
       }),
-      seatsPath,
+      profilesPath,
       logPath,
       nowMs: clock0002NextDayMs,
     });
     assert.equal(midnightWrapRes.exitCode, 0, "Midnight wrap ~23:58 ET at 00:02 ET must pass");
   });
 
-  it("Ruling 1: resolves per-seat memory IDs for all 5 rules (`default` vs `rnd` vs `publisher`) and formats seat-specific memory IDs in messages", () => {
-    // `default` -> the studio (global) index; `rnd` -> the R&D store; `publisher` -> the Publisher store.
-    // Only director-quote has a studio entry; the other four `default` ids still name the R&D entries
-    // until the studio store carries those rules (see the header of pretool-rules.ts).
-    const expectedMap: Record<string, { default: string; rnd: string; publisher: string }> = {
-      "unreviewed-merge": {
-        default: "publisher-merges",
-        rnd: "publisher-merges",
-        publisher: "rule-coordinator-and-merges",
-      },
-      "director-quote": {
-        default: "feedbackfeedbackneverquotethedirectormd",
-        rnd: "never-quote-director-in-public",
-        publisher: "rule-director-communication",
-      },
-      "memory-shell-write": {
-        default: "build-in-studio-tools-not-side-scripts",
-        rnd: "build-in-studio-tools-not-side-scripts",
-        publisher: "reference-memory-system",
-      },
-      "future-stamp": {
-        default: "rnd-memory-system",
-        rnd: "rnd-memory-system",
-        publisher: "reference-memory-system",
-      },
-      "release-reminder": {
-        default: "publisher-approves-every-publish",
-        rnd: "publisher-approves-every-publish",
-        publisher: "rule-coordinator-and-merges",
-      },
-    };
+  it("Ruling 1: resolves per-profile memory IDs, skills, notes, ruleAliases, and decision-log remapping from profiles.json", () => {
+    const ruling1Profiles = join(tempDir, "ruling1-profiles.json");
+    writeFileSync(
+      ruling1Profiles,
+      JSON.stringify({
+        profiles: {
+          "E:/AI/Research and Development": { profile: "docs", store: storeDir },
+          "E:/AI/Publisher": { profile: "release", store: "E:/AI/ReleaseStore/memory" },
+        },
+        rules: {
+          "unreviewed-merge": {
+            memory: { docs: "docs-merge-policy", release: "release-merge-policy" },
+            note: {
+              docs: "Docs profile: route reviewed PRs to release maintainers.",
+              release: "Release profile: confirm required checks and ledger entry.",
+            },
+          },
+          "quote-gate": {
+            memory: { default: "default-quote-policy" },
+          },
+          "release-reminder": {
+            skill: "release-checklist",
+            note: { release: "Run release checklist before publishing." },
+          },
+        },
+      }),
+      "utf-8",
+    );
+    const cfg = loadProfileConfig(ruling1Profiles);
 
     assert.deepEqual(
       PRETOOL_RULES.map((r) => r.id).sort(),
-      Object.keys(expectedMap).sort(),
-      "every rule in the table must have an expected memory map",
+      ["future-stamp", "memory-shell-write", "quote-gate", "release-reminder", "unreviewed-merge"],
     );
+
+    // Without config, memory ids are empty and formatMemorySuffix omits "(memory: ...)"
     for (const rule of PRETOOL_RULES) {
-      assert.equal(resolveRuleMemory(rule, "default"), expectedMap[rule.id]!.default);
-      assert.equal(resolveRuleMemory(rule, "rnd"), expectedMap[rule.id]!.rnd);
-      assert.equal(resolveRuleMemory(rule, "publisher"), expectedMap[rule.id]!.publisher);
+      assert.equal(resolveRuleMemory(rule, "default"), "");
+      assert.equal(resolveRuleMemory(rule, "docs"), "");
+      assert.equal(resolveRuleSkill(rule), "none");
+      assert.equal(formatMemorySuffix(""), "");
     }
+
+    // With profiles.json, configured per-profile memory ids, skills, notes, and aliases resolve
+    assert.equal(resolveRuleMemory(PRETOOL_RULES[0]!, "docs", cfg), "docs-merge-policy");
+    assert.equal(resolveRuleMemory(PRETOOL_RULES[0]!, "release", cfg), "release-merge-policy");
+    assert.equal(resolveRuleMemory(PRETOOL_RULES[1]!, "default", cfg), "default-quote-policy");
+    assert.equal(resolveRuleSkill(PRETOOL_RULES[4]!, cfg), "release-checklist");
+    assert.equal(
+      resolveRuleNote(PRETOOL_RULES[4]!, "release", cfg),
+      "Run release checklist before publishing.",
+    );
+
+    // Alias in rules override maps old id -> new id
+    const aliasedProfiles = join(tempDir, "aliased-profiles.json");
+    writeFileSync(
+      aliasedProfiles,
+      JSON.stringify({
+        ruleAliases: { "old-quote-id": "quote-gate" },
+        rules: {
+          "old-quote-id": {
+            action: { docs: "warn" },
+            memory: { docs: "aliased-quote-mem" },
+            note: { docs: "Note via alias." },
+          },
+        },
+      }),
+      "utf-8",
+    );
+    const aliasedCfg = loadProfileConfig(aliasedProfiles);
+    assert.equal(resolveRuleAction(PRETOOL_RULES[1]!, "docs", aliasedCfg), "warn");
+    assert.equal(resolveRuleMemory(PRETOOL_RULES[1]!, "docs", aliasedCfg), "aliased-quote-mem");
+    assert.equal(resolveRuleNote(PRETOOL_RULES[1]!, "docs", aliasedCfg), "Note via alias.");
+
+    // readDecisionLog remaps old rule ids in evaluated, matched, and rule_error notes
+    const legacyLog = join(tempDir, "legacy-decisions.jsonl");
+    writeFileSync(
+      legacyLog,
+      [
+        JSON.stringify({
+          ts: "2026-11-08T20:00:00.000Z",
+          profile: "docs",
+          session: "s1",
+          tool: "Write",
+          mode: "enforce",
+          evaluated: ["old-quote-id", "future-stamp"],
+          matched: [{ id: "old-quote-id", layer: "A", action: "block" }],
+          outcome: "block",
+          latency_ms: 1.2,
+          input_hash: "0".repeat(64),
+          notes: ["rule_error:old-quote-id"],
+        }),
+        "{ malformed line",
+        "",
+      ].join("\n"),
+      "utf-8",
+    );
+    const entries = readDecisionLog(legacyLog, { profilesPath: aliasedProfiles });
+    assert.equal(entries.length, 1);
+    assert.deepEqual(entries[0]!.evaluated, ["quote-gate", "future-stamp"]);
+    assert.deepEqual(entries[0]!.matched, [{ id: "quote-gate", layer: "A", action: "block" }]);
+    assert.deepEqual(entries[0]!.notes, ["rule_error:quote-gate"]);
   });
 
   it("covers additional sed write patterns, wrapper flags (`nice`, `nohup`, `time`, `env -u`, `xargs -I`), `cp -t`/`--target-directory=`, `dd of=`, `MultiEdit` disk reconstruction, and `=sha` merge flags", () => {
@@ -2683,7 +2948,7 @@ describe("Part 6: Issue #25 (P1.1–P4.15) and log-only rulings", () => {
           tool_input: { command: cmd },
           cwd: "E:/AI/Research and Development",
         }),
-        seatsPath,
+        profilesPath,
         logPath,
       });
       assert.equal(res.exitCode, 2, `Expected block for: ${cmd}`);
@@ -2700,7 +2965,7 @@ describe("Part 6: Issue #25 (P1.1–P4.15) and log-only rulings", () => {
         },
         cwd: "E:/AI/Research and Development",
       }),
-      seatsPath,
+      profilesPath,
       logPath,
       nowMs: fixedClockMs,
     });
@@ -2718,7 +2983,7 @@ describe("Part 6: Issue #25 (P1.1–P4.15) and log-only rulings", () => {
           tool_input: { command: mergeCmd },
           cwd: "E:/AI/Publisher",
         }),
-        seatsPath,
+        profilesPath,
         logPath,
         repliesDir,
       });
@@ -2729,7 +2994,7 @@ describe("Part 6: Issue #25 (P1.1–P4.15) and log-only rulings", () => {
 
 // ════════════════════════════════════════════════════════════════
 // Part 7: PR #26 Fix 1 — rig-path default removal, 7 FP fixes + 7 TP guards,
-//         hasReviewPassAtHead repo/PR scoping, and doctor --seats help
+//         hasReviewPassAtHead repo/PR scoping, and doctor --profiles help
 // ════════════════════════════════════════════════════════════════
 
 import * as pretoolModule from "../pretool.js";
@@ -2741,30 +3006,30 @@ import { COMMAND_HELP, renderCommandHelp } from "../help.js";
 
 describe("Part 7: PR #26 Fix 1 — shipped defaults, false-positive fixes, and review-pass scoping", () => {
   let tempDir: string;
-  let seatsPath: string;
+  let profilesPath: string;
   let logPath: string;
   let storeDir: string;
   const fixedClockMs = Date.UTC(2026, 10, 8, 20, 44, 0, 0); // 2026-11-08 15:44 ET
 
   beforeEach(() => {
     tempDir = mkdtempSync(join(tmpdir(), "loadout-pretool-fix1-"));
-    seatsPath = join(tempDir, "seats.json");
+    profilesPath = join(tempDir, "profiles.json");
     logPath = join(tempDir, "hook-decisions.jsonl");
     storeDir = join(tempDir, "store", "memory");
     mkdirSync(storeDir, { recursive: true });
 
     writeFileSync(
-      seatsPath,
+      profilesPath,
       JSON.stringify(
         {
-          seats: {
+          profiles: {
             "E:/AI/Research and Development": {
-              seat: "rnd",
+              profile: "docs",
               store: storeDir,
             },
             "E:/AI/Publisher": {
-              seat: "publisher",
-              store: "E:/AI/PublisherStore/memory",
+              profile: "release",
+              store: "E:/AI/ReleaseStore/memory",
             },
           },
         },
@@ -2780,7 +3045,7 @@ describe("Part 7: PR #26 Fix 1 — shipped defaults, false-positive fixes, and r
     rmSync(tempDir, { recursive: true, force: true });
   });
 
-  it("Ask 1: no shipped default (exported constant, default argument, or help text) holds a rig path (`E:/AI`, `rnd-local`, `antigravity`, `mikey`, or any drive letter), and suppression is off when unset", () => {
+  it("Ask 1: no shipped default (exported constant, default argument, or help text) holds a rig path, user account, or drive letter, and suppression is off when unset", () => {
     delete process.env.AI_LOADOUT_REPLIES_DIR;
 
     // 1. defaultRepliesDir() returns undefined when AI_LOADOUT_REPLIES_DIR is not set
@@ -2788,7 +3053,11 @@ describe("Part 7: PR #26 Fix 1 — shipped defaults, false-positive fixes, and r
     assert.equal("DEFAULT_REPLIES_DIR" in pretoolModule, false);
 
     // 2. Inspect all exported string/object constants across pretool, pretool-rules, and help
-    const forbiddenRigPattern = /e:\/ai|e:\\ai|rnd-local|antigravity|mikey|\b[a-zA-Z]:[\\/]/i;
+    const accountNeedle = ["mi", "key"].join("");
+    const forbiddenRigPattern = new RegExp(
+      `e:\\/ai|e:\\\\ai|rnd-local|antigravity|${accountNeedle}|\\b[a-zA-Z]:[\\\\/]`,
+      "i",
+    );
     for (const [modName, mod] of [
       ["pretool", pretoolModule],
       ["pretool-rules", pretoolRulesModule],
@@ -2815,7 +3084,7 @@ describe("Part 7: PR #26 Fix 1 — shipped defaults, false-positive fixes, and r
       );
     }
 
-    // 4. With neither seats.json repliesDir nor AI_LOADOUT_REPLIES_DIR set, unreviewed-merge suppression is off
+    // 4. With neither profiles.json repliesDir nor AI_LOADOUT_REPLIES_DIR set, unreviewed-merge suppression is off
     const res = runPreTool({
       stdinJson: JSON.stringify({
         tool_name: "Bash",
@@ -2825,7 +3094,7 @@ describe("Part 7: PR #26 Fix 1 — shipped defaults, false-positive fixes, and r
         },
         cwd: "E:/AI/Publisher",
       }),
-      seatsPath,
+      profilesPath,
       logPath,
     });
     assert.equal(res.outcome, "warn");
@@ -2847,7 +3116,7 @@ describe("Part 7: PR #26 Fix 1 — shipped defaults, false-positive fixes, and r
           tool_input: { command: allowCmd },
           cwd: "E:/AI/Research and Development",
         }),
-        seatsPath,
+        profilesPath,
         logPath,
       });
       assert.equal(allowRes.exitCode, 0, `Expected FP-MSW-1 allow for: ${allowCmd}`);
@@ -2867,7 +3136,7 @@ describe("Part 7: PR #26 Fix 1 — shipped defaults, false-positive fixes, and r
           tool_input: { command: blockCmd },
           cwd: "E:/AI/Research and Development",
         }),
-        seatsPath,
+        profilesPath,
         logPath,
       });
       assert.equal(blockRes.exitCode, 2, `Expected FP-MSW-1 true-positive block for: ${blockCmd}`);
@@ -2904,7 +3173,7 @@ describe("Part 7: PR #26 Fix 1 — shipped defaults, false-positive fixes, and r
           tool_input: { command: allowCmd },
           cwd: "E:/AI/Research and Development",
         }),
-        seatsPath,
+        profilesPath,
         logPath,
       });
       assert.equal(allowRes.exitCode, 0, `Expected FP-MSW-2 allow for: ${allowCmd}`);
@@ -2922,7 +3191,7 @@ describe("Part 7: PR #26 Fix 1 — shipped defaults, false-positive fixes, and r
           tool_input: { command: blockCmd },
           cwd: "E:/AI/Research and Development",
         }),
-        seatsPath,
+        profilesPath,
         logPath,
       });
       assert.equal(blockRes.exitCode, 2, `Expected FP-MSW-2 true-positive block for: ${blockCmd}`);
@@ -2945,7 +3214,7 @@ describe("Part 7: PR #26 Fix 1 — shipped defaults, false-positive fixes, and r
           tool_input: { command: allowCmd },
           cwd: "E:/AI/Research and Development",
         }),
-        seatsPath,
+        profilesPath,
         logPath,
       });
       assert.equal(allowRes.exitCode, 0, `Expected FP-MSW-3 allow for: ${allowCmd}`);
@@ -2964,7 +3233,7 @@ describe("Part 7: PR #26 Fix 1 — shipped defaults, false-positive fixes, and r
           tool_input: { command: blockCmd },
           cwd: "E:/AI/Research and Development",
         }),
-        seatsPath,
+        profilesPath,
         logPath,
       });
       assert.equal(blockRes.exitCode, 2, `Expected FP-MSW-3 true-positive block for: ${blockCmd}`);
@@ -2987,7 +3256,7 @@ describe("Part 7: PR #26 Fix 1 — shipped defaults, false-positive fixes, and r
           tool_input: { command: allowCmd },
           cwd: "E:/AI/Research and Development",
         }),
-        seatsPath,
+        profilesPath,
         logPath,
       });
       assert.equal(allowRes.exitCode, 0, `Expected FP-MSW-4 allow for: ${allowCmd}`);
@@ -3002,7 +3271,7 @@ describe("Part 7: PR #26 Fix 1 — shipped defaults, false-positive fixes, and r
         tool_input: { command: blockCmd },
         cwd: "E:/AI/Research and Development",
       }),
-      seatsPath,
+      profilesPath,
       logPath,
     });
     assert.equal(blockRes.exitCode, 2, "Expected FP-MSW-4 true-positive block while inside store");
@@ -3024,7 +3293,7 @@ describe("Part 7: PR #26 Fix 1 — shipped defaults, false-positive fixes, and r
         },
         cwd: "E:/AI/Research and Development",
       }),
-      seatsPath,
+      profilesPath,
       logPath,
       nowMs: clock2130Ms,
     });
@@ -3042,7 +3311,7 @@ describe("Part 7: PR #26 Fix 1 — shipped defaults, false-positive fixes, and r
         },
         cwd: "E:/AI/Research and Development",
       }),
-      seatsPath,
+      profilesPath,
       logPath,
       nowMs: clock2130Ms,
     });
@@ -3072,7 +3341,7 @@ describe("Part 7: PR #26 Fix 1 — shipped defaults, false-positive fixes, and r
         tool_input: { file_path: memFile, content: fencedBody },
         cwd: "E:/AI/Research and Development",
       }),
-      seatsPath,
+      profilesPath,
       logPath,
       nowMs: fixedClockMs,
     });
@@ -3093,7 +3362,7 @@ describe("Part 7: PR #26 Fix 1 — shipped defaults, false-positive fixes, and r
         tool_input: { file_path: memFile, content: futureFrontmatter },
         cwd: "E:/AI/Research and Development",
       }),
-      seatsPath,
+      profilesPath,
       logPath,
       nowMs: fixedClockMs,
     });
@@ -3112,7 +3381,7 @@ describe("Part 7: PR #26 Fix 1 — shipped defaults, false-positive fixes, and r
         },
         cwd: "E:/AI/Research and Development",
       }),
-      seatsPath,
+      profilesPath,
       logPath,
       nowMs: fixedClockMs,
     });
@@ -3125,11 +3394,11 @@ describe("Part 7: PR #26 Fix 1 — shipped defaults, false-positive fixes, and r
         tool_name: "Write",
         tool_input: {
           file_path: join(storeDir, "BOARD.md"),
-          content: "# R&D Board\n\n**Last updated:** 2099-01-01 12:00 ET\n",
+          content: "# Project Board\n\n**Last updated:** 2099-01-01 12:00 ET\n",
         },
         cwd: "E:/AI/Research and Development",
       }),
-      seatsPath,
+      profilesPath,
       logPath,
       nowMs: fixedClockMs,
     });
@@ -3137,7 +3406,7 @@ describe("Part 7: PR #26 Fix 1 — shipped defaults, false-positive fixes, and r
     assert.ok(blockRes.logEntry?.matched.some((m) => m.id === "future-stamp"));
   });
 
-  it("Ask 4: `hasReviewPassAtHead` requires matching repo and PR number on line 1, and `doctor --help` documents `--seats <p>`", () => {
+  it("Ask 4: `hasReviewPassAtHead` requires matching repo and PR number on line 1, and `doctor --help` documents `--profiles <p>`", () => {
     const repliesDir = join(tempDir, "replies");
     mkdirSync(repliesDir, { recursive: true });
 
@@ -3174,11 +3443,11 @@ describe("Part 7: PR #26 Fix 1 — shipped defaults, false-positive fixes, and r
       true,
     );
 
-    // 4. doctor --help documents --seats <p>
+    // 4. doctor --help documents --profiles <p>
     const doctorHelp = renderCommandHelp("doctor") ?? "";
     assert.ok(
-      doctorHelp.includes("--seats <p>"),
-      "doctor --help must document --seats <p>",
+      doctorHelp.includes("--profiles <p>"),
+      "doctor --help must document --profiles <p>",
     );
   });
 });

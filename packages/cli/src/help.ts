@@ -252,7 +252,7 @@ export const COMMAND_HELP: Record<string, HelpEntry> = {
 
   // ── rituals ──────────────────────────────────────────────────
   doctor: {
-    synopsis: "loadout-os doctor [--store <dir>] [--index <p>] [--project-index <p>] [--settings <p>] [--skills <dir>] [--usage <p>] [--seats <p>] [--repo-root <dir>] [--memory-warn-bytes <n>] [--subindex-warn-entries <n>] [--json]",
+    synopsis: "loadout-os doctor [--store <dir>] [--index <p>] [--project-index <p>] [--settings <p>] [--skills <dir>] [--usage <p>] [--profiles <p>] [--repo-root <dir>] [--memory-warn-bytes <n>] [--subindex-warn-entries <n>] [--json]",
     flags: [
       ["--store <dir>", "memory store dir (default canonical store)"],
       ["--index <p>", "global resolver index (default ~/.ai-loadout/index.json)"],
@@ -260,7 +260,7 @@ export const COMMAND_HELP: Record<string, HelpEntry> = {
       ["--settings <p>", "Claude Code settings.json (default ~/.claude/settings.json)"],
       ["--skills <dir>", "skills directory for triad skill checks (default ~/.claude/skills)"],
       ["--usage <p>", "usage.jsonl path (default ~/.ai-loadout/usage.jsonl)"],
-      ["--seats <p>", "override path to seats.json for per-seat triad memory checks (default ~/.ai-loadout/seats.json)"],
+      ["--profiles <p>", "override path to profiles.json for per-profile triad checks (default ~/.ai-loadout/profiles.json or AI_LOADOUT_PROFILES_PATH)"],
       ["--repo-root <dir>", "repo root for the hook-drift check (default cwd)"],
       ["--memory-warn-bytes <n>", "warn threshold in bytes for MEMORY.md size (default 14640 = 60% of 24.4 KB read limit)"],
       ["--subindex-warn-entries <n>", "warn threshold for entries in a sub-index (default 60)"],
@@ -338,15 +338,15 @@ export const COMMAND_HELP: Record<string, HelpEntry> = {
     ],
   },
   "hook pre-tool": {
-    synopsis: "loadout-os hook pre-tool [--mode enforce|log-only] [--seats <path>] [--log <path>] [--timeout-ms <ms>]",
+    synopsis: "loadout-os hook pre-tool [--mode enforce|log-only] [--profiles <path>] [--log <path>] [--timeout-ms <ms>]",
     flags: [
       ["--mode <mode>", "execution mode: 'enforce' (default: exit 2 on block, additionalContext on warn) or 'log-only' (always exit 0)"],
-      ["--seats <path>", "override path to seats.json (default: ~/.ai-loadout/seats.json or AI_LOADOUT_SEATS_PATH)"],
+      ["--profiles <path>", "override path to profiles.json (default: ~/.ai-loadout/profiles.json or AI_LOADOUT_PROFILES_PATH)"],
       ["--log <path>", "override path to hook-decisions.jsonl (default: ~/.ai-loadout/hook-decisions.jsonl or AI_LOADOUT_DECISIONS_LOG)"],
       ["--timeout-ms <ms>", "hard internal timeout in milliseconds (default: 300)"],
       ["--now <iso|ms>", "override wall-clock time for deterministic timestamp checks"],
     ],
-    note: "PreToolUse hook: passes read-only tools and read-only Bash pipelines silently (exit 0), evaluates the Layer A/B rule table per seat, appends a hashed decision record to hook-decisions.jsonl, fails open before any block match, and fails closed (exit 2 + stderr only) once a block rule has matched.",
+    note: "PreToolUse hook: passes read-only tools and read-only Bash pipelines silently (exit 0), evaluates the Layer A/B rule table per profile, appends a hashed decision record to hook-decisions.jsonl, fails open before any block match, and fails closed (exit 2 + stderr only) once a block rule has matched.",
     example: "loadout-os hook pre-tool --mode enforce",
     exits: [
       ["0", "allowed, read-only pass-through, warn (additionalContext on stdout), log-only, or fail-open error/timeout"],
@@ -354,11 +354,12 @@ export const COMMAND_HELP: Record<string, HelpEntry> = {
     ],
   },
   refresh: {
-    synopsis: "loadout-os refresh [--store <dir>] [--dest <path>] [--project <root>] [--id-source title|name] [--snapshot-repo <dir>] [--mirror-repo <bare>] [--fix] [--dry-run]",
+    synopsis: "loadout-os refresh [--store <dir>] [--dest <path>] [--project <root>] [--profiles <path>] [--id-source title|name] [--snapshot-repo <dir>] [--mirror-repo <bare>] [--fix] [--dry-run]",
     flags: [
       ["--store <dir>", "memory store dir (default canonical store)"],
       ["--dest <path>", "index file to write (default ~/.ai-loadout/index.json)"],
       ["--project <root>", "write project index to <root>/.claude/loadout/index.json"],
+      ["--profiles <path>", "override path to profiles.json for resolving --project store (default ~/.ai-loadout/profiles.json or AI_LOADOUT_PROFILES_PATH)"],
       ["--id-source <mode>", "entry id source when frontmatter has no explicit id: 'title' or 'name' (overrides store setting)"],
       ["--snapshot-repo <dir>", "git working copy to snapshot store .md files into"],
       ["--mirror-repo <bare>", "bare git repo to push snapshot commits to"],

@@ -63,7 +63,7 @@ import {
   hasFlag,
   flagValue,
 } from "./console.js";
-import { loadSeatConfig, normalizePreToolPath } from "./pretool.js";
+import { loadProfileConfig, normalizePreToolPath } from "./pretool.js";
 
 /**
  * Canonical memory store (holds MEMORY.md + topic files).
@@ -123,8 +123,8 @@ export interface RefreshOptions {
   idSource?: IdSource;
   /** Subprocess timeout in milliseconds for git commands (default 30,000). */
   gitTimeoutMs?: number;
-  /** Optional path to `seats.json` for resolving `--project` store when `--store` is omitted. */
-  seatsPath?: string;
+  /** Optional path to `profiles.json` for resolving `--project` store when `--store` is omitted. */
+  profilesPath?: string;
   /** Explicit override allowing `refresh` to replace an index whose recorded source store differs. */
   allowStoreChange?: boolean;
 }
@@ -505,20 +505,20 @@ export function extractIndexSourceStore(rawJson: string): string | null {
 }
 
 /**
- * Look up the memory store configured for `projectRoot` in `seats.json`.
+ * Look up the memory store configured for `projectRoot` in `profiles.json`.
  */
 export function resolveStoreForProject(
   projectRoot: string,
-  seatsPath?: string,
+  profilesPath?: string,
 ): string | null {
   try {
-    const sc = loadSeatConfig(seatsPath);
+    const pc = loadProfileConfig(profilesPath);
     const normProj = normalizePreToolPath(projectRoot).toLowerCase();
     if (!normProj) return null;
 
     let bestStore: string | null = null;
     let bestLen = -1;
-    for (const [rawPrefix, storeDir] of Object.entries(sc.projectStores ?? {})) {
+    for (const [rawPrefix, storeDir] of Object.entries(pc.projectStores ?? {})) {
       const normPrefix = normalizePreToolPath(rawPrefix).toLowerCase();
       if (!normPrefix) continue;
       if (
@@ -551,11 +551,11 @@ export function runRefresh(opts: RefreshOptions): RefreshResult {
   if (opts.store && opts.store.trim()) {
     resolvedStorePath = resolve(opts.store);
   } else if (project) {
-    const projectStore = resolveStoreForProject(project, opts.seatsPath);
+    const projectStore = resolveStoreForProject(project, opts.profilesPath);
     if (!projectStore) {
       throw new RefreshError(
         "PROJECT_STORE_REQUIRED",
-        `Refusing to refresh --project (${project}) without --store: no store is recorded for this project in seats.json. Pass --store <dir> explicitly or configure the project's store in seats.json.`,
+        `Refusing to refresh --project (${project}) without --store: no store is recorded for this project in profiles.json. Pass --store <dir> explicitly or configure the project's store in profiles.json.`,
         2,
       );
     }
@@ -880,7 +880,7 @@ export function dispatchRefresh(args: string[]): void {
   const store = flagValue(args, "store");
   const project = flagValue(args, "project");
   const dest = flagValue(args, "dest");
-  const seatsPath = flagValue(args, "seats");
+  const profilesPath = flagValue(args, "profiles");
   const allowStoreChange = hasFlag(args, "allow-store-change");
   const dryRun = hasFlag(args, "dry-run");
   const fixSummaries = hasFlag(args, "fix") || hasFlag(args, "sync-summaries");
@@ -898,7 +898,7 @@ export function dispatchRefresh(args: string[]): void {
       store,
       project,
       dest,
-      seatsPath,
+      profilesPath,
       allowStoreChange,
       dryRun,
       fixSummaries,

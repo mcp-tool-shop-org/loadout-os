@@ -70,6 +70,17 @@ For project-level memory stores, wire the four Claude Code hooks in `.claude/set
         ]
       }
     ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "loadout-os hook pre-tool --mode enforce"
+          }
+        ]
+      }
+    ],
     "PostToolUse": [
       {
         "matcher": "Write|Edit|MultiEdit",
@@ -88,14 +99,57 @@ For project-level memory stores, wire the four Claude Code hooks in `.claude/set
 - **`loadout-os hook session-start`** prints every `core` entry marked `metadata.loadout_inject: session-start` (such as `BOARD.md`) in full as UTF-8 under a file header, enforces configurable line/byte caps (`--max-lines` / `--max-bytes`) with a visible truncation note, warns when the board is older than `metadata.stale_after_min`, and checks whether any `<store>/*.md` is newer than the project `index.json` (auto-refreshing when edits were made through a shell, which skip `PostToolUse`).
 - **`loadout-os hook pre-compact`** warns on stdout when the injected board is older than `stale_after_min` so the agent refreshes `BOARD.md` before compaction.
 - **`loadout-os hook post-write`** runs after `Write`/`Edit` tool calls. When the edited path is inside the store recorded in `index.source`, it validates and refreshes the project index, exiting `2` with the errors on any failure (for `asyncRewake`) and `0` silently otherwise.
+- **`loadout-os hook pre-tool`** runs on `PreToolUse` (`Bash`, `Write`, `Edit`, `MultiEdit`). Read-only tools and read-only Bash segments pass through with zero disk I/O (`exit 0`). Other calls resolve the active profile from `~/.ai-loadout/profiles.json` (`AI_LOADOUT_PROFILES_PATH`) by longest matching `cwd` prefix, evaluate the Layer A/B rule table, and append a hashed record (`input_hash`, never raw command text) to `~/.ai-loadout/hook-decisions.jsonl`.
+
+## Pre-Tool Rules & `profiles.json`
+
+The only built-in profile is `default`. All per-profile overrides live in `profiles.json`:
+
+| Rule ID | Layer | Tools | Default Action | Purpose |
+|---|---|---|---|---|
+| `unreviewed-merge` | A | `Bash` | `warn` | Reminds to confirm a matching `PASS at <head8>` review reply before merging |
+| `quote-gate` | A | `Write`, `Edit`, `MultiEdit`, `Bash` | `block` | Blocks verbatim quoting of configured speakers (`quoteGate.speakers`) |
+| `memory-shell-write` | A | `Bash` | `block` | Blocks direct shell writes into memory stores |
+| `future-stamp` | A | `Write`, `Edit`, `MultiEdit` | `block` | Blocks tool-stamped timestamps more than 5 minutes ahead of the OS clock |
+| `release-reminder` | B | `Bash` | `warn` | Reminds before `npm publish`, `gh release create`, or `git push --tags` |
+
+Example `profiles.json` using neutral `docs` and `release` profiles:
+
+```json
+{
+  "profiles": {
+    "/repos/docs-site": { "profile": "docs", "store": "/stores/docs/memory" },
+    "/repos/release-bot": { "profile": "release", "store": "/stores/release/memory" }
+  },
+  "repliesDir": "/var/log/review-replies",
+  "rules": {
+    "unreviewed-merge": {
+      "action": { "docs": "off", "release": "warn" },
+      "memory": { "release": "release-merge-policy" },
+      "skill": "release-checklist",
+      "note": { "release": "Verify changelog and release tag alignment before merging." }
+    },
+    "quote-gate": {
+      "action": { "docs": "warn", "release": "block" }
+    }
+  },
+  "ruleAliases": {
+    "legacy-quote-rule": "quote-gate"
+  },
+  "quoteGate": {
+    "speakers": ["He", "She", "They", "the User", "Maintainer"],
+    "allowlistSuffixes": ["docs/quote-policy.md"]
+  }
+}
+```
 
 ## `doctor` — is the system healthy?
 
 ```
-loadout-os doctor [--store <dir>] [--index <p>] [--settings <p>] [--usage <p>] [--repo-root <dir>] [--json]
+loadout-os doctor [--store <dir>] [--index <p>] [--settings <p>] [--usage <p>] [--profiles <p>] [--repo-root <dir>] [--json]
 ```
 
-`doctor` is a read-only health screen — it **never writes**. It runs eight checks across the whole live system, each delegating to a library validator rather than self-grading.
+`doctor` is a read-only health screen — it **never writes**. It checks the memory store, global index, runtime hook drift, resolver layers, core entries, observability loop, hook wiring, usage log, and per-profile triad memory/skill links, each delegating to a library validator rather than self-grading.
 
 ## `report` — is the index earning its keep?
 

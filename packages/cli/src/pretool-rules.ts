@@ -1,23 +1,16 @@
 /**
- * Pre-tool rule table — Part 3 (Layer A hard blocks and Layer B soft reminders).
+ * Pre-tool rule table — Layer A hard blocks and Layer B soft reminders.
  *
- * Rules in this PR (Part 3, Part 4.3, and #25 enforce-readiness):
- *   1. unreviewed-merge   | warn-only | memory: { rnd: publisher-merges, publisher: rule-coordinator-and-merges }
- *   2. director-quote     | Layer A   | memory: { default: feedbackfeedbackneverquotethedirectormd, rnd: never-quote-director-in-public, publisher: rule-director-communication }
- *   3. memory-shell-write | Layer A   | memory: { rnd: build-in-studio-tools-not-side-scripts, publisher: reference-memory-system }
- *   4. future-stamp       | Layer A   | memory: { rnd: rnd-memory-system, publisher: reference-memory-system }
- *   5. release-reminder   | Layer B   | memory: { rnd: publisher-approves-every-publish, publisher: rule-coordinator-and-merges }
+ * Rules:
+ *   1. unreviewed-merge   | warn-only | confirms a recorded review pass matches PR head
+ *   2. quote-gate         | Layer A   | blocks verbatim quoting of configured speakers
+ *   3. memory-shell-write | Layer A   | blocks direct shell writes into memory stores
+ *   4. future-stamp       | Layer A   | blocks tool-stamped timestamps > 5 min ahead of OS clock
+ *   5. release-reminder   | Layer B   | reminds before publish / release / tag push
  *
- * Memory ids resolve per seat, and each must exist in the store that seat's sessions can read:
- * `rnd` -> the R&D store, `publisher` -> the Publisher store, `default` -> the studio (global)
- * index. Ids are store-specific: a store rebuild or a file move renames them, so after one,
- * re-run `loadout-os doctor` with a `seats.json` that declares each seat's `store`, which makes
- * the `triad-memories` check validate every seat against its own store.
- *
- * Known gap (measured 2026-11-21): no entry in the studio store carries rules 1, 3, 4 and 5, so
- * their `default` ids still name the R&D entries. Doctor's single-index fallback (no seat stores
- * declared) reports those four until the studio store gains the entries; at that point only the
- * `default` ids below need to change.
+ * Per-profile actions, memory ids, skills, and extra notes are configured in
+ * `~/.ai-loadout/profiles.json` (`AI_LOADOUT_PROFILES_PATH`). Shipped defaults carry
+ * only `default` actions and neutral messages with no hard-coded profile names or memory ids.
  */
 
 import {
@@ -35,6 +28,7 @@ import { isAbsolute, join, posix, resolve } from "node:path";
 import {
   defaultRepliesDir,
   extractSedWriteTargets,
+  formatMemorySuffix,
   normalizePreToolPath,
   parseBashCommand,
   prenormalizeStorePaths,
@@ -48,7 +42,7 @@ import {
 const HOMEDIR_SLASH = homedir().replace(/\\/g, "/");
 
 // ════════════════════════════════════════════════════════════════
-// Rule 1: unreviewed-merge (warn-only on every seat permanently — #25 ruling 2)
+// Rule 1: unreviewed-merge (warn-only across all profiles)
 // ════════════════════════════════════════════════════════════════
 
 function isExecutableNamed(token: string, expectedName: string): boolean {
@@ -317,25 +311,16 @@ export const UNREVIEWED_MERGE_RULE: PreToolRule = {
   tools: ["Bash"],
   action: {
     default: "warn",
-    rnd: "warn",
-    publisher: "warn",
   },
-  memory: {
-    default: "publisher-merges",
-    rnd: "publisher-merges",
-    publisher: "rule-coordinator-and-merges",
-  },
-  skill: "remote-argon",
+  memory: {},
+  skill: "none",
+  skillNoneReason:
+    "Merge verification is enforced inline unless a review skill is configured in profiles.json.",
   message: (_res, ctx) => {
-    const memId = resolveRuleMemory(UNREVIEWED_MERGE_RULE, ctx.seat);
-    if (ctx.seat === "rnd") {
-      return [
-        `[unreviewed-merge] REMINDER: R&D hands reviewed PRs to the Publisher to merge; merge only with an other-family verdict at the exact head sha: Opus for Carbon or Neon builds, Carbon in AI Studio for Claude-written work (memory: ${memId}, skill: remote-argon).`,
-        "Pass `--match-head-commit <head8>` (or `gatemerge <repo> <pr> <head8>`) with a matching `PASS at <head8>` reply to suppress.",
-      ].join("\n");
-    }
+    const memId = resolveRuleMemory(UNREVIEWED_MERGE_RULE, ctx.profile, ctx.profileConfig);
+    const memSuffix = formatMemorySuffix(memId);
     return [
-      `[unreviewed-merge] REMINDER: Merge only with an other-family verdict at the exact head sha: Opus for Carbon or Neon builds, Carbon in AI Studio for Claude-written work (memory: ${memId}, skill: remote-argon, ledger step 2).`,
+      `[unreviewed-merge] REMINDER: Confirm a recorded review pass matches the exact PR head commit before merging${memSuffix}.`,
       "Pass `--match-head-commit <head8>` (or `gatemerge <repo> <pr> <head8>`) with a matching `PASS at <head8>` reply to suppress.",
     ].join("\n");
   },
@@ -343,60 +328,156 @@ export const UNREVIEWED_MERGE_RULE: PreToolRule = {
 };
 
 // ════════════════════════════════════════════════════════════════
-// Rule 2: director-quote (Layer A — port of quote-gate.py af95dd4e)
+// Rule 2: quote-gate (Layer A — configurable speaker quote guard)
 // ════════════════════════════════════════════════════════════════
 
 /**
  * Files that legitimately contain the patterns because they document or test them
- * (ported from `quote-gate.py:58-61`, plus loadout-os's own quote-gate rule/test files).
+ * (loadout-os's own quote-gate rule/test files; additional suffixes come from profiles.json).
  */
 export const QUOTE_GATE_ALLOWLIST_SUFFIXES: readonly string[] = [
-  "feedback/feedback_never_quote_the_director.md",
-  ".claude/hooks/quote-gate.py",
   "packages/cli/src/pretool-rules.ts",
   "packages/cli/src/tests/pretool.test.ts",
+];
+
+/**
+ * Shipped default speaker list: pronouns and generic role nouns only, with no personal names.
+ * Additional speakers (names, titles) come from `quoteGate.speakers` in `profiles.json`.
+ */
+export const DEFAULT_QUOTE_GATE_SPEAKERS: readonly string[] = [
+  "He",
+  "She",
+  "They",
+  "the User",
 ];
 
 const PUBLISHING_CMD =
   /\bgit\s+(commit|tag|notes)\b|\bgh\s+(pr|issue|release|gist)\b/i;
 
-const SUBJECT = String.raw`(?:the\s+)?(?:Director|Mike|He|She|They|User)`;
-
-// P1 - the void practice markers (`quote-gate.py:72-77`)
-const P1_SOURCE =
-  String.raw`\b(?:his|her|their)\s+words` +
-  String.raw`|(?:Director|Mike)'s\s+words` +
-  String.raw`|Director'?s?-word\s+block`;
-
 const P1_QUICK_RE = /\b(?:words|block)\b/i;
-const P1_RE = new RegExp(P1_SOURCE, "gi");
 
-// Negation in the 70-char run-up (`quote-gate.py:80-84`)
+// Negation in the 70-char run-up
 const NEGATION = new RegExp(
   String.raw`\b(?:never|not|no|don'?t|do\s+not|forbid\w*|void|stop|without|instead\s+of` +
     String.raw`|rather\s+than|avoid\w*|quoting|quote|paraphrase\w*)\b`,
   "i",
 );
 
-// P2 - past-tense attribution, possessive speech-noun, bare "Mike:", or dated attribution (`quote-gate.py:87-107`)
-const ATTRIBUTION_SOURCE =
-  SUBJECT +
-  String.raw`\s+(?:said|replied|answered|asked|corrected|ruled|objected` +
-  String.raw`|challenged|directed|wrote|added|noted|told|put\s+it` +
-  String.raw`|cut\s+it\s+off|pushed\s+back|framed\s+it|called\s+it)` +
-  String.raw`|(?:Director|Mike|His|Her|Their)'?s?\s+` +
-  String.raw`(?:words|reply|answer|verdict|correction|phrasing|directive` +
-  String.raw`|live\s+word|own\s+rule|point|question)\s*[:\u2014-]` +
-  String.raw`|(?:^|\n)\s*(?:\*\*)?(?:The\s+)?(?:Director|Mike)(?:\*\*)?\s*:` +
-  String.raw`|\(?\s*(?:\*\*)?(?:The\s+)?(?:Director|Mike)\s*[,(]?\s*` +
-  String.raw`(?:20\d\d-\d\d-\d\d|\d\d-\d\d)\b[^\"\u201c\n:]{0,40}?\)?(?:\*\*)?\s*[:\u2014-]?` +
-  String.raw`\s*(?:\*{1,2})?\s*(?=[\"\u201c][^\s\"\u201d])`;
-
-const ATTRIBUTION_RE = new RegExp(ATTRIBUTION_SOURCE, "gim");
-
-// P3 - emphasised markdown block quote (`quote-gate.py:110`)
+// P3 - emphasised markdown block quote
 const P3_SOURCE = String.raw`^\s*>\s*\*{1,2}[\"\u201c]`;
 const P3_RE = new RegExp(P3_SOURCE, "gm");
+
+function escapeRegexLiteral(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+interface CompiledQuoteGatePatterns {
+  p1Re: RegExp | null;
+  attributionRe: RegExp | null;
+}
+
+const QUOTE_GATE_PATTERN_CACHE = new Map<string, CompiledQuoteGatePatterns>();
+
+export function compileQuoteGatePatterns(
+  speakers: readonly string[] = DEFAULT_QUOTE_GATE_SPEAKERS,
+): CompiledQuoteGatePatterns {
+  const cleaned = speakers.map((s) => s.trim()).filter(Boolean);
+  const cacheKey = cleaned.join("\0");
+  const cached = QUOTE_GATE_PATTERN_CACHE.get(cacheKey);
+  if (cached) return cached;
+
+  const pronounSubjectSet = new Set<string>();
+  const pronounPossessiveSet = new Set<string>();
+  const namedSpeakerSet = new Set<string>();
+
+  for (const raw of cleaned) {
+    const stem = raw.replace(/^the\s+/i, "").trim();
+    if (!stem) continue;
+    const lower = stem.toLowerCase();
+    if (lower === "he") {
+      pronounSubjectSet.add("He");
+      pronounPossessiveSet.add("His");
+    } else if (lower === "his") {
+      pronounPossessiveSet.add("His");
+    } else if (lower === "she") {
+      pronounSubjectSet.add("She");
+      pronounPossessiveSet.add("Her");
+    } else if (lower === "her") {
+      pronounPossessiveSet.add("Her");
+    } else if (lower === "they") {
+      pronounSubjectSet.add("They");
+      pronounPossessiveSet.add("Their");
+    } else if (lower === "their") {
+      pronounPossessiveSet.add("Their");
+    } else {
+      namedSpeakerSet.add(escapeRegexLiteral(stem));
+    }
+  }
+
+  const pronounSubjects = [...pronounSubjectSet];
+  const pronounPossessives = [...pronounPossessiveSet];
+  const namedSpeakers = [...namedSpeakerSet];
+  const allSubjects = [...namedSpeakers, ...pronounSubjects];
+
+  const p1Parts: string[] = [];
+  if (pronounPossessives.length > 0) {
+    p1Parts.push(String.raw`\b(?:${pronounPossessives.join("|")})\s+words`);
+  }
+  if (namedSpeakers.length > 0) {
+    const namedAlt = namedSpeakers.join("|");
+    p1Parts.push(String.raw`(?:the\s+)?\b(?:${namedAlt})'s\s+words`);
+    p1Parts.push(String.raw`\b(?:${namedAlt})'?s?-word\s+block`);
+  }
+  const p1Re = p1Parts.length > 0 ? new RegExp(p1Parts.join("|"), "gi") : null;
+
+  const attrParts: string[] = [];
+  if (allSubjects.length > 0) {
+    const subjectExpr =
+      namedSpeakers.length > 0
+        ? String.raw`(?:the\s+)?\b(?:${allSubjects.join("|")})`
+        : String.raw`\b(?:${allSubjects.join("|")})`;
+    attrParts.push(
+      subjectExpr +
+        String.raw`\s+(?:said|replied|answered|asked|corrected|ruled|objected` +
+        String.raw`|challenged|directed|wrote|added|noted|told|put\s+it` +
+        String.raw`|cut\s+it\s+off|pushed\s+back|framed\s+it|called\s+it)`,
+    );
+  }
+
+  const possBranches: string[] = [];
+  if (pronounPossessives.length > 0) {
+    possBranches.push(String.raw`\b(?:${pronounPossessives.join("|")})`);
+  }
+  if (namedSpeakers.length > 0) {
+    possBranches.push(String.raw`(?:the\s+)?\b(?:${namedSpeakers.join("|")})`);
+  }
+  if (possBranches.length > 0) {
+    attrParts.push(
+      String.raw`(?:${possBranches.join("|")})'?s?\s+` +
+        String.raw`(?:words|reply|answer|verdict|correction|phrasing|directive` +
+        String.raw`|live\s+word|own\s+rule|point|question)\s*[:\u2014-]`,
+    );
+  }
+
+  if (namedSpeakers.length > 0) {
+    const namedAlt = namedSpeakers.join("|");
+    attrParts.push(
+      String.raw`(?:^|\n)\s*(?:\*\*)?(?:The\s+)?(?:${namedAlt})(?:\*\*)?\s*:`,
+    );
+    attrParts.push(
+      String.raw`\(?\s*(?:\*\*)?(?:The\s+)?(?:${namedAlt})\s*[,(]?\s*` +
+        String.raw`(?:20\d\d-\d\d-\d\d|\d\d-\d\d)\b[^\"\u201c\n:]{0,40}?\)?(?:\*\*)?\s*[:\u2014-]?` +
+        String.raw`\s*(?:\*{1,2})?\s*(?=[\"\u201c][^\s\"\u201d])`,
+    );
+  }
+
+  const attributionRe =
+    attrParts.length > 0 ? new RegExp(attrParts.join("|"), "gim") : null;
+
+  const compiled = { p1Re, attributionRe };
+  QUOTE_GATE_PATTERN_CACHE.set(cacheKey, compiled);
+  return compiled;
+}
 
 const FIRST_PERSON =
   /\b(?:I|I'?m|I'?ve|I'?ll|I'?d|my|me|myself|mine|we|we'?re|we'?ve|our|us|let'?s)\b/i;
@@ -439,13 +520,17 @@ function lineOf(text: string, pos: number): string {
     .slice(0, 150);
 }
 
-export function findQuoteViolations(text: string): QuoteViolation[] {
+export function findQuoteViolations(
+  text: string,
+  speakers: readonly string[] = DEFAULT_QUOTE_GATE_SPEAKERS,
+): QuoteViolation[] {
   if (!text) return [];
+  const { p1Re, attributionRe } = compileQuoteGatePatterns(speakers);
   const hits: QuoteViolation[] = [];
 
-  if (P1_QUICK_RE.test(text)) {
-    P1_RE.lastIndex = 0;
-    for (const m of text.matchAll(P1_RE)) {
+  if (p1Re && P1_QUICK_RE.test(text)) {
+    p1Re.lastIndex = 0;
+    for (const m of text.matchAll(p1Re)) {
       const start = m.index ?? 0;
       const runUp = text.slice(Math.max(0, start - 70), start);
       if (NEGATION.test(runUp)) continue;
@@ -454,13 +539,15 @@ export function findQuoteViolations(text: string): QuoteViolation[] {
   }
 
   if (OPEN_QUOTE.test(text)) {
-    ATTRIBUTION_RE.lastIndex = 0;
-    for (const m of text.matchAll(ATTRIBUTION_RE)) {
-      const start = m.index ?? 0;
-      const end = start + m[0].length;
-      const span = quotedSpanAfter(text, end);
-      if (span && isSpeechSpan(span)) {
-        hits.push({ rule: "P2", line: lineOf(text, start) });
+    if (attributionRe) {
+      attributionRe.lastIndex = 0;
+      for (const m of text.matchAll(attributionRe)) {
+        const start = m.index ?? 0;
+        const end = start + m[0].length;
+        const span = quotedSpanAfter(text, end);
+        if (span && isSpeechSpan(span)) {
+          hits.push({ rule: "P2", line: lineOf(text, start) });
+        }
       }
     }
 
@@ -489,20 +576,38 @@ export function findQuoteViolations(text: string): QuoteViolation[] {
   return out;
 }
 
-export function isQuoteGateAllowlisted(filePath?: string): boolean {
-  if (!filePath) return false;
-  const norm = filePath.replace(/\\/g, "/").toLowerCase();
-  return QUOTE_GATE_ALLOWLIST_SUFFIXES.some((s) => norm.endsWith(s));
+function allQuoteGateAllowlistSuffixes(extraSuffixes?: readonly string[]): string[] {
+  const out = QUOTE_GATE_ALLOWLIST_SUFFIXES.map((s) => s.toLowerCase());
+  if (extraSuffixes) {
+    for (const s of extraSuffixes) {
+      const norm = s.trim().replace(/\\/g, "/").toLowerCase();
+      if (norm) out.push(norm);
+    }
+  }
+  return out;
 }
 
-export function bashTargetsQuoteGateAllowlisted(cmd: string): boolean {
+export function isQuoteGateAllowlisted(
+  filePath?: string,
+  extraSuffixes?: readonly string[],
+): boolean {
+  if (!filePath) return false;
+  const norm = filePath.replace(/\\/g, "/").toLowerCase();
+  return allQuoteGateAllowlistSuffixes(extraSuffixes).some((s) => norm.endsWith(s));
+}
+
+export function bashTargetsQuoteGateAllowlisted(
+  cmd: string,
+  extraSuffixes?: readonly string[],
+): boolean {
   const norm = cmd.replace(/\\/g, "/").toLowerCase();
-  return QUOTE_GATE_ALLOWLIST_SUFFIXES.some((s) => norm.includes(s));
+  return allQuoteGateAllowlistSuffixes(extraSuffixes).some((s) => norm.includes(s));
 }
 
 export function quoteTextsFromTool(
   toolName: string,
   toolInput: Record<string, unknown>,
+  extraAllowlistSuffixes?: readonly string[],
 ): string[] {
   if (toolName === "Write") {
     return [typeof toolInput.content === "string" ? toolInput.content : ""];
@@ -523,27 +628,29 @@ export function quoteTextsFromTool(
   }
   if (toolName === "Bash") {
     const cmd = typeof toolInput.command === "string" ? toolInput.command : "";
-    if (!PUBLISHING_CMD.test(cmd) || bashTargetsQuoteGateAllowlisted(cmd)) {
+    if (!PUBLISHING_CMD.test(cmd) || bashTargetsQuoteGateAllowlisted(cmd, extraAllowlistSuffixes)) {
       return [];
     }
-    // Unescape `\"` inside `git commit -m "... \"...\" ..."` (`quote-gate.py:210`)
+    // Unescape `\"` inside `git commit -m "... \"...\" ..."`
     return [cmd.replace(/\\"/g, '"')];
   }
   return [];
 }
 
-export function matchDirectorQuote(ctx: RuleMatchInput): RuleMatchResult {
+export function matchQuoteGate(ctx: RuleMatchInput): RuleMatchResult {
+  const extraAllowlist = ctx.profileConfig?.quoteGate?.allowlistSuffixes;
   const filePath =
     ctx.writePayload?.filePath ??
     (typeof ctx.toolInput.file_path === "string" ? ctx.toolInput.file_path : undefined);
-  if (isQuoteGateAllowlisted(filePath)) {
+  if (isQuoteGateAllowlisted(filePath, extraAllowlist)) {
     return { matched: false };
   }
 
-  const texts = quoteTextsFromTool(ctx.toolName, ctx.toolInput);
+  const speakers = ctx.profileConfig?.quoteGate?.speakers ?? DEFAULT_QUOTE_GATE_SPEAKERS;
+  const texts = quoteTextsFromTool(ctx.toolName, ctx.toolInput, extraAllowlist);
   const violations: QuoteViolation[] = [];
   for (const t of texts) {
-    violations.push(...findQuoteViolations(t));
+    violations.push(...findQuoteViolations(t, speakers));
   }
 
   if (violations.length === 0) {
@@ -557,33 +664,28 @@ export function matchDirectorQuote(ctx: RuleMatchInput): RuleMatchResult {
   };
 }
 
-export const DIRECTOR_QUOTE_RULE: PreToolRule = {
-  id: "director-quote",
+export const QUOTE_GATE_RULE: PreToolRule = {
+  id: "quote-gate",
   layer: "A",
   tools: ["Write", "Edit", "MultiEdit", "Bash"],
   action: {
     default: "block",
-    rnd: "block",
-    publisher: "block",
   },
-  memory: {
-    default: "feedbackfeedbackneverquotethedirectormd",
-    rnd: "never-quote-director-in-public",
-    publisher: "rule-director-communication",
-  },
+  memory: {},
   skill: "none",
   skillNoneReason:
-    "Inward/outward speech prohibition enforced at write/commit time; no procedural skill workflow applies.",
+    "Verbatim-quote guard enforced at write/commit time; no procedural skill workflow applies.",
   message: (res, ctx) => {
-    const memId = resolveRuleMemory(DIRECTOR_QUOTE_RULE, ctx.seat);
+    const memId = resolveRuleMemory(QUOTE_GATE_RULE, ctx.profile, ctx.profileConfig);
+    const memSuffix = formatMemorySuffix(memId);
     return [
-      `[director-quote] BLOCKED: Never reproduce the Director's words verbatim in any artifact (memory: ${memId}).`,
+      `[quote-gate] BLOCKED: Never reproduce a configured speaker's words verbatim in any artifact${memSuffix}.`,
       `  ${res.detail ?? "[P1/P2/P3] quote violation"}`,
-      'THE FIX: Write the decision or ruling ("He chose X because Y"), never the utterance.',
-      "Carve-outs: present-tense trigger phrases (<=6 words), labelled Director-authored specs, plain non-emphasised block quotes.",
+      'THE FIX: Write the decision or outcome ("They chose X because Y"), never the verbatim utterance.',
+      "Carve-outs: present-tense trigger phrases (<=6 words), labelled speaker-authored specs, plain non-emphasised block quotes.",
     ].join("\n");
   },
-  match: matchDirectorQuote,
+  match: matchQuoteGate,
 };
 
 // ════════════════════════════════════════════════════════════════
@@ -633,7 +735,7 @@ function matchesStoreNorm(normCandidate: string, normStores: string[]): boolean 
 
 /**
  * True if `candidatePath` is inside `~/.claude/projects/<slug>/memory/**`
- * or inside any configured store path from `seats.json` / `storePaths`
+ * or inside any configured store path from `profiles.json` / `storePaths`
  * (resolving relative candidates against `effectiveCwd` when provided — #25 P2.6).
  */
 export function isMemoryStorePath(
@@ -1215,7 +1317,7 @@ function powershellScriptWritesToStore(
   return false;
 }
 
-const STUDIO_CLI_SUBCOMMANDS = new Set([
+const LOADOUT_CLI_SUBCOMMANDS = new Set([
   "memories",
   "rules",
   "doctor",
@@ -1277,7 +1379,7 @@ function checkSegmentMemoryShellWrite(
         args[0].replace(/\\/g, "/"),
       ) ||
         (/(?:^|\/)cli\.[cm]?[jt]s$/i.test(args[0].replace(/\\/g, "/")) &&
-          Boolean(args[1] && STUDIO_CLI_SUBCOMMANDS.has(args[1])))))
+          Boolean(args[1] && LOADOUT_CLI_SUBCOMMANDS.has(args[1])))))
   ) {
     return null;
   }
@@ -1563,21 +1665,18 @@ export const MEMORY_SHELL_WRITE_RULE: PreToolRule = {
   tools: ["Bash"],
   action: {
     default: "block",
-    rnd: "block",
-    publisher: "block",
   },
-  memory: {
-    default: "build-in-studio-tools-not-side-scripts",
-    rnd: "build-in-studio-tools-not-side-scripts",
-    publisher: "reference-memory-system",
-  },
-  skill: "loadout-os",
+  memory: {},
+  skill: "none",
+  skillNoneReason:
+    "Direct shell writes to memory stores are blocked; configure a skill in profiles.json if needed.",
   message: (res, ctx) => {
-    const memId = resolveRuleMemory(MEMORY_SHELL_WRITE_RULE, ctx.seat);
+    const memId = resolveRuleMemory(MEMORY_SHELL_WRITE_RULE, ctx.profile, ctx.profileConfig);
+    const memSuffix = formatMemorySuffix(memId);
     return [
-      `[memory-shell-write] BLOCKED: Direct shell write into a memory store path is forbidden (memory: ${memId}).`,
+      `[memory-shell-write] BLOCKED: Direct shell write into a memory store path is forbidden${memSuffix}.`,
       `  Matched: ${res.detail ?? "shell write targeting memory store"}`,
-      "Use `loadout-os memories place|move|sync-summaries` or Claude Code's Write/Edit tools instead (skill: loadout-os).",
+      "Use `loadout-os memories place|move|sync-summaries` or structured Write/Edit tools instead.",
     ].join("\n");
   },
   match: matchMemoryShellWrite,
@@ -2047,21 +2146,18 @@ export const FUTURE_STAMP_RULE: PreToolRule = {
   tools: ["Write", "Edit", "MultiEdit"],
   action: {
     default: "block",
-    rnd: "block",
-    publisher: "block",
   },
-  memory: {
-    default: "rnd-memory-system",
-    rnd: "rnd-memory-system",
-    publisher: "reference-memory-system",
-  },
-  skill: "loadout-os",
+  memory: {},
+  skill: "none",
+  skillNoneReason:
+    "Future-dated timestamps are blocked at write time; configure a skill in profiles.json if needed.",
   message: (res, ctx) => {
-    const memId = resolveRuleMemory(FUTURE_STAMP_RULE, ctx.seat);
+    const memId = resolveRuleMemory(FUTURE_STAMP_RULE, ctx.profile, ctx.profileConfig);
+    const memSuffix = formatMemorySuffix(memId);
     return [
-      `[future-stamp] BLOCKED: Tool-stamped field is more than 5 minutes ahead of the OS clock (memory: ${memId}).`,
+      `[future-stamp] BLOCKED: Tool-stamped field is more than 5 minutes ahead of the OS clock${memSuffix}.`,
       `  Field: ${res.detail ?? "future timestamp"}`,
-      "Stamp times from the real OS clock or let `loadout-os` stamp them (skill: loadout-os).",
+      "Stamp times from the real OS clock or let `loadout-os` stamp them.",
     ].join("\n");
   },
   match: matchFutureStamp,
@@ -2150,19 +2246,16 @@ export const RELEASE_REMINDER_RULE: PreToolRule = {
   tools: ["Bash"],
   action: {
     default: "warn",
-    rnd: "warn",
-    publisher: "warn",
   },
-  memory: {
-    default: "publisher-approves-every-publish",
-    rnd: "publisher-approves-every-publish",
-    publisher: "rule-coordinator-and-merges",
-  },
-  skill: "full-treatment",
+  memory: {},
+  skill: "none",
+  skillNoneReason:
+    "Release reminders emit an inline warning unless a release checklist skill is configured in profiles.json.",
   message: (res, ctx) => {
-    const memId = resolveRuleMemory(RELEASE_REMINDER_RULE, ctx.seat);
+    const memId = resolveRuleMemory(RELEASE_REMINDER_RULE, ctx.profile, ctx.profileConfig);
+    const memSuffix = formatMemorySuffix(memId);
     return [
-      `[release-reminder] REMINDER: Every publish/release requires Publisher approval and the release checklist (memory: ${memId}, skill: full-treatment).`,
+      `[release-reminder] REMINDER: Confirm release readiness and required checks before publishing or tagging a release${memSuffix}.`,
       `  Command: ${res.detail ?? "publish/release"}`,
     ].join("\n");
   },
@@ -2175,7 +2268,7 @@ export const RELEASE_REMINDER_RULE: PreToolRule = {
 
 export const PRETOOL_RULES: readonly PreToolRule[] = [
   UNREVIEWED_MERGE_RULE,
-  DIRECTOR_QUOTE_RULE,
+  QUOTE_GATE_RULE,
   MEMORY_SHELL_WRITE_RULE,
   FUTURE_STAMP_RULE,
   RELEASE_REMINDER_RULE,

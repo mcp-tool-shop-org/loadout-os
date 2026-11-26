@@ -177,7 +177,7 @@ function parseRawMemoryIdSource(rawMemory: string): IdSource | undefined {
 }
 
 /**
- * Resolve the effective `idSource` (`"title"` or `"name"`) for a memory store (Publisher ruling B):
+ * Resolve the effective `idSource` (`"title"` or `"name"`) for a memory store (#19):
  * 1. Explicit CLI/caller `opts.idSource` (`--id-source title|name`) wins over the store setting.
  * 2. Per-store setting in `<store>/.loadout.json` (`idSource` / `id_source`) or `MEMORY.md`
  *    frontmatter (`metadata.id_source` / `metadata.idSource` / `idSource` / `id_source`).
@@ -391,7 +391,7 @@ function entryFromFrontmatter(
 ): LoadoutEntry {
   const lines = content.split("\n").length;
 
-  // Publisher ruling B / #19: an explicit frontmatter `id:` (top-level or `metadata.id` fallback)
+  // #19: an explicit frontmatter `id:` (top-level or `metadata.id` fallback)
   // always wins over both idSource values.
   // Otherwise, use `nameToId(ref.name)` when idSource === "title", and `fm.id` (from `name:`) when idSource === "name".
   const explicitId = readExplicitId(content);
