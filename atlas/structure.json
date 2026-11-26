@@ -51,7 +51,7 @@
       "unresolvedSites": 0
     },
     {
-      "dynamicReads": 10,
+      "dynamicReads": 12,
       "dynamicSpawns": 6,
       "dynamicSpawnsInTests": 5,
       "dynamicWrites": 3,
@@ -59,7 +59,7 @@
       "externals": 0,
       "files": [
         {
-          "hash": "4b9025544a90f36e89333f034f15a6e6ae80e35c7bb9e28ddc06ed86dc483486",
+          "hash": "9de8864c862df32e64a3e48d04da1bf1e32d2b42a662b29b9c4d3a31049575a7",
           "path": "packages/cli/CHANGELOG.md"
         },
         {
@@ -67,7 +67,7 @@
           "path": "packages/cli/LICENSE"
         },
         {
-          "hash": "40be13459f62fe5de644c21f5d6ae12de4f14044db52416960e889df1d6e510d",
+          "hash": "96ef2fae50036156bedefc22daccf048df15e2218919ad0b759e06ac53820b72",
           "path": "packages/cli/README.md"
         },
         {
@@ -273,78 +273,76 @@
             {
               "in": "resolveScaleThresholds",
               "kind": "catch",
-              "line": 144
+              "line": 148
             },
             {
               "in": "loadIndex",
               "kind": "catch",
-              "line": 257
+              "line": 261
             },
             {
               "in": "runDoctor",
               "kind": "catch",
-              "line": 303
+              "line": 307
             },
             {
               "in": "runDoctor",
               "kind": "catch",
-              "line": 417
+              "line": 426
             },
             {
               "in": "runDoctor",
               "kind": "catch",
-              "line": 421
+              "line": 430
             },
             {
               "in": "runDoctor",
               "kind": "catch",
-              "line": 455
+              "line": 464
             },
             {
               "in": "runDoctor",
               "kind": "catch",
-              "line": 530
+              "line": 539
             },
             {
               "in": "runDoctor",
               "kind": "catch",
-              "line": 561
+              "line": 570
             },
             {
               "in": "runDoctor",
               "kind": "catch",
-              "line": 644
+              "line": 653
             },
             {
               "in": "runDoctor",
               "kind": "catch",
-              "line": 689
+              "line": 698
             },
             {
               "in": "loadStoreMemoryIds",
               "kind": "catch",
-              "line": 722
+              "line": 731
             },
             {
               "in": "runDoctor",
               "kind": "catch",
-              "line": 911
+              "line": 920
             }
           ],
-          "hash": "cf3479e53abe69c2c1f2c769434fde4bc0063ec556a4ecf2f56dc267ca404942",
+          "hash": "a8781fda87f2f6650c3c3fd547f6f1592231ba1d32caa1a86a8351c101986c8e",
           "importOrder": [
             "packages/memories/src/index.ts",
             "packages/kernel/src/index.ts",
             "packages/cli/src/console.ts",
             "packages/cli/src/pretool.ts",
-            "packages/cli/src/pretool-rules.ts",
-            "packages/cli/src/refresh.ts"
+            "packages/cli/src/pretool-rules.ts"
           ],
           "importsFiles": [
             "packages/cli/src/console.ts",
             "packages/cli/src/pretool-rules.ts",
             "packages/cli/src/pretool.ts",
-            "packages/cli/src/refresh.ts",
             "packages/kernel/src/index.ts",
             "packages/memories/src/index.ts"
           ],
@@ -356,7 +354,7 @@
             "renderCommandHelp",
             "wantsHelp"
           ],
-          "hash": "e768f9af1aeeeefeeb2992b8caf8f4a7c983b0b83a1abb8ca27e7064af48c464",
+          "hash": "cd181be31fcf6df81eab6d8d071c2cefbb0ab1414fdc09b54e541894d1b19fff",
           "importsFiles": [
             "packages/cli/src/console.ts"
           ],
@@ -452,7 +450,7 @@
           "path": "packages/cli/src/hook.ts"
         },
         {
-          "hash": "d6267e4e2faeccee046e647147747eb21b0409039ae467b7e9dcd6d49f22f064",
+          "hash": "ae260bdaabd6bbf111bfdc683166c2c508326dffafc97a592efc952e78f0e41c",
           "importOrder": [
             "packages/cli/src/cli.ts",
             "packages/cli/src/console.ts",
@@ -565,85 +563,85 @@
             {
               "in": "formatWarnValue",
               "kind": "catch",
-              "line": 448
+              "line": 463
             },
             {
               "in": "loadProfileConfig",
               "kind": "catch",
-              "line": 546
+              "line": 561
             },
             {
               "in": "loadProfileConfig",
               "kind": "throw",
-              "line": 558
+              "line": 573
             },
             {
               "in": "loadProfileConfig",
               "kind": "catch",
-              "line": 567
+              "line": 582
             },
             {
               "in": "loadProfileConfig",
               "kind": "throw",
-              "line": 568
+              "line": 583
             },
             {
               "in": "loadProfileConfig",
               "kind": "throw",
-              "line": 575
+              "line": 590
             },
             {
               "in": "parsePreToolStdin",
               "kind": "throw",
-              "line": 891
+              "line": 917
             },
             {
               "in": "parsePreToolStdin",
               "kind": "throw",
-              "line": 895
+              "line": 921
             },
             {
               "in": "parsePreToolStdin",
               "kind": "throw",
-              "line": 899
+              "line": 925
             },
             {
               "in": "parsePreToolStdin",
               "kind": "throw",
-              "line": 906
+              "line": 932
             },
             {
               "in": "parseBashCommand",
               "kind": "throw",
-              "line": 1230
+              "line": 1256
             },
             {
               "in": "readDecisionLog",
               "kind": "catch",
-              "line": 2011
+              "line": 2038
             },
             {
               "in": "safeWriteLog",
               "kind": "catch",
-              "line": 2117
+              "line": 2175
             },
             {
               "in": "runPreTool",
               "kind": "throw",
-              "line": 2133
+              "line": 2191
             },
             {
               "in": "runPreTool",
               "kind": "catch",
-              "line": 2198
+              "line": 2256
             },
             {
               "in": "runPreTool",
               "kind": "catch",
-              "line": 2287
+              "line": 2349
             }
           ],
-          "hash": "f82d1394e2d1495765f3b776420dfb310e689ade72db9994cb4cf685e43d0257",
+          "hash": "a25d7f2ec29831793337189367848115de51f1dd97006ea9a9159235f15662a0",
           "importsFiles": [
             "packages/cli/src/pretool-rules.ts"
           ],
@@ -886,7 +884,7 @@
           "testFramework": "node --test"
         },
         {
-          "hash": "af1aca528deea0643745c73d6a08881202802cfed22590565972fb1f83b1b9cf",
+          "hash": "fb91b4e911248c03a08f97838784061d504dd8fbd4255d87cd8d75fa6765a5d7",
           "importOrder": [
             "packages/cli/src/doctor.ts",
             "packages/cli/src/cli.ts",
@@ -924,7 +922,7 @@
           "path": "packages/cli/src/tests/fixtures.ts"
         },
         {
-          "hash": "745f930d299a258850dca8515e687201158645bae9e519a5e8641812fb69cf7f",
+          "hash": "a34f9c96106ac9f2c8474f60cf6bc2bc699bace951f78c499989cdb60636c516",
           "importsFiles": [
             "packages/cli/src/cli.ts",
             "packages/cli/src/help.ts",
@@ -946,7 +944,7 @@
           "testFramework": "node --test"
         },
         {
-          "hash": "aa048233972a6ebffde2d64ea2342e7d25d9ad2107b43cd34ad80fd16037cdaf",
+          "hash": "35dc02ea6cd45da8b087c75a9fadd4b335ee0fb3cf62c1c3a1712cf1e504b47e",
           "importOrder": [
             "packages/cli/src/pretool.ts",
             "packages/cli/src/cli.ts",
@@ -971,7 +969,7 @@
           "exports": [
             "scanLinesForHits"
           ],
-          "hash": "e66a3a278a7dfdd947fd58ce99a29e6f1d98cfa511b71c4279deaddcc11c84b5",
+          "hash": "4845810ad358f6cc63c3a5b2fe58e9defcdf8dd7b0bea64541ca0de3335f7280",
           "path": "packages/cli/src/tests/public-hygiene.test.ts",
           "testFramework": "node --test"
         },
@@ -1033,7 +1031,7 @@
       "origin": "authored",
       "outsidePlaces": [
         {
-          "reads": 56,
+          "reads": 49,
           "where": [
             "caller"
           ],
@@ -1107,7 +1105,7 @@
           "writes": 5
         }
       ],
-      "outsideReads": 79,
+      "outsideReads": 72,
       "outsideWrites": 16,
       "role": "code",
       "testRunners": [
@@ -3983,7 +3981,7 @@
           "path": ".gitignore"
         },
         {
-          "hash": "73e230c4ff27c81ecc54261fdd45e096fc13e05a42daf09156ec05fcb6e11141",
+          "hash": "d5ff6a6382f773db85fa0d951c6b8540c7bf699a11fe3ae7d82b7cdd7957199b",
           "path": "CHANGELOG.md"
         },
         {
@@ -4011,7 +4009,7 @@
           "path": "README.ja.md"
         },
         {
-          "hash": "dd655af9c3a5a2eedfb9a5e5183827526673e194b0a84feeb2a1ea8aa4d01004",
+          "hash": "c6b41b353f65d597867aa5496a15764b87de4d5a686aa2942ed49293fff76c71",
           "path": "README.md"
         },
         {
@@ -5881,7 +5879,7 @@
           "path": "site/src/content/docs/handbook/reference.md"
         },
         {
-          "hash": "6c2b16430fd2f9f904f4d8f9c00bf6adaa224c8ada751df2ffcaf9e2887b8b33",
+          "hash": "ac7bab37c96cf180c7d0512ccd2e3eed0ef7097ef8a88fe4e70448e65fb8e444",
           "path": "site/src/content/docs/handbook/rituals.md"
         },
         {
@@ -7005,7 +7003,7 @@
   ],
   "engine": "1.26.0",
   "generatedFrom": {
-    "commit": "a36f1ed763fef108b054c9c4a86e51371718d9e4",
+    "commit": "63c68310002afbdedf0e6dd732b42ab55525dc34",
     "tracked": 389
   },
   "landings": [
@@ -7173,6 +7171,12 @@
           "by": "packages/cli/esbuild.config.mjs",
           "call": "readFileSync",
           "confidence": "ast"
+        },
+        {
+          "by": "packages/cli/src/tests/public-hygiene.test.ts",
+          "call": "readdirSync",
+          "confidence": "ast",
+          "fromTests": true
         }
       ],
       "target": "packages/cli",

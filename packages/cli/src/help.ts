@@ -354,12 +354,13 @@ export const COMMAND_HELP: Record<string, HelpEntry> = {
     ],
   },
   refresh: {
-    synopsis: "loadout-os refresh [--store <dir>] [--dest <path>] [--project <root>] [--profiles <path>] [--id-source title|name] [--snapshot-repo <dir>] [--mirror-repo <bare>] [--fix] [--dry-run]",
+    synopsis: "loadout-os refresh [--store <dir>] [--dest <path>] [--project <root>] [--profiles <path>] [--allow-store-change] [--id-source title|name] [--snapshot-repo <dir>] [--mirror-repo <bare>] [--fix] [--dry-run]",
     flags: [
       ["--store <dir>", "memory store dir (overrides AI_LOADOUT_STORE and defaultStore in profiles.json)"],
       ["--dest <path>", "index file to write (default ~/.ai-loadout/index.json)"],
       ["--project <root>", "write project index to <root>/.claude/loadout/index.json"],
       ["--profiles <path>", "override path to profiles.json for resolving defaultStore (global) or --project store (default ~/.ai-loadout/profiles.json or AI_LOADOUT_PROFILES_PATH)"],
+      ["--allow-store-change", "allow overwriting an index built from a different source_store (preserves prior store's backup)"],
       ["--id-source <mode>", "entry id source when frontmatter has no explicit id: 'title' or 'name' (overrides store setting)"],
       ["--snapshot-repo <dir>", "git working copy to snapshot store .md files into"],
       ["--mirror-repo <bare>", "bare git repo to push snapshot commits to"],

@@ -8,7 +8,7 @@
 import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync, existsSync } from "node:fs";
-import { join } from "node:path";
+import { join, parse } from "node:path";
 import { tmpdir } from "node:os";
 
 import {
@@ -31,6 +31,7 @@ import {
   hashToolInput,
   defaultProfilesPath,
   defaultDecisionLogPath,
+  collectStorePaths,
   DEFAULT_PRETOOL_TIMEOUT_MS,
   ProfileConfigError,
   type PreToolRule,
@@ -127,7 +128,8 @@ describe("Part 1: hook pre-tool entry, profile map, pass-through, rule table, de
 
       assert.equal(resolveProfile("E:/AI/Research and Development", cfg), "docs");
       assert.equal(resolveProfile("e:\\ai\\research and development\\packages\\cli", cfg), "docs");
-      assert.equal(resolveProfile("/e/AI/ReleaseRepo/subproject", cfg), "release");
+      assert.equal(resolveProfile("/e/AI/ReleaseRepo/subproject", cfg, { platform: "win32" }), "release");
+      assert.equal(resolveProfile("/e/AI/ReleaseRepo/subproject", cfg, { platform: "linux" }), "default");
       assert.equal(resolveProfile("\\\\?\\E:\\AI\\ReleaseRepo\\repo\\", cfg), "release");
       // Longest prefix wins over shorter parent prefix
       assert.equal(
@@ -170,8 +172,12 @@ describe("Part 1: hook pre-tool entry, profile map, pass-through, rule table, de
         "e:/ai/research and development",
       );
       assert.equal(
-        normalizePreToolPath("/e/AI/ReleaseRepo/"),
+        normalizePreToolPath("/e/AI/ReleaseRepo/", { platform: "win32" }),
         "e:/ai/releaserepo",
+      );
+      assert.equal(
+        normalizePreToolPath("/e/AI/ReleaseRepo/", { platform: "linux" }),
+        "/e/AI/ReleaseRepo",
       );
     });
 
@@ -3836,6 +3842,284 @@ describe("Part 7: PR #26 Fix 1 — shipped defaults, false-positive fixes, and r
       doctorHelp.includes("--profiles <p>"),
       "doctor --help must document --profiles <p>",
     );
+  });
+
+  it("F2: warn-only rules (unreviewed-merge and release-reminder) clamp config `block` -> `warn` with config_warning, while keeping `off` allowed", () => {
+    const clampProfiles = join(tempDir, "warn-clamp-profiles.json");
+    writeFileSync(
+      clampProfiles,
+      JSON.stringify({
+        profiles: {
+          "E:/AI/DocsRepo": "docs",
+          "E:/AI/RelRepo": "release",
+        },
+        rules: {
+          "unreviewed-merge": {
+            action: { default: "block", release: "block", docs: "off" },
+          },
+          "release-reminder": {
+            action: { default: "block", release: "block", docs: "off" },
+          },
+        },
+      }),
+      "utf-8",
+    );
+
+    const warnings: string[] = [];
+    const cfg = loadProfileConfig(clampProfiles, {
+      onWarning: (w) => warnings.push(w),
+    });
+    assert.equal(cfg.rules["unreviewed-merge"]?.action?.default, "warn");
+    assert.equal(cfg.rules["unreviewed-merge"]?.action?.release, "warn");
+    assert.equal(cfg.rules["unreviewed-merge"]?.action?.docs, "off");
+    assert.equal(cfg.rules["release-reminder"]?.action?.default, "warn");
+    assert.equal(cfg.rules["release-reminder"]?.action?.release, "warn");
+    assert.equal(cfg.rules["release-reminder"]?.action?.docs, "off");
+    assert.ok(
+      warnings.some((w) =>
+        w.includes("rules.unreviewed-merge.action.default") &&
+        w.includes("block is not allowed for a warn-only rule; using warn"),
+      ),
+    );
+    assert.ok(
+      warnings.some((w) =>
+        w.includes("rules.release-reminder.action.release") &&
+        w.includes("block is not allowed for a warn-only rule; using warn"),
+      ),
+    );
+
+    for (const [ruleId, cmd] of [
+      ["unreviewed-merge", "gh pr merge 21 --squash"],
+      ["release-reminder", "npm publish"],
+    ] as const) {
+      for (const cwd of ["E:/AI/UnmappedRepo", "E:/AI/RelRepo"]) {
+        const res = runPreTool({
+          stdinJson: JSON.stringify({
+            tool_name: "Bash",
+            tool_input: { command: cmd },
+            cwd,
+          }),
+          profilesPath: clampProfiles,
+          logPath,
+        });
+        assert.equal(res.exitCode, 0, `${ruleId} must never exit 2 even when config specifies block`);
+        assert.equal(res.stderr, "");
+        assert.equal(res.outcome, "warn");
+        assert.ok(res.stdout.includes(ruleId));
+        assert.ok(res.logEntry?.matched.some((m) => m.id === ruleId && m.action === "warn"));
+        assert.ok(
+          res.logEntry?.notes?.some(
+            (n) =>
+              n.includes("config_warning:") &&
+              n.includes(ruleId) &&
+              n.includes("block is not allowed for a warn-only rule; using warn"),
+          ),
+        );
+      }
+
+      // `"off"` stays allowed
+      const offRes = runPreTool({
+        stdinJson: JSON.stringify({
+          tool_name: "Bash",
+          tool_input: { command: cmd },
+          cwd: "E:/AI/DocsRepo",
+        }),
+        profilesPath: clampProfiles,
+        logPath,
+      });
+      assert.equal(offRes.exitCode, 0);
+      assert.equal(offRes.outcome, "allow");
+      assert.equal(offRes.stdout, "");
+    }
+
+    // Defense-in-depth: programmatic ProfileConfig with raw `"block"` also clamps in resolveRuleAction
+    const rawCfg = {
+      ...cfg,
+      rules: {
+        "unreviewed-merge": { action: { default: "block" as const } },
+        "release-reminder": { action: { release: "block" as const } },
+      },
+    };
+    const mergeRule = PRETOOL_RULES.find((r) => r.id === "unreviewed-merge")!;
+    const relRule = PRETOOL_RULES.find((r) => r.id === "release-reminder")!;
+    assert.equal(resolveRuleAction(mergeRule, "default", rawCfg), "warn");
+    assert.equal(resolveRuleAction(relRule, "release", rawCfg), "warn");
+  });
+
+  it("F3: AI_LOADOUT_STORE protects a store set only via env for both memory-shell-write and future-stamp", () => {
+    const envOnlyStore = join(tempDir, "env-only-external-store");
+    mkdirSync(envOnlyStore, { recursive: true });
+    const emptyProfiles = join(tempDir, "empty-f3-profiles.json");
+    writeFileSync(emptyProfiles, JSON.stringify({}), "utf-8");
+
+    const prevEnvStore = process.env.AI_LOADOUT_STORE;
+    try {
+      process.env.AI_LOADOUT_STORE = envOnlyStore;
+      const storeFile = join(envOnlyStore, "topic-notes.md");
+
+      const bashRes = runPreTool({
+        stdinJson: JSON.stringify({
+          tool_name: "Bash",
+          tool_input: { command: `rm "${storeFile.replace(/\\/g, "/")}"` },
+          cwd: tempDir,
+        }),
+        profilesPath: emptyProfiles,
+        logPath,
+      });
+      assert.equal(bashRes.exitCode, 2, "memory-shell-write must block shell write into AI_LOADOUT_STORE");
+      assert.ok(bashRes.logEntry?.matched.some((m) => m.id === "memory-shell-write"));
+
+      const fixedClockMs = Date.parse("2026-11-26T12:00:00Z");
+      const stampRes = runPreTool({
+        stdinJson: JSON.stringify({
+          tool_name: "Write",
+          tool_input: {
+            file_path: storeFile,
+            content: "# Topic\n\n**Last updated:** 2099-01-01 12:00 ET\n",
+          },
+          cwd: tempDir,
+        }),
+        profilesPath: emptyProfiles,
+        logPath,
+        nowMs: fixedClockMs,
+      });
+      assert.equal(stampRes.exitCode, 2, "future-stamp must block future timestamp in AI_LOADOUT_STORE");
+      assert.ok(stampRes.logEntry?.matched.some((m) => m.id === "future-stamp"));
+    } finally {
+      if (prevEnvStore === undefined) delete process.env.AI_LOADOUT_STORE;
+      else process.env.AI_LOADOUT_STORE = prevEnvStore;
+    }
+  });
+
+  it("FIX-1 Item 2: AI_LOADOUT_STORE resolves relative paths and skips overly broad paths (root, home dir, .git repo root) with config_warning while protecting normal stores", () => {
+    const emptyProfiles = join(tempDir, "empty-fix1-profiles.json");
+    writeFileSync(emptyProfiles, JSON.stringify({}), "utf-8");
+
+    const prevCwd = process.cwd();
+    const prevEnvStore = process.env.AI_LOADOUT_STORE;
+    const prevHome = process.env.HOME;
+    const prevUserProfile = process.env.USERPROFILE;
+
+    try {
+      // 1. Relative AI_LOADOUT_STORE resolves to absolute path and protects across another cwd
+      process.chdir(tempDir);
+      process.env.AI_LOADOUT_STORE = join("rel-store", "memory");
+      const emptyCfg = loadProfileConfig(emptyProfiles);
+      const collectedRel = collectStorePaths(emptyCfg);
+      const expectedRelStore = resolve(tempDir, "rel-store", "memory");
+      assert.ok(collectedRel.includes(expectedRelStore));
+
+      const otherCwd = join(tempDir, "other-workdir");
+      mkdirSync(otherCwd, { recursive: true });
+      const relBlocked = runPreTool({
+        stdinJson: JSON.stringify({
+          tool_name: "Bash",
+          tool_input: {
+            command: `rm "${join(expectedRelStore, "topic.md").replace(/\\/g, "/")}"`,
+          },
+          cwd: otherCwd,
+        }),
+        profilesPath: emptyProfiles,
+        logPath,
+      });
+      assert.equal(relBlocked.exitCode, 2, "Resolved relative AI_LOADOUT_STORE must block shell writes");
+      assert.ok(relBlocked.logEntry?.matched.some((m) => m.id === "memory-shell-write"));
+
+      // 2. Home-dir AI_LOADOUT_STORE is skipped with config_warning and does not block writes under home
+      const fakeHome = join(tempDir, "fake-home");
+      mkdirSync(fakeHome, { recursive: true });
+      process.env.HOME = fakeHome;
+      process.env.USERPROFILE = fakeHome;
+      process.env.AI_LOADOUT_STORE = fakeHome;
+
+      const homeRes = runPreTool({
+        stdinJson: JSON.stringify({
+          tool_name: "Bash",
+          tool_input: {
+            command: `rm "${join(fakeHome, "scratch.txt").replace(/\\/g, "/")}"`,
+          },
+          cwd: tempDir,
+        }),
+        profilesPath: emptyProfiles,
+        logPath,
+      });
+      assert.equal(homeRes.exitCode, 0, "Home-dir AI_LOADOUT_STORE must be skipped with warning");
+      assert.equal(homeRes.outcome, "allow");
+      assert.ok(
+        homeRes.logEntry?.notes?.some((n) => n.includes("config_warning:AI_LOADOUT_STORE skipped (home_dir)")),
+      );
+
+      // 3a. Filesystem root is skipped with config_warning
+      process.env.AI_LOADOUT_STORE = parse(tempDir).root;
+      const rootRes = runPreTool({
+        stdinJson: JSON.stringify({
+          tool_name: "Bash",
+          tool_input: {
+            command: `rm "${join(tempDir, "root-test.txt").replace(/\\/g, "/")}"`,
+          },
+          cwd: tempDir,
+        }),
+        profilesPath: emptyProfiles,
+        logPath,
+      });
+      assert.equal(rootRes.exitCode, 0);
+      assert.equal(rootRes.outcome, "allow");
+      assert.ok(
+        rootRes.logEntry?.notes?.some((n) =>
+          n.includes("config_warning:AI_LOADOUT_STORE skipped (filesystem_root)"),
+        ),
+      );
+
+      // 3b. Repo root containing `.git` is skipped with config_warning
+      const fakeRepo = join(tempDir, "fake-repo");
+      mkdirSync(join(fakeRepo, ".git"), { recursive: true });
+      process.env.AI_LOADOUT_STORE = fakeRepo;
+      const repoRes = runPreTool({
+        stdinJson: JSON.stringify({
+          tool_name: "Bash",
+          tool_input: {
+            command: `rm "${join(fakeRepo, "README.md").replace(/\\/g, "/")}"`,
+          },
+          cwd: tempDir,
+        }),
+        profilesPath: emptyProfiles,
+        logPath,
+      });
+      assert.equal(repoRes.exitCode, 0);
+      assert.equal(repoRes.outcome, "allow");
+      assert.ok(
+        repoRes.logEntry?.notes?.some((n) =>
+          n.includes("config_warning:AI_LOADOUT_STORE skipped (repo_root)"),
+        ),
+      );
+
+      // 4. Normal store directory still blocks without warnings
+      const validStore = join(tempDir, "valid-store", "memory");
+      mkdirSync(validStore, { recursive: true });
+      process.env.AI_LOADOUT_STORE = validStore;
+      const validRes = runPreTool({
+        stdinJson: JSON.stringify({
+          tool_name: "Bash",
+          tool_input: {
+            command: `rm "${join(validStore, "topic.md").replace(/\\/g, "/")}"`,
+          },
+          cwd: tempDir,
+        }),
+        profilesPath: emptyProfiles,
+        logPath,
+      });
+      assert.equal(validRes.exitCode, 2);
+      assert.ok(validRes.logEntry?.matched.some((m) => m.id === "memory-shell-write"));
+      assert.ok(!validRes.logEntry?.notes?.some((n) => n.includes("AI_LOADOUT_STORE skipped")));
+    } finally {
+      process.chdir(prevCwd);
+      if (prevEnvStore === undefined) delete process.env.AI_LOADOUT_STORE;
+      else process.env.AI_LOADOUT_STORE = prevEnvStore;
+      if (prevHome === undefined) delete process.env.HOME;
+      else process.env.HOME = prevHome;
+      if (prevUserProfile === undefined) delete process.env.USERPROFILE;
+      else process.env.USERPROFILE = prevUserProfile;
+    }
   });
 });
 
