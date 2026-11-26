@@ -175,12 +175,13 @@ metadata:
 | `future-stamp` | A | `Write`, `Edit`, `MultiEdit` | `block` | Blocks tool-stamped timestamps more than 5 minutes ahead of the OS clock |
 | `release-reminder` | B | `Bash` | `warn` | Reminds before `npm publish`, `gh release create`, or `git push --tags` |
 
-**Profiles & config (`~/.ai-loadout/profiles.json`, env `AI_LOADOUT_PROFILES_PATH`):**
+**Profiles & config (`~/.ai-loadout/profiles.json`, env `AI_LOADOUT_PROFILES_PATH`, `AI_LOADOUT_STORE`):**
 
-The only built-in profile is `default`. Longest matching `cwd` prefix selects the active profile and optional store/replies/rule overrides:
+The only built-in profile is `default`. Global `refresh` and `doctor` resolve the default memory store with precedence `--store <dir>` > `AI_LOADOUT_STORE` > `defaultStore` in `profiles.json` (and refuse with `DEFAULT_STORE_REQUIRED` if none is configured; they never derive from `cwd`). Longest matching `cwd` prefix selects the active profile and optional store/replies/rule overrides:
 
 ```json
 {
+  "defaultStore": "/stores/global/memory",
   "profiles": {
     "/repos/docs-site": { "profile": "docs", "store": "/stores/docs/memory" },
     "/repos/release-bot": { "profile": "release", "store": "/stores/release/memory" }

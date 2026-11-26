@@ -84,6 +84,8 @@ export class ProfileConfigError extends Error {
 export interface ProfileConfig {
   /** Raw prefix -> profile name mapping from profiles.json. */
   profiles: Record<string, string>;
+  /** Configured default memory store path from profiles.json (for global refresh and doctor). */
+  defaultStore?: string;
   /** Additional memory store paths configured in profiles.json or env. */
   storePaths: string[];
   /** Profile name -> primary store path mapping from profiles.json. */
@@ -416,6 +418,7 @@ function isPlainObject(val: unknown): val is Record<string, unknown> {
 const VALID_RULE_ACTIONS = new Set<RuleAction>(["block", "warn", "off"]);
 
 const TOP_LEVEL_CONFIG_KEYS = new Set([
+  "defaultStore",
   "profiles",
   "rules",
   "ruleAliases",
@@ -523,9 +526,10 @@ function mergeRuleOverride(
 /**
  * Load and validate `~/.ai-loadout/profiles.json`.
  * - If the default file does not exist and no explicit override was set, returns an empty config.
- * - If an explicit override path is missing, or the file is unreadable, malformed JSON, or invalidly
- *   typed, throws a `ProfileConfigError` so the caller fails open and logs `error_open`.
- * - Unknown keys record a warning in `warnings` (and `opts.onWarning`) without crashing.
+ * - If an explicit override path is missing, unreadable, malformed JSON, or not a top-level JSON
+ *   object, throws a `ProfileConfigError` so callers fail safely (`error_open` in hook; `fail` in doctor).
+ * - Unknown keys and invalidly typed sub-fields or rule/profile overrides are soft-dropped and
+ *   recorded in `warnings` (and `opts.onWarning`) without disabling the rest of the config.
  */
 export function loadProfileConfig(
   profilesPath?: string,
@@ -590,7 +594,17 @@ export function loadProfileConfig(
   const storePaths: string[] = [];
   const profileStores: Record<string, string> = {};
   const projectStores: Record<string, string> = {};
+  let defaultStore: string | undefined;
   let repliesDir: string | undefined;
+
+  if (parsed.defaultStore !== undefined) {
+    if (typeof parsed.defaultStore !== "string" || !parsed.defaultStore.trim()) {
+      warn(`Invalid profiles.json 'defaultStore' value (${formatWarnValue(parsed.defaultStore)}): expected a non-empty string; ignoring`);
+    } else {
+      defaultStore = parsed.defaultStore.trim();
+      storePaths.push(defaultStore);
+    }
+  }
 
   if (parsed.repliesDir !== undefined) {
     if (typeof parsed.repliesDir !== "string" || !parsed.repliesDir.trim()) {
@@ -820,6 +834,7 @@ export function loadProfileConfig(
   }
 
   return {
+    ...(defaultStore ? { defaultStore } : {}),
     profiles,
     storePaths,
     profileStores,

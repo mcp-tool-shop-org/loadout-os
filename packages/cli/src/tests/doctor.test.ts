@@ -10,7 +10,7 @@ import { readdirSync, existsSync, readFileSync, writeFileSync, mkdirSync } from 
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { runDoctor, defaultDoctorPaths, type DoctorPaths } from "../doctor.js";
+import { runDoctor, defaultDoctorPaths, type DoctorCheck, type DoctorPaths } from "../doctor.js";
 import { dispatch } from "../cli.js";
 import { makeSandbox } from "./fixtures.js";
 
@@ -28,7 +28,7 @@ function pathsFor(sb: ReturnType<typeof makeSandbox>): DoctorPaths {
   };
 }
 
-function find(checks: { id: string; status: string; message: string; hint?: string }[], id: string) {
+function find(checks: DoctorCheck[], id: string): DoctorCheck {
   const c = checks.find((x) => x.id === id);
   assert.ok(c, `expected a check with id "${id}"`);
   return c!;
@@ -1168,5 +1168,68 @@ test("FIX-1 Item 2: doctor reports profiles.json config warnings without failing
   } finally {
     process.exitCode = prevExitCode;
     sb.cleanup();
+  }
+});
+
+test("FIX-2 Item 1: doctor reports DEFAULT_STORE_REQUIRED fail when no default store is configured, and resolves profiles.json defaultStore / AI_LOADOUT_STORE regardless of cwd", () => {
+  const sb = makeSandbox({ withSettingsHook: true });
+  const sbDecoy = makeSandbox();
+  const prevCwd = process.cwd();
+  const prevEnvStore = process.env.AI_LOADOUT_STORE;
+  const prevEnvProfiles = process.env.AI_LOADOUT_PROFILES_PATH;
+
+  try {
+    delete process.env.AI_LOADOUT_STORE;
+    delete process.env.AI_LOADOUT_PROFILES_PATH;
+
+    // 1. No --store, no AI_LOADOUT_STORE, no defaultStore -> store-validates fails with DEFAULT_STORE_REQUIRED
+    const emptyProfiles = join(sb.dir, "empty-profiles.json");
+    writeFileSync(emptyProfiles, JSON.stringify({}), "utf-8");
+
+    process.chdir(sbDecoy.storeDir);
+    const defaultPathsNoCfg = defaultDoctorPaths(sbDecoy.dir, sb.dir);
+    assert.equal(defaultPathsNoCfg.store, "", "defaultDoctorPaths must never derive store from repoRoot/cwd");
+
+    const missingStoreDoc = runDoctor({
+      ...pathsFor(sb),
+      store: "",
+      profilesPath: emptyProfiles,
+    });
+    const missingCheck = find(missingStoreDoc.checks, "store-validates");
+    assert.equal(missingCheck.status, "fail");
+    assert.equal(missingCheck.code, "DEFAULT_STORE_REQUIRED");
+    assert.equal(missingStoreDoc.ok, false);
+    assert.match(missingCheck.hint ?? "", /--store/);
+    assert.match(missingCheck.hint ?? "", /AI_LOADOUT_STORE/);
+    assert.match(missingCheck.hint ?? "", /defaultStore/);
+
+    // 2. defaultStore in profiles.json resolves regardless of cwd
+    const cfgProfiles = join(sb.dir, "cfg-profiles.json");
+    writeFileSync(cfgProfiles, JSON.stringify({ defaultStore: sb.storeDir }), "utf-8");
+    const cfgDoc = runDoctor({
+      ...pathsFor(sb),
+      store: "",
+      profilesPath: cfgProfiles,
+    });
+    assert.equal(find(cfgDoc.checks, "store-validates").status, "pass");
+
+    // 3. AI_LOADOUT_STORE overrides defaultStore in profiles.json
+    const sbEnv = makeSandbox({ withSettingsHook: true });
+    try {
+      process.env.AI_LOADOUT_STORE = sbEnv.storeDir;
+      process.env.AI_LOADOUT_PROFILES_PATH = cfgProfiles;
+      const envPaths = defaultDoctorPaths(sbDecoy.dir, sb.dir);
+      assert.equal(envPaths.store, resolve(sbEnv.storeDir));
+    } finally {
+      sbEnv.cleanup();
+    }
+  } finally {
+    process.chdir(prevCwd);
+    if (prevEnvStore === undefined) delete process.env.AI_LOADOUT_STORE;
+    else process.env.AI_LOADOUT_STORE = prevEnvStore;
+    if (prevEnvProfiles === undefined) delete process.env.AI_LOADOUT_PROFILES_PATH;
+    else process.env.AI_LOADOUT_PROFILES_PATH = prevEnvProfiles;
+    sb.cleanup();
+    sbDecoy.cleanup();
   }
 });

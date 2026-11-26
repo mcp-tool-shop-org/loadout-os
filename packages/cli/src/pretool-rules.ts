@@ -439,8 +439,8 @@ export function compileQuoteGatePatterns(
   }
   if (namedStems.length > 0) {
     const namedAlt = namedStems.join("|");
-    p1Parts.push(String.raw`(?:the\s+)?\b(?:${namedAlt})'s\s+words`);
-    p1Parts.push(String.raw`\b(?:${namedAlt})'?s?-word\s+block`);
+    p1Parts.push(String.raw`\b(?:${namedAlt})'s\s+words`);
+    p1Parts.push(String.raw`\b${namedStems[0]}'?s?-word\s+block`);
   }
   const p1Re = p1Parts.length > 0 ? new RegExp(p1Parts.join("|"), "gi") : null;
 
@@ -459,7 +459,7 @@ export function compileQuoteGatePatterns(
     possBranches.push(String.raw`\b(?:${pronounPossessives.join("|")})`);
   }
   if (namedStems.length > 0) {
-    possBranches.push(String.raw`(?:the\s+)?\b(?:${namedStems.join("|")})`);
+    possBranches.push(String.raw`\b(?:${namedStems.join("|")})`);
   }
   if (possBranches.length > 0) {
     attrParts.push(

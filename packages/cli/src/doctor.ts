@@ -47,12 +47,13 @@ import {
   type ProfileConfig,
 } from "./pretool.js";
 import { PRETOOL_RULES } from "./pretool-rules.js";
-import { deriveClaudeProjectSlug } from "./refresh.js";
+import { resolveDefaultStore } from "./refresh.js";
 
 export type CheckStatus = "pass" | "warn" | "fail";
 
 export interface DoctorCheck {
   id: string;
+  code?: string;
   status: CheckStatus;
   message: string;
   hint?: string;
@@ -122,12 +123,13 @@ function toPositiveNumber(val: unknown): number | undefined {
 export function resolveScaleThresholds(
   paths: DoctorPaths,
   memoryMdContent?: string,
+  storePath: string = paths.store,
 ): { memoryWarnBytes: number; subindexWarnEntries: number } {
   let cfgBytes: number | undefined;
   let cfgEntries: number | undefined;
 
-  const storeConfigPath = join(paths.store, ".loadout.json");
-  if (existsSync(storeConfigPath)) {
+  const storeConfigPath = storePath ? join(storePath, ".loadout.json") : "";
+  if (storeConfigPath && existsSync(storeConfigPath)) {
     try {
       const cfg = JSON.parse(readFileSync(storeConfigPath, "utf-8")) as Record<
         string,
@@ -216,8 +218,10 @@ export function defaultDoctorPaths(
   const profilesPath = envProfilesPath
     ? resolve(envProfilesPath)
     : resolve(home, ".ai-loadout", "profiles.json");
+  const resolvedProfilesPath =
+    envProfilesPath || existsSync(profilesPath) ? profilesPath : undefined;
   return {
-    store: resolve(home, ".claude", "projects", deriveClaudeProjectSlug(repoRoot), "memory"),
+    store: resolveDefaultStore(resolvedProfilesPath) ?? "",
     index: resolve(home, ".ai-loadout", "index.json"),
     settings: resolve(home, ".claude", "settings.json"),
     usage: resolve(home, ".ai-loadout", "usage.jsonl"),
@@ -225,7 +229,7 @@ export function defaultDoctorPaths(
     hookMirror: resolve(home, ".claude", "loadout-hook", "loadout-hook.mjs"),
     skillsDir: resolve(home, ".claude", "skills"),
     extraIndexes: existsSync(projectIndex) ? [projectIndex] : [],
-    ...(envProfilesPath || existsSync(profilesPath) ? { profilesPath } : {}),
+    ...(resolvedProfilesPath ? { profilesPath: resolvedProfilesPath } : {}),
   };
 }
 
@@ -283,98 +287,141 @@ function loadIndex(
 export function runDoctor(paths: DoctorPaths): DoctorResult {
   const checks: DoctorCheck[] = [];
 
+  let loadedProfileConfig: ProfileConfig | undefined;
+  let profilesConfigCheck: DoctorCheck | undefined;
+  if (paths.profilesPath) {
+    try {
+      loadedProfileConfig = loadProfileConfig(paths.profilesPath);
+      if (loadedProfileConfig.warnings.length > 0) {
+        profilesConfigCheck = {
+          id: "profiles-config",
+          status: "warn",
+          message: `profiles.json has ${loadedProfileConfig.warnings.length} warning(s): ${loadedProfileConfig.warnings.join("; ")}`,
+          hint: "Fix or remove invalid keys/values in profiles.json.",
+        };
+      }
+    } catch (err) {
+      profilesConfigCheck = {
+        id: "profiles-config",
+        status: "fail",
+        message: `Failed to load profiles.json (${paths.profilesPath}): ${(err as Error).message}`,
+        hint: "Fix JSON syntax, top-level structure, or the explicit --profiles / AI_LOADOUT_PROFILES_PATH path.",
+      };
+    }
+  }
+
+  const envStore = process.env.AI_LOADOUT_STORE?.trim();
+  const effectiveStore = paths.store?.trim()
+    ? resolve(paths.store)
+    : envStore
+      ? resolve(envStore)
+      : loadedProfileConfig?.defaultStore?.trim()
+        ? resolve(loadedProfileConfig.defaultStore.trim())
+        : "";
+
   // (a) store MEMORY.md validates (0 errors)
-  const memoryMd = join(paths.store, "MEMORY.md");
-  if (!existsSync(memoryMd)) {
+  if (!effectiveStore) {
     checks.push({
       id: "store-validates",
+      code: "DEFAULT_STORE_REQUIRED",
       status: "fail",
-      message: `Store MEMORY.md not found: ${memoryMd}`,
-      hint: "Point --store <dir> at the directory containing MEMORY.md, or configure project stores in profiles.json.",
+      message:
+        "DEFAULT_STORE_REQUIRED: No default memory store configured (neither --store, AI_LOADOUT_STORE, nor defaultStore in profiles.json is set).",
+      hint: 'Pass --store <dir>, set AI_LOADOUT_STORE=<dir>, or set "defaultStore" in ~/.ai-loadout/profiles.json.',
     });
   } else {
-    try {
-      const analysis = analyzeMemoryMd(memoryMd);
-      const issues = validateMemory(analysis);
-      const errors = issues.filter((i) => i.severity === "error").length;
-      const warnings = issues.filter((i) => i.severity === "warning").length;
-      if (errors > 0) {
-        checks.push({
-          id: "store-validates",
-          status: "fail",
-          message: `Store MEMORY.md has ${errors} error(s), ${warnings} warning(s)`,
-          hint: "Run `loadout-os memories validate <MEMORY.md>` for detail.",
-        });
-      } else if (warnings > 0) {
-        checks.push({
-          id: "store-validates",
-          status: "warn",
-          message: `Store MEMORY.md valid (0 errors) with ${warnings} warning(s)`,
-          hint: "Run `loadout-os memories validate <MEMORY.md>` for detail.",
-        });
-      } else {
-        checks.push({
-          id: "store-validates",
-          status: "pass",
-          message: `Store MEMORY.md validates (0 errors, ${analysis.refs.length} refs)`,
-        });
-      }
-
-      // (a2) MEMORY.md size vs 60% of Claude Code's 24.4 KB read limit & sub-index entry counts
-      const memoryMdRaw = readFileSync(memoryMd, "utf-8");
-      const memoryMdBytes = Buffer.byteLength(memoryMdRaw, "utf-8");
-      const { memoryWarnBytes, subindexWarnEntries } = resolveScaleThresholds(
-        paths,
-        memoryMdRaw,
-      );
-      const pctOfReadLimit = Math.round(
-        (memoryMdBytes / CLAUDE_CODE_MEMORY_READ_LIMIT_BYTES) * 100,
-      );
-
-      if (memoryMdBytes > memoryWarnBytes) {
-        checks.push({
-          id: "memory-read-limit",
-          status: "warn",
-          message: `MEMORY.md is ${memoryMdBytes} B (${pctOfReadLimit}% of Claude Code's 24.4 KB read limit; warn threshold ${memoryWarnBytes} B)`,
-          hint: "Split root entries into sub-indexes with `loadout-os memories split --by <rules.json>`.",
-        });
-      } else {
-        checks.push({
-          id: "memory-read-limit",
-          status: "pass",
-          message: `MEMORY.md size ${memoryMdBytes} B (${pctOfReadLimit}% of 24.4 KB read limit <= ${memoryWarnBytes} B warn threshold)`,
-        });
-      }
-
-      // Gather sub-index entry counts from analysis and any sub-index files in the store directory
-      const subindexCounts = new Map<string, number>();
-      if (analysis.subindexEntryCounts) {
-        for (const [subFile, count] of Object.entries(
-          analysis.subindexEntryCounts,
-        )) {
-          subindexCounts.set(subFile, count);
+    const memoryMd = join(effectiveStore, "MEMORY.md");
+    if (!existsSync(memoryMd)) {
+      checks.push({
+        id: "store-validates",
+        status: "fail",
+        message: `Store MEMORY.md not found: ${memoryMd}`,
+        hint: 'Point --store <dir> at the directory containing MEMORY.md, or set "defaultStore" / project stores in profiles.json.',
+      });
+    } else {
+      try {
+        const analysis = analyzeMemoryMd(memoryMd);
+        const issues = validateMemory(analysis);
+        const errors = issues.filter((i) => i.severity === "error").length;
+        const warnings = issues.filter((i) => i.severity === "warning").length;
+        if (errors > 0) {
+          checks.push({
+            id: "store-validates",
+            status: "fail",
+            message: `Store MEMORY.md has ${errors} error(s), ${warnings} warning(s)`,
+            hint: "Run `loadout-os memories validate <MEMORY.md>` for detail.",
+          });
+        } else if (warnings > 0) {
+          checks.push({
+            id: "store-validates",
+            status: "warn",
+            message: `Store MEMORY.md valid (0 errors) with ${warnings} warning(s)`,
+            hint: "Run `loadout-os memories validate <MEMORY.md>` for detail.",
+          });
+        } else {
+          checks.push({
+            id: "store-validates",
+            status: "pass",
+            message: `Store MEMORY.md validates (0 errors, ${analysis.refs.length} refs)`,
+          });
         }
-      }
-      if (existsSync(paths.store)) {
-        try {
-          for (const entry of readdirSync(paths.store)) {
-            if (extname(entry) !== ".md" || entry === "MEMORY.md") continue;
-            if (subindexCounts.has(entry)) continue;
-            const fullPath = join(paths.store, entry);
-            try {
-              if (!statSync(fullPath).isFile()) continue;
-              const subRaw = readFileSync(fullPath, "utf-8");
-              if (detectSubindex(entry, subRaw).isSubindex) {
-                subindexCounts.set(entry, parseMemoryMd(subRaw).refs.length);
-              }
-            } catch {
-              // ignore unreadable file
-            }
+
+        // (a2) MEMORY.md size vs 60% of Claude Code's 24.4 KB read limit & sub-index entry counts
+        const memoryMdRaw = readFileSync(memoryMd, "utf-8");
+        const memoryMdBytes = Buffer.byteLength(memoryMdRaw, "utf-8");
+        const { memoryWarnBytes, subindexWarnEntries } = resolveScaleThresholds(
+          paths,
+          memoryMdRaw,
+          effectiveStore,
+        );
+        const pctOfReadLimit = Math.round(
+          (memoryMdBytes / CLAUDE_CODE_MEMORY_READ_LIMIT_BYTES) * 100,
+        );
+
+        if (memoryMdBytes > memoryWarnBytes) {
+          checks.push({
+            id: "memory-read-limit",
+            status: "warn",
+            message: `MEMORY.md is ${memoryMdBytes} B (${pctOfReadLimit}% of Claude Code's 24.4 KB read limit; warn threshold ${memoryWarnBytes} B)`,
+            hint: "Split root entries into sub-indexes with `loadout-os memories split --by <rules.json>`.",
+          });
+        } else {
+          checks.push({
+            id: "memory-read-limit",
+            status: "pass",
+            message: `MEMORY.md size ${memoryMdBytes} B (${pctOfReadLimit}% of 24.4 KB read limit <= ${memoryWarnBytes} B warn threshold)`,
+          });
+        }
+
+        // Gather sub-index entry counts from analysis and any sub-index files in the store directory
+        const subindexCounts = new Map<string, number>();
+        if (analysis.subindexEntryCounts) {
+          for (const [subFile, count] of Object.entries(
+            analysis.subindexEntryCounts,
+          )) {
+            subindexCounts.set(subFile, count);
           }
-        } catch {
-          // ignore unreadable dir
         }
-      }
+        if (existsSync(effectiveStore)) {
+          try {
+            for (const entry of readdirSync(effectiveStore)) {
+              if (extname(entry) !== ".md" || entry === "MEMORY.md") continue;
+              if (subindexCounts.has(entry)) continue;
+              const fullPath = join(effectiveStore, entry);
+              try {
+                if (!statSync(fullPath).isFile()) continue;
+                const subRaw = readFileSync(fullPath, "utf-8");
+                if (detectSubindex(entry, subRaw).isSubindex) {
+                  subindexCounts.set(entry, parseMemoryMd(subRaw).refs.length);
+                }
+              } catch {
+                // ignore unreadable file
+              }
+            }
+          } catch {
+            // ignore unreadable dir
+          }
+        }
 
       const overSubindexes: { file: string; count: number }[] = [];
       let maxSubindexEntries = 0;
@@ -411,6 +458,7 @@ export function runDoctor(paths: DoctorPaths): DoctorResult {
         status: "fail",
         message: `Could not analyze store MEMORY.md: ${(e as Error).message}`,
       });
+    }
     }
   }
 
@@ -678,26 +726,8 @@ export function runDoctor(paths: DoctorPaths): DoctorResult {
     return ids;
   };
 
-  let loadedProfileConfig: ProfileConfig | undefined;
-  if (paths.profilesPath) {
-    try {
-      loadedProfileConfig = loadProfileConfig(paths.profilesPath);
-      if (loadedProfileConfig.warnings.length > 0) {
-        checks.push({
-          id: "profiles-config",
-          status: "warn",
-          message: `profiles.json has ${loadedProfileConfig.warnings.length} warning(s): ${loadedProfileConfig.warnings.join("; ")}`,
-          hint: "Fix or remove invalid keys/values in profiles.json.",
-        });
-      }
-    } catch (err) {
-      checks.push({
-        id: "profiles-config",
-        status: "fail",
-        message: `Failed to load profiles.json (${paths.profilesPath}): ${(err as Error).message}`,
-        hint: "Fix JSON syntax, top-level structure, or the explicit --profiles / AI_LOADOUT_PROFILES_PATH path.",
-      });
-    }
+  if (profilesConfigCheck) {
+    checks.push(profilesConfigCheck);
   }
 
   let configuredProfileStores: Record<string, string> = {};
@@ -933,7 +963,7 @@ export function printDoctor(result: DoctorResult, paths: DoctorPaths): void {
   log();
   log(`${BOLD}loadout-os doctor${RESET} ${DIM}— read-only health screen${RESET}`);
   log();
-  log(`  ${DIM}store:    ${paths.store}${RESET}`);
+  log(`  ${DIM}store:    ${paths.store || "(unconfigured)"}${RESET}`);
   log(`  ${DIM}index:    ${paths.index}${RESET}`);
   log(`  ${DIM}settings: ${paths.settings}${RESET}`);
   log(`  ${DIM}usage:    ${paths.usage}${RESET}`);

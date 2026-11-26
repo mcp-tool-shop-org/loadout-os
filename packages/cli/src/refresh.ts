@@ -66,35 +66,25 @@ import {
 import { loadProfileConfig, normalizePreToolPath } from "./pretool.js";
 
 /**
- * Derive Claude Code's project-store directory slug from a project directory path
- * (e.g. `C:\work\app` -> `C--work-app`, `/home/alice/repo` -> `-home-alice-repo`).
+ * Resolve the configured default memory store for global refresh / doctor.
+ * Precedence (after explicit `--store`): `AI_LOADOUT_STORE` env var > `defaultStore` in `profiles.json`.
+ * Never guesses or derives a store from `process.cwd()`.
  */
-export function deriveClaudeProjectSlug(projectDir: string = process.cwd()): string {
-  const abs = resolve(projectDir);
-  return (abs.replace(/[:\\/]/g, "-").replace(/\s+/g, "-")) || "default";
+export function resolveDefaultStore(profilesPath?: string): string | null {
+  const envStore = process.env.AI_LOADOUT_STORE?.trim();
+  if (envStore) {
+    return resolve(envStore);
+  }
+  try {
+    const pc = loadProfileConfig(profilesPath);
+    if (pc.defaultStore && pc.defaultStore.trim()) {
+      return resolve(pc.defaultStore.trim());
+    }
+    return null;
+  } catch {
+    return null;
+  }
 }
-
-/**
- * Default memory store path derived from the current working directory.
- * Override with `--store <dir>` or configure per-project stores in `profiles.json`.
- */
-export function defaultStore(
-  projectDir: string = process.cwd(),
-  homeDir: string = homedir(),
-): string {
-  return join(
-    homeDir,
-    ".claude",
-    "projects",
-    deriveClaudeProjectSlug(projectDir),
-    "memory",
-  );
-}
-
-/**
- * Canonical memory store (holds MEMORY.md + topic files).
- */
-export const DEFAULT_STORE = defaultStore();
 
 /** Default destination: the live global resolver index the hook reads. */
 export function defaultDest(): string {
@@ -119,7 +109,7 @@ export function sameResolvedPath(a: string, b: string): boolean {
 }
 
 export interface RefreshOptions {
-  /** Store directory containing MEMORY.md (default DEFAULT_STORE). */
+  /** Store directory containing MEMORY.md (overrides AI_LOADOUT_STORE and profiles.json defaultStore). */
   store?: string;
   /** Destination index path (default ~/.ai-loadout/index.json, or <project>/.claude/loadout/index.json when project is set). */
   dest?: string;
@@ -186,12 +176,20 @@ export class RefreshError extends Error {
   readonly code: string;
   readonly exitCode: number;
   readonly issues?: ValidationIssue[];
-  constructor(code: string, message: string, exitCode: number, issues?: ValidationIssue[]) {
+  readonly hint?: string;
+  constructor(
+    code: string,
+    message: string,
+    exitCode: number,
+    issues?: ValidationIssue[],
+    hint?: string,
+  ) {
     super(message);
     this.name = "RefreshError";
     this.code = code;
     this.exitCode = exitCode;
     this.issues = issues;
+    this.hint = hint;
   }
 }
 
@@ -581,7 +579,17 @@ export function runRefresh(opts: RefreshOptions): RefreshResult {
     }
     resolvedStorePath = projectStore;
   } else {
-    resolvedStorePath = resolve(DEFAULT_STORE);
+    const configuredDefault = resolveDefaultStore(opts.profilesPath);
+    if (!configuredDefault) {
+      throw new RefreshError(
+        "DEFAULT_STORE_REQUIRED",
+        "Refusing global refresh without a configured default store: neither --store, AI_LOADOUT_STORE, nor defaultStore in profiles.json is set.",
+        2,
+        undefined,
+        'Pass --store <dir>, set AI_LOADOUT_STORE=<dir>, or set "defaultStore" in ~/.ai-loadout/profiles.json.',
+      );
+    }
+    resolvedStorePath = configuredDefault;
   }
   const store = resolvedStorePath;
   const dest = resolve(
@@ -937,9 +945,10 @@ export function dispatchRefresh(args: string[]): void {
       } else {
         log();
         log(`  ${RED}✗ [${e.code}]${RESET} ${e.message}`);
+        if (e.hint) log(`    ${DIM}${e.hint}${RESET}`);
         log();
       }
-      fail(e.code, e.message, undefined, e.exitCode);
+      fail(e.code, e.message, e.hint, e.exitCode);
     }
     throw e;
   }

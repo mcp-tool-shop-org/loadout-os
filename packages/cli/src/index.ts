@@ -113,7 +113,7 @@ export {
   dispatchRefresh,
   rewritePathsAbsolute,
   defaultDest,
-  DEFAULT_STORE,
+  resolveDefaultStore,
   RefreshError,
 } from "./refresh.js";
 export type { RefreshOptions, RefreshResult } from "./refresh.js";

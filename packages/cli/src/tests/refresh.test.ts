@@ -958,3 +958,90 @@ test("Issue #25 Item 5: refresh --project without --store uses profiles.json sto
   }
 });
 
+test("FIX-2 Item 1: global refresh refuses with DEFAULT_STORE_REQUIRED when unconfigured, resolves defaultStore from profiles.json across any cwd, and enforces --store > AI_LOADOUT_STORE > defaultStore", () => {
+  const sbDefault = makeRefreshSandbox({ valid: true });
+  const sbEnv = makeRefreshSandbox({ valid: true });
+  const sbFlag = makeRefreshSandbox({ valid: true });
+  const sbDecoyCwd = makeRefreshSandbox({ valid: true });
+  const prevCwd = process.cwd();
+  const prevEnvStore = process.env.AI_LOADOUT_STORE;
+  const prevEnvProfiles = process.env.AI_LOADOUT_PROFILES_PATH;
+
+  try {
+    const emptyProfiles = join(sbDefault.dir, "empty-profiles.json");
+    writeFileSync(emptyProfiles, JSON.stringify({}), "utf-8");
+
+    const scratchDest = join(sbDefault.dir, "out", "global-index.json");
+    delete process.env.AI_LOADOUT_STORE;
+    delete process.env.AI_LOADOUT_PROFILES_PATH;
+
+    // 1. With neither --store, AI_LOADOUT_STORE, nor defaultStore configured: refuses & writes nothing
+    assert.throws(
+      () => runRefresh({ dest: scratchDest, profilesPath: emptyProfiles }),
+      (err: unknown) =>
+        err instanceof RefreshError &&
+        err.code === "DEFAULT_STORE_REQUIRED" &&
+        err.exitCode === 2 &&
+        typeof err.hint === "string" &&
+        err.hint.includes("--store") &&
+        err.hint.includes("AI_LOADOUT_STORE") &&
+        err.hint.includes("defaultStore"),
+    );
+    assert.equal(existsSync(scratchDest), false);
+
+    // 2. With defaultStore in profiles.json: resolves identically from two different cwds (even a decoy dir with MEMORY.md)
+    const profilesWithDefault = join(sbDefault.dir, "profiles.json");
+    writeFileSync(
+      profilesWithDefault,
+      JSON.stringify({ defaultStore: sbDefault.storeDir }, null, 2),
+      "utf-8",
+    );
+
+    process.chdir(sbDecoyCwd.storeDir);
+    const resFromCwd1 = runRefresh({
+      dest: scratchDest,
+      profilesPath: profilesWithDefault,
+      dryRun: true,
+    });
+    assert.equal(resFromCwd1.store, resolve(sbDefault.storeDir));
+    assert.equal(resFromCwd1.wrote, false);
+
+    process.chdir(sbEnv.dir);
+    const resFromCwd2 = runRefresh({
+      dest: scratchDest,
+      profilesPath: profilesWithDefault,
+      dryRun: true,
+    });
+    assert.equal(resFromCwd2.store, resolve(sbDefault.storeDir));
+    assert.equal(resFromCwd2.wrote, false);
+
+    // 3. Precedence: AI_LOADOUT_STORE overrides profiles.json defaultStore
+    process.env.AI_LOADOUT_STORE = sbEnv.storeDir;
+    const resEnvWins = runRefresh({
+      dest: scratchDest,
+      profilesPath: profilesWithDefault,
+      dryRun: true,
+    });
+    assert.equal(resEnvWins.store, resolve(sbEnv.storeDir));
+
+    // 4. Precedence: --store overrides both AI_LOADOUT_STORE and profiles.json defaultStore
+    const resFlagWins = runRefresh({
+      store: sbFlag.storeDir,
+      dest: scratchDest,
+      profilesPath: profilesWithDefault,
+      dryRun: true,
+    });
+    assert.equal(resFlagWins.store, resolve(sbFlag.storeDir));
+  } finally {
+    process.chdir(prevCwd);
+    if (prevEnvStore === undefined) delete process.env.AI_LOADOUT_STORE;
+    else process.env.AI_LOADOUT_STORE = prevEnvStore;
+    if (prevEnvProfiles === undefined) delete process.env.AI_LOADOUT_PROFILES_PATH;
+    else process.env.AI_LOADOUT_PROFILES_PATH = prevEnvProfiles;
+    sbDefault.cleanup();
+    sbEnv.cleanup();
+    sbFlag.cleanup();
+    sbDecoyCwd.cleanup();
+  }
+});
+

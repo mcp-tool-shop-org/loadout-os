@@ -1709,7 +1709,7 @@ describe("Part 3: the five generic rules (unreviewed-merge, quote-gate, memory-s
       assert.equal(notAllowlistedByDefault.exitCode, 2);
     });
 
-    it("FIX-1 Item 1 oracle: configured speakers + namedSpeakers match base regexes string-by-string across corpus, and fail oracle if 'the User' enters namedSpeakers", () => {
+    it("FIX-1/FIX-2 quote-gate oracle: matches base regex on the shared corpus and first-name P1 word-block, proves 6 intentional leading word-boundary narrowings against base, and catches 'the User' in namedSpeakers", () => {
       const legacyPair = `${LEGACY_ROLE_SPEAKER}|${LEGACY_BASE_NAME}`;
       const baseSubject = String.raw`(?:the\s+)?(?:${legacyPair}|He|She|They|User)`;
       const baseP1Re = new RegExp(
@@ -1784,6 +1784,10 @@ describe("Part 3: the five generic rules (unreviewed-merge, quote-gate, memory-s
         ]),
         ["base P1 second named", `Do not use ${LEGACY_BASE_NAME}'s words in the changelog.`],
         ["base P1 second named unnegated", `We kept ${LEGACY_BASE_NAME}'s words in the changelog.`],
+        ["base P1 word-block first name only", `Remove the ${LEGACY_ROLE_SPEAKER}-word block.`],
+        ["base P1 word-block second name allow", `Remove the ${LEGACY_BASE_NAME}-word block.`],
+        ["base P1 70-char negation outside window", `never ${"a".repeat(70)} The ${LEGACY_ROLE_SPEAKER}'s words remain.`],
+        ["base P1 70-char negation inside window", `never ${"a".repeat(58)} The ${LEGACY_ROLE_SPEAKER}'s words stay forbidden.`],
         ["base P2 bare second named", `${LEGACY_BASE_NAME}: "I want the changelog updated today."`],
         ["base P2 dated second named", `${LEGACY_BASE_NAME} 2026-11-08: "I want every check verified."`],
         ["base user possessive-words allow", "Store the user's words in the log."],
@@ -1804,6 +1808,24 @@ describe("Part 3: the five generic rules (unreviewed-merge, quote-gate, memory-s
         const got = extracted.flatMap((t) => findQuoteViolations(t, oracleSpeakers, oracleNamedSpeakers));
         const expected = extracted.flatMap((t) => findBaseOracleViolations(t));
         assert.deepEqual(got, expected, `Oracle mismatch on case '${label}'`);
+      }
+
+      // Explicit boundary probes: base matched substring glued to a preceding word; new leading \b prevents false positives across all 6 branches
+      const gluedName = `sub${LEGACY_ROLE_SPEAKER.toLowerCase()}`;
+      const intentionalBoundaryNarrowings: Array<[string, string]> = [
+        ["P2 subject glued (pronoun)", 'Ashe said "I will finish the migration before tomorrow morning."'],
+        ["P2 subject glued (role)", 'superuser said "I will restart the service right now."'],
+        ["P2 pronoun possessive glued", 'cypher\'s reply: "I want to rotate the signing keys before release."'],
+        ["P2 named possessive glued", `${gluedName}'s verdict: "I think we should split this module first."`],
+        ["P2 dated glued", `${gluedName} 2026-11-08: "I want to review the schema changes today."`],
+        ["P1 possessive-words glued", `Record the ${gluedName}'s words in the meeting notes.`],
+        ["P1 word-block glued", `Trim the ${gluedName}-word block from the draft.`],
+      ];
+      for (const [branch, probe] of intentionalBoundaryNarrowings) {
+        const baseHits = findBaseOracleViolations(probe);
+        const newHits = findQuoteViolations(probe, oracleSpeakers, oracleNamedSpeakers);
+        assert.equal(baseHits.length, 1, `Expected base oracle to false-positive on ${branch}: ${probe}`);
+        assert.equal(newHits.length, 0, `Expected leading \\b to narrow away false-positive on ${branch}: ${probe}`);
       }
 
       // Negative proof: putting "the User" back into namedSpeakers breaks oracle equivalence on P1 user's words

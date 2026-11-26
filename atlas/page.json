@@ -60,75 +60,30 @@
   ],
   "changes": {
     "fileCounts": {
-      "added": 1,
-      "changed": 31,
+      "added": 0,
+      "changed": 13,
       "moved": 0,
-      "parts": 6,
+      "parts": 3,
       "removed": 0
     },
     "items": [
       {
-        "kind": "door",
-        "sentence": "CI now also runs packages/cli/src/tests/public-hygiene.test.ts.",
-        "subjects": [
-          ".github/workflows/ci.yml",
-          "packages/cli/src/tests/public-hygiene.test.ts"
-        ]
-      },
-      {
-        "kind": "door",
-        "sentence": "Release now also runs packages/cli/src/tests/public-hygiene.test.ts.",
-        "subjects": [
-          ".github/workflows/release.yml",
-          "packages/cli/src/tests/public-hygiene.test.ts"
-        ]
-      },
-      {
-        "kind": "landing",
-        "sentence": ".claude/projects is now written by packages/cli/src/refresh.ts.",
-        "subjects": [
-          ".claude/projects",
-          "packages/cli/src/refresh.ts"
-        ]
-      },
-      {
-        "kind": "landing",
-        "sentence": ".claude/projects/default/memory/index.json is now written by packages/cli/src/refresh.ts.",
-        "subjects": [
-          ".claude/projects/default/memory/index.json",
-          "packages/cli/src/refresh.ts"
-        ]
-      },
-      {
-        "kind": "landing",
-        "sentence": ".claude/ is now read by packages/cli/src/tests/public-hygiene.test.ts.",
-        "subjects": [
-          ".claude/",
-          "packages/cli/src/tests/public-hygiene.test.ts"
-        ]
-      },
-      {
-        "kind": "landing",
-        "sentence": "And 7 more new writers and readers of places.",
-        "subjects": []
-      },
-      {
         "kind": "counts",
-        "sentence": "1 file added and 31 changed content, across 6 parts.",
+        "sentence": "Nothing structural changed since 2026-11-26; 13 files changed content.",
         "subjects": []
       }
     ],
     "since": {
-      "commit": "3fe2ae44ed0239f982cc76908ed10a2110af7144",
-      "generatedAt": "2026-11-11T22:20:34.061Z"
+      "commit": "e3fdae47bc8f52a438dffc49a971f0e61e477e95",
+      "generatedAt": "2026-11-26T05:23:28.616Z"
     },
-    "unchanged": false
+    "unchanged": true
   },
   "changesTogether": [
     {
       "a": "packages/cli/src/pretool-rules.ts",
       "b": "packages/cli/src/tests/pretool.test.ts",
-      "either": 6,
+      "either": 7,
       "partLabels": [
         "cli",
         "cli"
@@ -138,12 +93,12 @@
         "cli"
       ],
       "relation": "inside",
-      "shared": 5
+      "shared": 6
     },
     {
       "a": "packages/cli/src/cli.ts",
       "b": "packages/cli/src/doctor.ts",
-      "either": 8,
+      "either": 9,
       "partLabels": [
         "cli",
         "cli"
@@ -153,11 +108,26 @@
         "cli"
       ],
       "relation": "inside",
-      "shared": 6
+      "shared": 7
     },
     {
       "a": "packages/cli/src/cli.ts",
       "b": "packages/cli/src/help.ts",
+      "either": 9,
+      "partLabels": [
+        "cli",
+        "cli"
+      ],
+      "parts": [
+        "cli",
+        "cli"
+      ],
+      "relation": "inside",
+      "shared": 7
+    },
+    {
+      "a": "packages/cli/src/doctor.ts",
+      "b": "packages/cli/src/help.ts",
       "either": 8,
       "partLabels": [
         "cli",
@@ -171,8 +141,8 @@
       "shared": 6
     },
     {
-      "a": "packages/cli/src/doctor.ts",
-      "b": "packages/cli/src/help.ts",
+      "a": "packages/cli/src/index.ts",
+      "b": "packages/cli/src/tests/fixtures.ts",
       "either": 7,
       "partLabels": [
         "cli",
@@ -184,21 +154,6 @@
       ],
       "relation": "inside",
       "shared": 5
-    },
-    {
-      "a": "packages/cli/src/cli.ts",
-      "b": "packages/cli/src/tests/doctor.test.ts",
-      "either": 9,
-      "partLabels": [
-        "cli",
-        "cli"
-      ],
-      "parts": [
-        "cli",
-        "cli"
-      ],
-      "relation": "inside",
-      "shared": 6
     }
   ],
   "changesTogetherNote": [
@@ -207,7 +162,7 @@
     "Window: 180 days; a pair counts from 3 shared commits, since 0 source files reach 10 revisions; the floor rises to 10 when 25 do."
   ],
   "changesTogetherWithTests": 3,
-  "commit": "e3fdae47bc8f52a438dffc49a971f0e61e477e95",
+  "commit": "a36f1ed763fef108b054c9c4a86e51371718d9e4",
   "defaultBranch": "main",
   "derived": "9 parts, mostly Markdown (236 files); code in TypeScript (91), CSS (8), JavaScript (7), Astro (4) and PowerShell (1). Work enters through 6 doors; the busiest is CI, which reaches 6 parts. It publishes @mcptoolshop/loadout-os to npm. It deploys a site to GitHub Pages. People run ai-loadout, claude-memories, claude-rules and loadout-os.",
   "doors": [
@@ -300,7 +255,7 @@
         "on a push to main touching 9 paths",
         "or by hand"
       ],
-      "untracked": ".claude/loadout/ and .claude/projects/, which are not tracked"
+      "untracked": ".claude/loadout/, which is not tracked"
     },
     {
       "builds": [
@@ -372,7 +327,7 @@
       "triggers": [
         "when a tag matching `v*` is pushed"
       ],
-      "untracked": ".claude/loadout/ and .claude/projects/, which are not tracked"
+      "untracked": ".claude/loadout/, which is not tracked"
     },
     {
       "checks": [],
@@ -597,10 +552,10 @@
   ],
   "engine": "1.26.0",
   "generated": [],
-  "generatedAt": "2026-11-26T05:23:28.616Z",
+  "generatedAt": "2026-11-26T05:39:32.795Z",
   "limits": [
     "6 writes and 29 reads use paths built at run time and are not named here.",
-    "3 writes go to places this repository does not track, so they are not listed as generated.",
+    "1 write goes to places this repository does not track, so it is not listed as generated.",
     "7 writes and 74 reads go to a path their caller passes, not to this repository.",
     "2 writes and 32 reads go to the directory the command is run in, not to this repository.",
     "7 writes and 15 reads go to the home directory (.ai-loadout/) or a path their caller passes, not to this repository.",

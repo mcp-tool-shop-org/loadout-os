@@ -103,7 +103,7 @@ For project-level memory stores, wire the four Claude Code hooks in `.claude/set
 
 ## Pre-Tool Rules & `profiles.json`
 
-The only built-in profile is `default`. All per-profile overrides live in `profiles.json`:
+The only built-in profile is `default`. Global `refresh` and `doctor` resolve the default memory store via `--store <dir>` > `AI_LOADOUT_STORE` > `defaultStore` in `profiles.json` (refusing with `DEFAULT_STORE_REQUIRED` if unset, never guessing from `cwd`). All per-profile overrides live in `profiles.json`:
 
 | Rule ID | Layer | Tools | Default Action | Purpose |
 |---|---|---|---|---|
@@ -117,6 +117,7 @@ Example `profiles.json` using neutral `docs` and `release` profiles:
 
 ```json
 {
+  "defaultStore": "/stores/global/memory",
   "profiles": {
     "/repos/docs-site": { "profile": "docs", "store": "/stores/docs/memory" },
     "/repos/release-bot": { "profile": "release", "store": "/stores/release/memory" }

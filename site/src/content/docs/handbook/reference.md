@@ -102,7 +102,7 @@ loadout-os hook pre-tool      [--mode enforce|log-only] [--profiles <path>] [--l
 
 - `hook test` drives the `UserPromptSubmit` runtime hook against a sample prompt in an isolated HOME so the live `usage.jsonl` is never written. Exit `0` when the hook ran, `1` when the hook binary is not found.
 - `hook session-start`, `hook pre-compact`, and `hook post-write` manage project-layer board injection and automatic index refreshes.
-- `hook pre-tool` evaluates the Layer A/B rule table against `PreToolUse` payloads using `~/.ai-loadout/profiles.json` (`AI_LOADOUT_PROFILES_PATH`), failing open before a block match and exiting `2` with stderr only when blocked in `enforce` mode.
+- `hook pre-tool` evaluates the Layer A/B rule table against `PreToolUse` payloads using `~/.ai-loadout/profiles.json` (`AI_LOADOUT_PROFILES_PATH`), failing open before a block match and exiting `2` with stderr only when blocked in `enforce` mode. Global `refresh` and `doctor` resolve their default memory store with precedence `--store <dir>` > `AI_LOADOUT_STORE` > `profiles.json` `defaultStore` (refusing with `DEFAULT_STORE_REQUIRED` if unset).
 
 ```bash
 loadout-os hook test --prompt "scaffold a new game"
