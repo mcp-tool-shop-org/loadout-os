@@ -177,7 +177,7 @@ metadata:
 
 **Profili e configurazione (`~/.ai-loadout/profiles.json`, variabili d'ambiente `AI_LOADOUT_PROFILES_PATH`, `AI_LOADOUT_STORE`):**
 
-L'unico profilo integrato è `default`. I livelli globale e `refresh` e `doctor` risolvono l'archivio di memoria predefinito con la precedenza `--store <dir>` > `AI_LOADOUT_STORE` > `defaultStore` in `profiles.json` (e rifiutano con `DEFAULT_STORE_REQUIRED` se non è configurato nulla; non derivano mai da `cwd`). Il prefisso più lungo corrispondente `cwd` seleziona il profilo attivo e le opzioni di override dell'archivio/risposte/regole:
+L'unico profilo integrato è `default`. I comandi globali `refresh` e `doctor` risolvono l'archivio di memoria predefinito con la precedenza `--store <dir>` > `AI_LOADOUT_STORE` > `defaultStore` in `profiles.json` (e rifiutano con `DEFAULT_STORE_REQUIRED` se non è configurato nulla; non derivano mai da `cwd`). Il prefisso più lungo corrispondente `cwd` seleziona il profilo attivo e le opzioni di override dell'archivio/risposte/regole:
 
 ```json
 {

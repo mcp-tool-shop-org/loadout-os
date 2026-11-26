@@ -163,7 +163,7 @@ metadata:
 
 ### 3. Hook PreToolUse et `profiles.json`
 
-`loadout-os hook pre-tool` protège les appels d’outils en cours avant l’exécution, en transmettant silencieusement les outils en lecture seule et les pipelines Bash en lecture seule (`exit 0`), en évaluant la table de règles de couche A/B par profil actif, en enregistrant les décisions hachées (`input_hash`, jamais le texte de commande brut) dans `~/.ai-loadout/hook-decisions.jsonl`, en échouant en cas d’absence de correspondance de bloc et en échouant en cas de correspondance de règle de bloc (`exit 2` + uniquement stderr).
+`loadout-os hook pre-tool` protège les appels d’outils en cours avant l’exécution, en transmettant silencieusement les outils en lecture seule et les pipelines Bash en lecture seule (`exit 0`), en évaluant la table de règles de couche A/B par profil actif, en enregistrant les décisions hachées (`input_hash`, jamais le texte de commande brut) dans `~/.ai-loadout/hook-decisions.jsonl`, en échouant en mode ouvert (fail-open) avant toute correspondance de règle de blocage, et en mode fermé (fail-closed : `exit 2` + stderr uniquement) dès qu’une règle de blocage correspond.
 
 **Règles intégrées :**
 
@@ -172,12 +172,12 @@ metadata:
 | `unreviewed-merge` | A | `Bash` | `warn` | Rappelle de vérifier un passage d’examen enregistré (`PASS at <head8>`) avant de fusionner |
 | `quote-gate` | A | `Write`, `Edit`, `MultiEdit`, `Bash` | `block` | Empêche la citation littérale de locuteurs configurés dans les artefacts ou le texte de validation/PR |
 | `memory-shell-write` | A | `Bash` | `block` | Empêche les écritures directes du shell dans les référentiels de mémoire |
-| `future-stamp` | A | `Write`, `Edit`, `MultiEdit` | `block` | Empêche les horodatages estampillés par des outils datant de plus de 5 minutes par rapport à l’heure du système d’exploitation |
+| `future-stamp` | A | `Write`, `Edit`, `MultiEdit` | `block` | Bloque les horodatages apposés par un outil qui dépassent de plus de 5 minutes l’heure du système d’exploitation |
 | `release-reminder` | B | `Bash` | `warn` | Rappelle avant `npm publish`, `gh release create` ou `git push --tags` |
 
 **Profils et configuration (`~/.ai-loadout/profiles.json`, environnement `AI_LOADOUT_PROFILES_PATH`, `AI_LOADOUT_STORE`) :**
 
-Le seul profil intégré est `default`. Les variables globales `refresh` et `doctor` déterminent l’emplacement de stockage par défaut en appliquant l’ordre de priorité suivant : `--store <dir>` > `AI_LOADOUT_STORE` > `defaultStore` dans `profiles.json` (et refusent l’opération avec `DEFAULT_STORE_REQUIRED` si aucun n’est configuré ; elles ne dérivent jamais de `cwd`). Le préfixe `cwd` le plus long correspondant sélectionne le profil actif et les remplacements optionnels pour le stockage, les réponses ou les règles :
+Le seul profil intégré est `default`. Les commandes globales `refresh` et `doctor` déterminent l’emplacement de stockage par défaut en appliquant l’ordre de priorité suivant : `--store <dir>` > `AI_LOADOUT_STORE` > `defaultStore` dans `profiles.json` (et refusent l’opération avec `DEFAULT_STORE_REQUIRED` si aucun n’est configuré ; elles ne dérivent jamais de `cwd`). Le préfixe `cwd` le plus long correspondant sélectionne le profil actif et les remplacements optionnels pour le stockage, les réponses ou les règles :
 
 ```json
 {

@@ -163,7 +163,7 @@ metadata:
 
 ### 3. PreToolUse 挂钩和 `profiles.json`
 
-`loadout-os hook pre-tool` 在执行之前对工具调用进行保护，以只读模式传递只读工具和只读 Bash 管道（`exit 0`），根据活动配置文件评估 A/B 规则表，将哈希决策（`input_hash`，绝不使用原始命令文本）记录到 `~/.ai-loadout/hook-decisions.jsonl`，在匹配到块之前失败（开放），并在匹配到块规则后失败（封闭）（`exit 2` + 仅 stderr）。
+`loadout-os hook pre-tool` 在执行之前对工具调用进行保护，静默放行只读工具和只读 Bash 管道（`exit 0`），根据活动配置文件评估 A/B 规则表，将哈希决策（`input_hash`，绝不使用原始命令文本）记录到 `~/.ai-loadout/hook-decisions.jsonl`，在匹配到块之前失败（开放），并在匹配到块规则后失败（封闭）（`exit 2` + 仅 stderr）。
 
 **内置规则：**
 

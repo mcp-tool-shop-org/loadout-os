@@ -172,12 +172,12 @@ metadata:
 | `unreviewed-merge` | A | `Bash` | `warn` | 記録されたレビューパス（`PASS at <head8>`）をマージする前に、確認するように促します。 |
 | `quote-gate` | A | `Write`, `Edit`, `MultiEdit`, `Bash` | `block` | アーティファクトまたはコミット/PRテキストで、構成されたスピーカーをそのまま引用することをブロックします。 |
 | `memory-shell-write` | A | `Bash` | `block` | メモリストアへの直接的なシェル書き込みをブロックします。 |
-| `future-stamp` | A | `Write`, `Edit`, `MultiEdit` | `block` | OSクロックよりも5分以上前のタイムスタンプをツールでスタンプすることをブロックします。 |
+| `future-stamp` | A | `Write`, `Edit`, `MultiEdit` | `block` | OSクロックより5分以上先のタイムスタンプをツールで付けることをブロックします。 |
 | `release-reminder` | B | `Bash` | `warn` | `npm publish`、`gh release create`、または`git push --tags`を実行する前に、促します。 |
 
 **プロファイルと構成（`~/.ai-loadout/profiles.json`、環境変数`AI_LOADOUT_PROFILES_PATH`、`AI_LOADOUT_STORE`）：**
 
-組み込みのプロファイルは`default`のみです。グローバル`refresh`と`doctor`は、デフォルトのメモリストアを優先順位`--store <dir>`>`AI_LOADOUT_STORE`>`defaultStore`で解決します（`profiles.json`）。いずれも構成されていない場合は、拒否します（`DEFAULT_STORE_REQUIRED`）。グローバル/`cwd`からは派生しません。最長一致の`cwd`プレフィックスが、アクティブなプロファイルとオプションのストア/レスポンス/ルールオーバーライドを選択します。
+組み込みのプロファイルは`default`のみです。グローバル`refresh`と`doctor`は、デフォルトのメモリストアを優先順位`--store <dir>`>`AI_LOADOUT_STORE`>`defaultStore`で解決します（`profiles.json`）。いずれも構成されていない場合は、拒否します（`DEFAULT_STORE_REQUIRED`）。`cwd`からは派生しません。最長一致の`cwd`プレフィックスが、アクティブなプロファイルとオプションのストア/レスポンス/ルールオーバーライドを選択します。
 
 ```json
 {
